@@ -1,0 +1,25 @@
+apiVersion: phone-controll/v1
+kind: TestPlan
+metadata:
+  name: flutter-test-smoke
+spec:
+  device:
+    platform: android
+    pool: any
+  project:
+    path: .
+  phases:
+    - phase: PRE_FLIGHT
+    - phase: CLEAN
+      package_id: REPLACE_WITH_PACKAGE_ID
+    - phase: LAUNCHED
+      package_id: REPLACE_WITH_PACKAGE_ID
+      wait_for_key: REPLACE_WITH_BOOT_WIDGET_KEY
+      timeout_s: 15
+    - phase: UNDER_TEST
+      driver:
+        kind: flutter_test
+        target: integration_test/REPLACE_WITH_TEST_FILE.dart
+      capture: [screenshot, logs]
+  report:
+    format: json

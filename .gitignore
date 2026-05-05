@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+*.egg
+.eggs/
+
+# Tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# MCP runtime
+~/.mcp_phone_controll/
+
+# Build outputs
+build/
+dist/
+
+# Local env / secrets
+.env
+.env.*
+!.env.example
+
+# OS
+Thumbs.db

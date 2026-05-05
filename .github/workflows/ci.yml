@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package: [phone-controll]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Set up Python 3.11
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          cd packages/${{ matrix.package }}
+          uv venv --python 3.11
+          uv pip install -e ".[dev]"
+      - name: Run tests
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          cd packages/${{ matrix.package }}
+          .venv/bin/pytest -q
+      - name: Lint
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          cd packages/${{ matrix.package }}
+          .venv/bin/ruff check src tests

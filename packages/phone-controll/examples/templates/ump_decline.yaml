@@ -1,0 +1,27 @@
+apiVersion: phone-controll/v1
+kind: TestPlan
+metadata:
+  name: ump-decline
+spec:
+  device:
+    platform: android
+    pool: any
+  project:
+    path: .
+  phases:
+    - phase: PRE_FLIGHT
+    - phase: CLEAN
+      package_id: REPLACE_WITH_PACKAGE_ID
+    - phase: LAUNCHED
+      package_id: REPLACE_WITH_PACKAGE_ID
+      wait_for_key: splashLogo
+      timeout_s: 15
+    - phase: UMP_GATE
+      driver:
+        kind: patrol_test
+        target: integration_test/ump_decline_test.dart
+      planned_outcome: decline
+    - phase: VERDICT_DECLINED
+      capture: [screenshot, logs]
+  report:
+    format: junit
