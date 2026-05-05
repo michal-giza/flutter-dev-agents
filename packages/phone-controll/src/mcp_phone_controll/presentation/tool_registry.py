@@ -115,6 +115,44 @@ from ..domain.usecases.virtual_devices import (
     StopVirtualDevice,
     StopVirtualDeviceParams,
 )
+from ..domain.usecases.dev_session import (
+    AttachDebugSession,
+    AttachDebugSessionParams,
+    CallServiceExtension,
+    CallServiceExtensionParams,
+    DumpRenderTree,
+    DumpWidgetTree,
+    DumpWidgetTreeParams,
+    ListDebugSessions,
+    ReadDebugLog,
+    ReadDebugLogParams,
+    RestartDebugSession,
+    RestartDebugSessionParams,
+    StartDebugSession,
+    StartDebugSessionParams,
+    StopDebugSession,
+    StopDebugSessionParams,
+    TailDebugLog,
+    TailDebugLogParams,
+    ToggleInspector,
+    ToggleInspectorParams,
+)
+from ..domain.usecases.ide import (
+    CloseIdeWindow,
+    CloseIdeWindowParams,
+    FocusIdeWindow,
+    FocusIdeWindowParams,
+    IsIdeAvailable,
+    IsIdeAvailableParams,
+    ListIdeWindows,
+    OpenProjectInIde,
+    OpenProjectInIdeParams,
+)
+from ..domain.usecases.wda_setup import (
+    SetupWebDriverAgent,
+    SetupWebDriverAgentParams,
+)
+from ..domain.entities import IdeKind as _IdeKind
 from ..domain.usecases.ui_query import (
     AssertVisible,
     AssertVisibleParams,
@@ -404,6 +442,112 @@ def _params_boot_simulator(args: JsonDict) -> BootSimulatorParams:
     return BootSimulatorParams(name_or_udid=args["name_or_udid"])
 
 
+# --- dev-session param builders ----------------------------------------
+
+
+def _params_start_debug_session(args: JsonDict) -> StartDebugSessionParams:
+    return StartDebugSessionParams(
+        project_path=Path(args["project_path"]).expanduser(),
+        mode=BuildMode(args.get("mode", "debug")),
+        flavor=args.get("flavor"),
+        target=args.get("target"),
+        serial=args.get("serial"),
+    )
+
+
+def _params_stop_debug_session(args: JsonDict) -> StopDebugSessionParams:
+    return StopDebugSessionParams(session_id=args.get("session_id"))
+
+
+def _params_restart_debug_session(args: JsonDict) -> RestartDebugSessionParams:
+    return RestartDebugSessionParams(
+        session_id=args.get("session_id"),
+        full_restart=bool(args.get("full_restart", False)),
+    )
+
+
+def _params_attach_debug_session(args: JsonDict) -> AttachDebugSessionParams:
+    return AttachDebugSessionParams(
+        vm_service_uri=args["vm_service_uri"],
+        project_path=Path(args["project_path"]).expanduser(),
+    )
+
+
+def _params_read_debug_log(args: JsonDict) -> ReadDebugLogParams:
+    return ReadDebugLogParams(
+        session_id=args.get("session_id"),
+        since_s=int(args.get("since_s", 30)),
+        level=str(args.get("level", "all")),
+        max_lines=int(args.get("max_lines", 500)),
+    )
+
+
+def _params_tail_debug_log(args: JsonDict) -> TailDebugLogParams:
+    return TailDebugLogParams(
+        until_pattern=args["until_pattern"],
+        session_id=args.get("session_id"),
+        timeout_s=float(args.get("timeout_s", 30.0)),
+    )
+
+
+def _params_call_service_extension(args: JsonDict) -> CallServiceExtensionParams:
+    return CallServiceExtensionParams(
+        method=args["method"],
+        args=args.get("args"),
+        session_id=args.get("session_id"),
+    )
+
+
+def _params_dump_widget_tree(args: JsonDict) -> DumpWidgetTreeParams:
+    return DumpWidgetTreeParams(session_id=args.get("session_id"))
+
+
+def _params_toggle_inspector(args: JsonDict) -> ToggleInspectorParams:
+    return ToggleInspectorParams(
+        enabled=bool(args["enabled"]),
+        session_id=args.get("session_id"),
+    )
+
+
+# --- IDE param builders ------------------------------------------------
+
+
+def _params_open_project_in_ide(args: JsonDict) -> OpenProjectInIdeParams:
+    return OpenProjectInIdeParams(
+        project_path=Path(args["project_path"]).expanduser(),
+        ide=_IdeKind(args.get("ide", "vscode")),
+        new_window=bool(args.get("new_window", True)),
+    )
+
+
+def _params_close_ide_window(args: JsonDict) -> CloseIdeWindowParams:
+    return CloseIdeWindowParams(
+        project_path=Path(args["project_path"]).expanduser()
+        if args.get("project_path")
+        else None,
+        window_id=args.get("window_id"),
+    )
+
+
+def _params_focus_ide_window(args: JsonDict) -> FocusIdeWindowParams:
+    return FocusIdeWindowParams(
+        project_path=Path(args["project_path"]).expanduser()
+    )
+
+
+def _params_is_ide_available(args: JsonDict) -> IsIdeAvailableParams:
+    return IsIdeAvailableParams(ide=_IdeKind(args.get("ide", "vscode")))
+
+
+def _params_setup_wda(args: JsonDict) -> SetupWebDriverAgentParams:
+    return SetupWebDriverAgentParams(
+        udid=args["udid"],
+        wda_dir=Path(args["wda_dir"]).expanduser() if args.get("wda_dir") else None,
+        repo_url=args.get("repo_url", "https://github.com/appium/WebDriverAgent.git"),
+        scheme=args.get("scheme", "WebDriverAgentRunner"),
+    )
+
+
 def _params_compare_screenshot(args: JsonDict) -> CompareScreenshotParams:
     return CompareScreenshotParams(
         actual_path=Path(args["actual_path"]).expanduser(),
@@ -514,6 +658,26 @@ class UseCases:
     stop_virtual_device: StopVirtualDevice
     list_simulators: ListSimulators
     boot_simulator: BootSimulator
+    # dev-session
+    start_debug_session: StartDebugSession
+    stop_debug_session: StopDebugSession
+    restart_debug_session: RestartDebugSession
+    list_debug_sessions: ListDebugSessions
+    attach_debug_session: AttachDebugSession
+    read_debug_log: ReadDebugLog
+    tail_debug_log: TailDebugLog
+    call_service_extension: CallServiceExtension
+    dump_widget_tree: DumpWidgetTree
+    dump_render_tree: DumpRenderTree
+    toggle_inspector: ToggleInspector
+    # IDE
+    open_project_in_ide: OpenProjectInIde
+    list_ide_windows: ListIdeWindows
+    close_ide_window: CloseIdeWindow
+    focus_ide_window: FocusIdeWindow
+    is_ide_available: IsIdeAvailable
+    # WDA setup
+    setup_webdriveragent: SetupWebDriverAgent
     new_session: NewSession
     get_artifacts_dir: GetArtifactsDir
 
@@ -1156,6 +1320,216 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             ),
             build_params=_params_stop_virtual_device,
             invoke=_bind(uc.stop_virtual_device, _params_stop_virtual_device),
+        ),
+        # ---- dev session lifecycle ------------------------------------
+        ToolDescriptor(
+            name="start_debug_session",
+            description=(
+                "Boot `flutter run --machine` against the selected device and wait "
+                "for app.started. Requires this session to hold the device lock."
+            ),
+            input_schema=_schema(
+                {
+                    "project_path": _string("Flutter project root."),
+                    "mode": _enum(["debug", "profile", "release"]),
+                    "flavor": _string(""),
+                    "target": _string("Optional entry-point dart file."),
+                    "serial": _string("Defaults to selected device."),
+                },
+                ["project_path"],
+            ),
+            build_params=_params_start_debug_session,
+            invoke=_bind(uc.start_debug_session, _params_start_debug_session),
+        ),
+        ToolDescriptor(
+            name="stop_debug_session",
+            description="Stop a debug session. Defaults to the most-recently-started.",
+            input_schema=_schema({"session_id": _string("")}),
+            build_params=_params_stop_debug_session,
+            invoke=_bind(uc.stop_debug_session, _params_stop_debug_session),
+        ),
+        ToolDescriptor(
+            name="restart_debug_session",
+            description="Hot reload (default) or hot restart (full_restart=true).",
+            input_schema=_schema(
+                {
+                    "session_id": _string(""),
+                    "full_restart": _bool("Default false (hot reload)."),
+                }
+            ),
+            build_params=_params_restart_debug_session,
+            invoke=_bind(uc.restart_debug_session, _params_restart_debug_session),
+        ),
+        ToolDescriptor(
+            name="list_debug_sessions",
+            description="List all debug sessions owned by this MCP process.",
+            input_schema=_schema({}),
+            build_params=_params_no,
+            invoke=_bind(uc.list_debug_sessions, _params_no),
+        ),
+        ToolDescriptor(
+            name="attach_debug_session",
+            description=(
+                "Attach to a `flutter run` started outside this MCP via its VM "
+                "service URI. Advanced; not implemented in v1."
+            ),
+            input_schema=_schema(
+                {
+                    "vm_service_uri": _string(""),
+                    "project_path": _string(""),
+                },
+                ["vm_service_uri", "project_path"],
+            ),
+            build_params=_params_attach_debug_session,
+            invoke=_bind(uc.attach_debug_session, _params_attach_debug_session),
+        ),
+        ToolDescriptor(
+            name="read_debug_log",
+            description=(
+                "Recent log slice from a debug session (app + daemon events). "
+                "Filters by level and a window in seconds."
+            ),
+            input_schema=_schema(
+                {
+                    "session_id": _string(""),
+                    "since_s": _int(""),
+                    "level": _enum(["all", "info", "warning", "error", "progress"]),
+                    "max_lines": _int(""),
+                }
+            ),
+            build_params=_params_read_debug_log,
+            invoke=_bind(uc.read_debug_log, _params_read_debug_log),
+        ),
+        ToolDescriptor(
+            name="tail_debug_log",
+            description="Wait until a regex matches a log line, or timeout.",
+            input_schema=_schema(
+                {
+                    "until_pattern": _string(""),
+                    "session_id": _string(""),
+                    "timeout_s": _number(""),
+                },
+                ["until_pattern"],
+            ),
+            build_params=_params_tail_debug_log,
+            invoke=_bind(uc.tail_debug_log, _params_tail_debug_log),
+        ),
+        ToolDescriptor(
+            name="call_service_extension",
+            description=(
+                "Call a registered VM service extension (ext.flutter.*). Returns "
+                "the result and elapsed_ms."
+            ),
+            input_schema=_schema(
+                {
+                    "method": _string("e.g. ext.flutter.debugDumpApp"),
+                    "args": {"type": "object", "additionalProperties": True},
+                    "session_id": _string(""),
+                },
+                ["method"],
+            ),
+            build_params=_params_call_service_extension,
+            invoke=_bind(uc.call_service_extension, _params_call_service_extension),
+        ),
+        ToolDescriptor(
+            name="dump_widget_tree",
+            description="Convenience for ext.flutter.debugDumpApp.",
+            input_schema=_schema({"session_id": _string("")}),
+            build_params=_params_dump_widget_tree,
+            invoke=_bind(uc.dump_widget_tree, _params_dump_widget_tree),
+        ),
+        ToolDescriptor(
+            name="dump_render_tree",
+            description="Convenience for ext.flutter.debugDumpRenderTree.",
+            input_schema=_schema({"session_id": _string("")}),
+            build_params=_params_dump_widget_tree,
+            invoke=_bind(uc.dump_render_tree, _params_dump_widget_tree),
+        ),
+        ToolDescriptor(
+            name="toggle_inspector",
+            description="Toggle the Flutter widget inspector overlay (ext.flutter.inspector.show).",
+            input_schema=_schema(
+                {
+                    "enabled": _bool(""),
+                    "session_id": _string(""),
+                },
+                ["enabled"],
+            ),
+            build_params=_params_toggle_inspector,
+            invoke=_bind(uc.toggle_inspector, _params_toggle_inspector),
+        ),
+        # ---- IDE windows ---------------------------------------------
+        ToolDescriptor(
+            name="open_project_in_ide",
+            description=(
+                "Open a project in a NEW VS Code window (`code -n <path>` by "
+                "default). Tracks the spawned PID for later close."
+            ),
+            input_schema=_schema(
+                {
+                    "project_path": _string(""),
+                    "ide": _enum(["vscode"]),
+                    "new_window": _bool("Default true."),
+                },
+                ["project_path"],
+            ),
+            build_params=_params_open_project_in_ide,
+            invoke=_bind(uc.open_project_in_ide, _params_open_project_in_ide),
+        ),
+        ToolDescriptor(
+            name="list_ide_windows",
+            description="List IDE windows opened by this MCP process.",
+            input_schema=_schema({}),
+            build_params=_params_no,
+            invoke=_bind(uc.list_ide_windows, _params_no),
+        ),
+        ToolDescriptor(
+            name="close_ide_window",
+            description="Close an IDE window by project_path or window_id.",
+            input_schema=_schema(
+                {
+                    "project_path": _string(""),
+                    "window_id": _string(""),
+                }
+            ),
+            build_params=_params_close_ide_window,
+            invoke=_bind(uc.close_ide_window, _params_close_ide_window),
+        ),
+        ToolDescriptor(
+            name="focus_ide_window",
+            description="Bring the IDE window to the foreground (macOS osascript).",
+            input_schema=_schema(
+                {"project_path": _string("")},
+                ["project_path"],
+            ),
+            build_params=_params_focus_ide_window,
+            invoke=_bind(uc.focus_ide_window, _params_focus_ide_window),
+        ),
+        ToolDescriptor(
+            name="is_ide_available",
+            description="Returns the IDE version string if installed; else error.",
+            input_schema=_schema({"ide": _enum(["vscode"])}),
+            build_params=_params_is_ide_available,
+            invoke=_bind(uc.is_ide_available, _params_is_ide_available),
+        ),
+        ToolDescriptor(
+            name="setup_webdriveragent",
+            description=(
+                "Build WebDriverAgent for an iOS device (one-time per device, "
+                "long-running). Clones the Appium WDA repo if `wda_dir` not "
+                "given, then `xcodebuild build-for-testing`."
+            ),
+            input_schema=_schema(
+                {
+                    "udid": _string(""),
+                    "wda_dir": _string("Existing WDA checkout (skip clone)."),
+                    "repo_url": _string(""),
+                    "scheme": _string("Default WebDriverAgentRunner."),
+                },
+                ["udid"],
+            ),
+            build_params=_params_setup_wda,
+            invoke=_bind(uc.setup_webdriveragent, _params_setup_wda),
         ),
         ToolDescriptor(
             name="new_session",

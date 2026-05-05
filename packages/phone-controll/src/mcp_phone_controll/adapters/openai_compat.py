@@ -62,10 +62,67 @@ def create_app(dispatcher=None, *, allow_agent_proxy: bool = True):
     async def health():
         return {"ok": True, "tools": len(dispatcher.descriptors)}
 
+    # Dev-session sub-router: a stable URL prefix exposing only the
+    # debug-session + IDE + WDA-setup tools. Lets us extract this surface
+    # into a standalone MCP later without behavioural change.
+    _wire_dev_session_router(app, dispatcher)
+
     if allow_agent_proxy:
         _wire_agent_proxy(app, dispatcher)
 
     return app
+
+
+_DEV_SESSION_TOOL_NAMES = frozenset(
+    {
+        "start_debug_session",
+        "stop_debug_session",
+        "restart_debug_session",
+        "list_debug_sessions",
+        "attach_debug_session",
+        "read_debug_log",
+        "tail_debug_log",
+        "call_service_extension",
+        "dump_widget_tree",
+        "dump_render_tree",
+        "toggle_inspector",
+        "open_project_in_ide",
+        "list_ide_windows",
+        "close_ide_window",
+        "focus_ide_window",
+        "is_ide_available",
+        "setup_webdriveragent",
+    }
+)
+
+
+def _wire_dev_session_router(app, dispatcher) -> None:
+    from fastapi import APIRouter, HTTPException
+
+    router = APIRouter(prefix="/dev-session", tags=["dev-session"])
+
+    @router.get("/tools")
+    async def dev_list_tools() -> list[dict[str, Any]]:
+        descriptors = [
+            d for d in dispatcher.descriptors if d.name in _DEV_SESSION_TOOL_NAMES
+        ]
+        return to_openai_functions(descriptors)
+
+    @router.post("/tools/{name}")
+    async def dev_call_tool(name: str, args: dict[str, Any] | None = None):
+        if name not in _DEV_SESSION_TOOL_NAMES:
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    f"{name!r} is not a dev-session tool; "
+                    "use /tools/{name} for the full surface"
+                ),
+            )
+        if not dispatcher.has(name):
+            raise HTTPException(status_code=404, detail=f"unknown tool: {name}")
+        return await dispatcher.dispatch(name, args or {})
+
+    app.include_router(router)
 
 
 def _wire_agent_proxy(app, dispatcher) -> None:

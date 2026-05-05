@@ -127,5 +127,40 @@ class LockNotHeldFailure(Failure):
 
 
 @dataclass(frozen=True, slots=True)
+class DebugSessionFailure(Failure):
+    """The `flutter run --machine` process failed or returned an error."""
+
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class HotReloadFailure(Failure):
+    """Hot reload / hot restart returned an error from the daemon."""
+
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class ServiceExtensionFailure(Failure):
+    """A `ext.flutter.*` service extension call failed."""
+
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class IdeNotFoundFailure(Failure):
+    """The IDE binary (e.g. `code`) wasn't on PATH and no fallback found it."""
+
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class IdeWindowNotFoundFailure(Failure):
+    """No IDE window matches the requested project_path or window_id."""
+
+    pass
+
+
+@dataclass(frozen=True, slots=True)
 class UnexpectedFailure(Failure):
     pass

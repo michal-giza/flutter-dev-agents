@@ -20,8 +20,15 @@ _PLAN_SCHEMA = {
         "UNDER_TEST",
         "VERDICT_DECLINED",
         "VERDICT_BLOCKED",
+        "OPEN_IDE",
+        "DEV_SESSION_START",
+        "HOT_RELOAD",
+        "DEV_SESSION_STOP",
     ],
-    "valid_driver_kinds": ["patrol_test", "flutter_test", "tap_text", "noop"],
+    "valid_driver_kinds": [
+        "patrol_test", "flutter_test", "tap_text", "noop",
+        "dev_session_action", "read_debug_log",
+    ],
     "phase_requirements": {
         "PRE_FLIGHT": {"required": [], "optional": []},
         "CLEAN": {"required": ["package_id"]},
@@ -30,6 +37,10 @@ _PLAN_SCHEMA = {
         "UNDER_TEST": {"required": ["driver"], "optional": ["capture"]},
         "VERDICT_DECLINED": {"required": [], "optional": ["capture"]},
         "VERDICT_BLOCKED": {"required": [], "optional": ["capture"]},
+        "OPEN_IDE": {"required": [], "optional": ["ide", "new_window"]},
+        "DEV_SESSION_START": {"required": [], "optional": ["mode", "flavor", "target"]},
+        "HOT_RELOAD": {"required": [], "optional": ["full_restart", "capture"]},
+        "DEV_SESSION_STOP": {"required": [], "optional": []},
     },
     "driver_kinds": {
         "patrol_test": {

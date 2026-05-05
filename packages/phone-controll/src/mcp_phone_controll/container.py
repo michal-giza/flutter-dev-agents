@@ -127,7 +127,53 @@ from .infrastructure.pymobiledevice3_cli import PyMobileDevice3Cli
 from .infrastructure.uiautomator2_factory import CachingUiAutomator2Factory
 from .infrastructure.wda_factory import CachingWdaFactory
 from .infrastructure.yaml_plan_loader import YamlPlanLoader
+from .infrastructure.ide_cli import IdeCli
+from .infrastructure.wda_setup_cli import WdaSetupCli
+from .data.repositories.flutter_debug_session_repository import (
+    FlutterDebugSessionRepository,
+)
+from .data.repositories.vscode_ide_repository import VsCodeIdeRepository
+from .domain.usecases.dev_session import (
+    AttachDebugSession,
+    CallServiceExtension,
+    DumpRenderTree,
+    DumpWidgetTree,
+    ListDebugSessions,
+    ReadDebugLog,
+    RestartDebugSession,
+    StartDebugSession,
+    StopDebugSession,
+    TailDebugLog,
+    ToggleInspector,
+)
+from .domain.usecases.ide import (
+    CloseIdeWindow,
+    FocusIdeWindow,
+    IsIdeAvailable,
+    ListIdeWindows,
+    OpenProjectInIde,
+)
+from .domain.usecases.wda_setup import SetupWebDriverAgent
 from .presentation.tool_registry import ToolDispatcher, UseCases, build_registry
+
+
+def _stop_debug_sessions_atexit(debug_repo) -> None:
+    """Best-effort sync stop of every active debug session at process exit.
+
+    Avoids leaving an orphan `flutter run --machine` daemon attached to a
+    device, which would block the next session's start_debug_session.
+    """
+    try:
+        import asyncio as _asyncio
+
+        # Run the async stop_all on a fresh loop.
+        loop = _asyncio.new_event_loop()
+        try:
+            loop.run_until_complete(debug_repo.stop_all())
+        finally:
+            loop.close()
+    except Exception:  # noqa: BLE001 — atexit must never raise
+        return
 
 
 def _release_session_locks_atexit(lock_repo, session_id: str) -> None:
@@ -184,6 +230,8 @@ def build_runtime(
     emulator_cli = AndroidEmulatorCli(runner)
     u2_factory = CachingUiAutomator2Factory()
     wda_factory = CachingWdaFactory()
+    ide_cli = IdeCli(runner)
+    wda_setup_cli = WdaSetupCli(runner)
 
     # Per-platform repositories
     android_devices = AdbDeviceRepository(adb)
@@ -242,18 +290,19 @@ def build_runtime(
         artifacts_root or Path.home() / ".mcp_phone_controll" / "sessions"
     )
     state_repo = InMemorySessionStateRepository()
-    env_repo = SystemEnvironmentRepository(adb, flutter, pmd3, patrol)
+    env_repo = SystemEnvironmentRepository(adb, flutter, pmd3, patrol, ide_cli)
     capabilities = StaticCapabilitiesProvider()
     trace_repo = InMemorySessionTraceRepository()
     plan_loader = YamlPlanLoader()
     vision_repo = OpenCvVisionRepository()
     virtual_devices = CompositeVirtualDeviceManager(emulator_cli, simctl, adb)
-    lock_repo = FilesystemDeviceLockRepository(root=lock_root)
 
-    # Best-effort: release any lock this session held when the process exits.
-    # Filesystem repo's stale-PID logic is the safety net if this never runs
-    # (kill -9, OOM), but cleaning up explicitly keeps `list_locks` clean.
+    # Lock repo first; dev-session repo depends on it.
+    lock_repo = FilesystemDeviceLockRepository(root=lock_root)
+    debug_repo = FlutterDebugSessionRepository(flutter, lock_repo, session_id)
+    ide_repo = VsCodeIdeRepository(ide_cli)
     atexit.register(_release_session_locks_atexit, lock_repo, session_id)
+    atexit.register(_stop_debug_sessions_atexit, debug_repo)
 
     # Dispatcher needed by plan executor — created without it first, then re-built.
     placeholder_dispatcher: ToolDispatcher | None = None
@@ -317,6 +366,26 @@ def build_runtime(
         stop_virtual_device=StopVirtualDevice(virtual_devices),
         list_simulators=ListSimulators(virtual_devices),
         boot_simulator=BootSimulator(virtual_devices),
+        # dev-session
+        start_debug_session=StartDebugSession(debug_repo, state_repo),
+        stop_debug_session=StopDebugSession(debug_repo),
+        restart_debug_session=RestartDebugSession(debug_repo),
+        list_debug_sessions=ListDebugSessions(debug_repo),
+        attach_debug_session=AttachDebugSession(debug_repo),
+        read_debug_log=ReadDebugLog(debug_repo),
+        tail_debug_log=TailDebugLog(debug_repo),
+        call_service_extension=CallServiceExtension(debug_repo),
+        dump_widget_tree=DumpWidgetTree(debug_repo),
+        dump_render_tree=DumpRenderTree(debug_repo),
+        toggle_inspector=ToggleInspector(debug_repo),
+        # IDE
+        open_project_in_ide=OpenProjectInIde(ide_repo),
+        list_ide_windows=ListIdeWindows(ide_repo),
+        close_ide_window=CloseIdeWindow(ide_repo),
+        focus_ide_window=FocusIdeWindow(ide_repo),
+        is_ide_available=IsIdeAvailable(ide_repo),
+        # WDA setup
+        setup_webdriveragent=SetupWebDriverAgent(wda_setup_cli),
         new_session=NewSession(artifacts_repo),
         get_artifacts_dir=GetArtifactsDir(artifacts_repo),
     )

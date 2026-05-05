@@ -33,6 +33,33 @@ def test_health_endpoint(tmp_path):
     assert body["tools"] > 30
 
 
+def test_dev_session_subrouter_lists_only_dev_tools(tmp_path):
+    client = _client(tmp_path)
+    r = client.get("/dev-session/tools")
+    assert r.status_code == 200
+    names = {t["function"]["name"] for t in r.json()}
+    assert "start_debug_session" in names
+    assert "open_project_in_ide" in names
+    assert "setup_webdriveragent" in names
+    # Non-dev tools must NOT appear under /dev-session
+    assert "list_devices" not in names
+    assert "take_screenshot" not in names
+
+
+def test_dev_session_subrouter_rejects_non_dev_tools(tmp_path):
+    client = _client(tmp_path)
+    r = client.post("/dev-session/tools/list_devices", json={})
+    assert r.status_code == 404
+
+
+def test_dev_session_subrouter_dispatches_dev_tools(tmp_path):
+    client = _client(tmp_path)
+    r = client.post("/dev-session/tools/list_debug_sessions", json={})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is True
+
+
 def test_list_tools_returns_openai_function_schemas(tmp_path):
     client = _client(tmp_path)
     r = client.get("/tools")

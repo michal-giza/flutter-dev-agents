@@ -137,6 +137,11 @@ class YamlPlanLoader:
                 capture = (capture,)
             else:
                 capture = tuple(capture)
+            known_keys = {
+                "phase", "driver", "planned_outcome", "package_id", "project_path",
+                "wait_for_key", "wait_for_text", "timeout_s", "capture", "notes",
+            }
+            extras = {k: v for k, v in raw.items() if k not in known_keys}
             phases.append(
                 PlanPhase(
                     phase=phase_name,
@@ -149,6 +154,7 @@ class YamlPlanLoader:
                     timeout_s=raw.get("timeout_s"),
                     capture=capture,
                     notes=raw.get("notes"),
+                    extras=extras,
                 )
             )
 

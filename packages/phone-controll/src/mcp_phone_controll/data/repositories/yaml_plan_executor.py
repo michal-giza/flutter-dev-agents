@@ -31,11 +31,15 @@ from ...domain.repositories import PlanExecutor
 from ...domain.result import Err, Result, err, ok
 
 
-VALID_DRIVER_KINDS = ("patrol_test", "flutter_test", "tap_text", "noop")
+VALID_DRIVER_KINDS = (
+    "patrol_test", "flutter_test", "tap_text", "noop",
+    "dev_session_action", "read_debug_log",
+)
 VALID_PHASES = (
     "PRE_FLIGHT", "CLEAN", "LAUNCHED",
     "<NAME>_GATE", "UNDER_TEST",
     "VERDICT_DECLINED", "VERDICT_BLOCKED",
+    "OPEN_IDE", "DEV_SESSION_START", "HOT_RELOAD", "DEV_SESSION_STOP",
 )
 _TERMINAL_PHASES = ("VERDICT_DECLINED", "VERDICT_BLOCKED", "REPORT")
 
@@ -115,6 +119,14 @@ class YamlPlanExecutor(PlanExecutor):
                 return await self._clean(phase)
             if phase_name == "LAUNCHED":
                 return await self._launched(phase)
+            if phase_name == "OPEN_IDE":
+                return await self._open_ide(plan, phase)
+            if phase_name == "DEV_SESSION_START":
+                return await self._dev_session_start(plan, phase)
+            if phase_name == "HOT_RELOAD":
+                return await self._hot_reload(phase)
+            if phase_name == "DEV_SESSION_STOP":
+                return await self._dev_session_stop(phase)
             if phase_name.endswith("_GATE") or phase_name == "UNDER_TEST":
                 return await self._driver_phase(plan, phase)
             if phase_name == "VERDICT_DECLINED" or phase_name == "VERDICT_BLOCKED":
@@ -245,6 +257,21 @@ class YamlPlanExecutor(PlanExecutor):
             res = await self._call("run_integration_tests", args)
         elif kind == "tap_text":
             res = await self._call("tap_text", {"text": phase.driver.target or ""})
+        elif kind == "dev_session_action":
+            method = phase.driver.target or "ext.flutter.debugDumpApp"
+            res = await self._call(
+                "call_service_extension",
+                {"method": method, "args": phase.driver.args or None},
+            )
+        elif kind == "read_debug_log":
+            res = await self._call(
+                "read_debug_log",
+                {
+                    "since_s": int((phase.driver.args or {}).get("since_s", 30)),
+                    "level": (phase.driver.args or {}).get("level", "all"),
+                    "max_lines": int((phase.driver.args or {}).get("max_lines", 200)),
+                },
+            )
         elif kind == "noop":
             res = {"ok": True, "data": "noop"}
         else:
@@ -274,6 +301,83 @@ class YamlPlanExecutor(PlanExecutor):
             actual_outcome="terminal", artifacts=artifacts,
         )
 
+    async def _open_ide(self, plan: TestPlan, phase: PlanPhase) -> PhaseOutcome:
+        project = phase.project_path or (
+            str(plan.project_path) if plan.project_path else None
+        )
+        if not project:
+            return PhaseOutcome(
+                phase=phase.phase, ok=False,
+                planned_outcome=phase.planned_outcome,
+                actual_outcome="missing_project_path",
+                error_code="InvalidArgumentFailure",
+                error_message="OPEN_IDE phase needs project_path",
+            )
+        args = {
+            "project_path": project,
+            "ide": phase.extras.get("ide", "vscode"),
+            "new_window": bool(phase.extras.get("new_window", True)),
+        }
+        res = await self._call("open_project_in_ide", args)
+        if not res["ok"]:
+            return self._fail(phase, res)
+        return PhaseOutcome(
+            phase=phase.phase, ok=True, planned_outcome=phase.planned_outcome,
+            actual_outcome="ide_opened",
+        )
+
+    async def _dev_session_start(
+        self, plan: TestPlan, phase: PlanPhase
+    ) -> PhaseOutcome:
+        project = phase.project_path or (
+            str(plan.project_path) if plan.project_path else None
+        )
+        if not project:
+            return PhaseOutcome(
+                phase=phase.phase, ok=False,
+                planned_outcome=phase.planned_outcome,
+                actual_outcome="missing_project_path",
+                error_code="InvalidArgumentFailure",
+                error_message="DEV_SESSION_START phase needs project_path",
+            )
+        args = {
+            "project_path": project,
+            "mode": phase.extras.get("mode", "debug"),
+        }
+        if phase.extras.get("flavor"):
+            args["flavor"] = phase.extras["flavor"]
+        if phase.extras.get("target"):
+            args["target"] = phase.extras["target"]
+        res = await self._call("start_debug_session", args)
+        if not res["ok"]:
+            return self._fail(phase, res)
+        return PhaseOutcome(
+            phase=phase.phase, ok=True, planned_outcome=phase.planned_outcome,
+            actual_outcome="dev_session_started",
+        )
+
+    async def _hot_reload(self, phase: PlanPhase) -> PhaseOutcome:
+        res = await self._call(
+            "restart_debug_session",
+            {"full_restart": bool(phase.extras.get("full_restart", False))},
+        )
+        if not res["ok"]:
+            return self._fail(phase, res)
+        artifacts = await self._capture(phase)
+        return PhaseOutcome(
+            phase=phase.phase, ok=True, planned_outcome=phase.planned_outcome,
+            actual_outcome="reloaded", artifacts=artifacts,
+        )
+
+    async def _dev_session_stop(self, phase: PlanPhase) -> PhaseOutcome:
+        res = await self._call("stop_debug_session", {})
+        if not res["ok"]:
+            return self._fail(phase, res)
+        return PhaseOutcome(
+            phase=phase.phase, ok=True, planned_outcome=phase.planned_outcome,
+            actual_outcome="dev_session_stopped",
+        )
+
     async def _capture(self, phase: PlanPhase) -> tuple[str, ...]:
         captured: list[str] = []
         for kind in phase.capture:
@@ -286,6 +390,8 @@ class YamlPlanExecutor(PlanExecutor):
                 # logs are returned inline; we don't persist them as files here yet
             elif kind == "ui_dump":
                 await self._call("dump_ui", {})
+            elif kind == "debug_log":
+                await self._call("read_debug_log", {"since_s": 10, "level": "all"})
         return tuple(captured)
 
     def _fail(self, phase: PlanPhase, envelope: dict) -> PhaseOutcome:

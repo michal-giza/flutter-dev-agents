@@ -224,7 +224,7 @@ class PhaseDriver:
 
 @dataclass(frozen=True, slots=True)
 class PlanPhase:
-    phase: str                      # PRE_FLIGHT | CLEAN | LAUNCHED | <GATE> | UNDER_TEST | VERDICT_*
+    phase: str                      # PRE_FLIGHT | CLEAN | LAUNCHED | <GATE> | UNDER_TEST | VERDICT_* | OPEN_IDE | DEV_SESSION_*
     driver: PhaseDriver | None = None
     planned_outcome: str | None = None     # "accept" | "decline" | "pass" | "decided"
     package_id: str | None = None
@@ -232,8 +232,9 @@ class PlanPhase:
     wait_for_key: str | None = None
     wait_for_text: str | None = None
     timeout_s: float | None = None
-    capture: tuple[str, ...] = ()         # ("screenshot", "logs", "ui_dump")
+    capture: tuple[str, ...] = ()         # ("screenshot", "logs", "ui_dump", "debug_log")
     notes: str | None = None
+    extras: dict = field(default_factory=dict)   # phase-specific config (mode, ide, new_window, full_restart, ...)
 
 
 @dataclass(frozen=True, slots=True)
@@ -351,3 +352,67 @@ class EnvironmentCheck:
 class EnvironmentReport:
     ok: bool
     checks: list[EnvironmentCheck] = field(default_factory=list)
+
+
+# --- Dev session (flutter run --machine) ---------------------------------
+
+
+class DebugSessionState(str, Enum):
+    STARTING = "starting"
+    RUNNING = "running"
+    RELOADING = "reloading"
+    STOPPED = "stopped"
+    ERRORED = "errored"
+
+
+@dataclass(frozen=True, slots=True)
+class DebugSession:
+    """A long-lived `flutter run --machine` process attached to one device."""
+
+    id: str
+    project_path: Path
+    device_serial: str
+    mode: BuildMode
+    started_at: datetime
+    state: DebugSessionState
+    app_id: str | None = None
+    vm_service_uri: str | None = None
+    flavor: str | None = None
+    target: str | None = None
+    pid: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class DebugLogEntry:
+    """One line of output from a debug session."""
+
+    timestamp: datetime
+    level: str                  # "info" | "warning" | "error" | "stdout" | "stderr" | "progress"
+    source: str                 # "app" | "daemon" | "stdout" | "stderr"
+    message: str
+    isolate_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ServiceExtensionResult:
+    method: str
+    result: dict
+    elapsed_ms: int
+
+
+# --- IDE windows ---------------------------------------------------------
+
+
+class IdeKind(str, Enum):
+    VSCODE = "vscode"
+
+
+@dataclass(frozen=True, slots=True)
+class IdeWindow:
+    """An IDE window this MCP process opened. Tracked per project."""
+
+    window_id: str
+    project_path: Path
+    ide: IdeKind
+    pid: int
+    opened_at: datetime

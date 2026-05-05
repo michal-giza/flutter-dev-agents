@@ -180,6 +180,95 @@ def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:
         stop_virtual_device=StopVirtualDevice(FakeVirtualDeviceManager()),
         list_simulators=ListSimulators(FakeVirtualDeviceManager()),
         boot_simulator=BootSimulator(FakeVirtualDeviceManager()),
+        # dev-session
+        start_debug_session=__import__(
+            "mcp_phone_controll.domain.usecases.dev_session", fromlist=["StartDebugSession"]
+        ).StartDebugSession(
+            __import__("tests.fakes.fake_dev_session", fromlist=["FakeDebugSessionRepository"]).FakeDebugSessionRepository(),
+            state,
+        ),
+        stop_debug_session=__import__(
+            "mcp_phone_controll.domain.usecases.dev_session", fromlist=["StopDebugSession"]
+        ).StopDebugSession(
+            __import__("tests.fakes.fake_dev_session", fromlist=["FakeDebugSessionRepository"]).FakeDebugSessionRepository()
+        ),
+        restart_debug_session=__import__(
+            "mcp_phone_controll.domain.usecases.dev_session", fromlist=["RestartDebugSession"]
+        ).RestartDebugSession(
+            __import__("tests.fakes.fake_dev_session", fromlist=["FakeDebugSessionRepository"]).FakeDebugSessionRepository()
+        ),
+        list_debug_sessions=__import__(
+            "mcp_phone_controll.domain.usecases.dev_session", fromlist=["ListDebugSessions"]
+        ).ListDebugSessions(
+            __import__("tests.fakes.fake_dev_session", fromlist=["FakeDebugSessionRepository"]).FakeDebugSessionRepository()
+        ),
+        attach_debug_session=__import__(
+            "mcp_phone_controll.domain.usecases.dev_session", fromlist=["AttachDebugSession"]
+        ).AttachDebugSession(
+            __import__("tests.fakes.fake_dev_session", fromlist=["FakeDebugSessionRepository"]).FakeDebugSessionRepository()
+        ),
+        read_debug_log=__import__(
+            "mcp_phone_controll.domain.usecases.dev_session", fromlist=["ReadDebugLog"]
+        ).ReadDebugLog(
+            __import__("tests.fakes.fake_dev_session", fromlist=["FakeDebugSessionRepository"]).FakeDebugSessionRepository()
+        ),
+        tail_debug_log=__import__(
+            "mcp_phone_controll.domain.usecases.dev_session", fromlist=["TailDebugLog"]
+        ).TailDebugLog(
+            __import__("tests.fakes.fake_dev_session", fromlist=["FakeDebugSessionRepository"]).FakeDebugSessionRepository()
+        ),
+        call_service_extension=__import__(
+            "mcp_phone_controll.domain.usecases.dev_session", fromlist=["CallServiceExtension"]
+        ).CallServiceExtension(
+            __import__("tests.fakes.fake_dev_session", fromlist=["FakeDebugSessionRepository"]).FakeDebugSessionRepository()
+        ),
+        dump_widget_tree=__import__(
+            "mcp_phone_controll.domain.usecases.dev_session", fromlist=["DumpWidgetTree"]
+        ).DumpWidgetTree(
+            __import__("tests.fakes.fake_dev_session", fromlist=["FakeDebugSessionRepository"]).FakeDebugSessionRepository()
+        ),
+        dump_render_tree=__import__(
+            "mcp_phone_controll.domain.usecases.dev_session", fromlist=["DumpRenderTree"]
+        ).DumpRenderTree(
+            __import__("tests.fakes.fake_dev_session", fromlist=["FakeDebugSessionRepository"]).FakeDebugSessionRepository()
+        ),
+        toggle_inspector=__import__(
+            "mcp_phone_controll.domain.usecases.dev_session", fromlist=["ToggleInspector"]
+        ).ToggleInspector(
+            __import__("tests.fakes.fake_dev_session", fromlist=["FakeDebugSessionRepository"]).FakeDebugSessionRepository()
+        ),
+        # IDE
+        open_project_in_ide=__import__(
+            "mcp_phone_controll.domain.usecases.ide", fromlist=["OpenProjectInIde"]
+        ).OpenProjectInIde(
+            __import__("tests.fakes.fake_dev_session", fromlist=["FakeIdeRepository"]).FakeIdeRepository()
+        ),
+        list_ide_windows=__import__(
+            "mcp_phone_controll.domain.usecases.ide", fromlist=["ListIdeWindows"]
+        ).ListIdeWindows(
+            __import__("tests.fakes.fake_dev_session", fromlist=["FakeIdeRepository"]).FakeIdeRepository()
+        ),
+        close_ide_window=__import__(
+            "mcp_phone_controll.domain.usecases.ide", fromlist=["CloseIdeWindow"]
+        ).CloseIdeWindow(
+            __import__("tests.fakes.fake_dev_session", fromlist=["FakeIdeRepository"]).FakeIdeRepository()
+        ),
+        focus_ide_window=__import__(
+            "mcp_phone_controll.domain.usecases.ide", fromlist=["FocusIdeWindow"]
+        ).FocusIdeWindow(
+            __import__("tests.fakes.fake_dev_session", fromlist=["FakeIdeRepository"]).FakeIdeRepository()
+        ),
+        is_ide_available=__import__(
+            "mcp_phone_controll.domain.usecases.ide", fromlist=["IsIdeAvailable"]
+        ).IsIdeAvailable(
+            __import__("tests.fakes.fake_dev_session", fromlist=["FakeIdeRepository"]).FakeIdeRepository()
+        ),
+        # WDA setup
+        setup_webdriveragent=__import__(
+            "mcp_phone_controll.domain.usecases.wda_setup", fromlist=["SetupWebDriverAgent"]
+        ).SetupWebDriverAgent(
+            __import__("tests.fakes.fake_dev_session", fromlist=["FakeWdaSetupCli"]).FakeWdaSetupCli()
+        ),
         new_session=NewSession(artifacts),
         get_artifacts_dir=GetArtifactsDir(artifacts),
     )
@@ -309,6 +398,23 @@ async def test_registry_covers_all_use_case_fields(tmp_path: Path):
         "stop_virtual_device",
         "list_simulators",
         "boot_simulator",
+        "start_debug_session",
+        "stop_debug_session",
+        "restart_debug_session",
+        "list_debug_sessions",
+        "attach_debug_session",
+        "read_debug_log",
+        "tail_debug_log",
+        "call_service_extension",
+        "dump_widget_tree",
+        "dump_render_tree",
+        "toggle_inspector",
+        "open_project_in_ide",
+        "list_ide_windows",
+        "close_ide_window",
+        "focus_ide_window",
+        "is_ide_available",
+        "setup_webdriveragent",
         "new_session",
         "get_artifacts_dir",
     }

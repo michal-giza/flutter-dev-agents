@@ -1,0 +1,45 @@
+apiVersion: phone-controll/v1
+kind: TestPlan
+metadata:
+  name: dev-iteration
+spec:
+  device:
+    platform: android
+    pool: any
+  project:
+    path: .
+  phases:
+    # Open the project in its own VS Code window so a human can follow along.
+    - phase: OPEN_IDE
+      ide: vscode
+      new_window: true
+
+    # Confirm host toolchain (this phase has no driver; PRE_FLIGHT covers
+    # check_environment + new_session under the hood).
+    - phase: PRE_FLIGHT
+
+    # Clean handoff: stop, clear, home, screenshot.
+    - phase: CLEAN
+      package_id: REPLACE_WITH_PACKAGE_ID
+
+    # Boot a long-lived `flutter run --machine` session against the selected device.
+    - phase: DEV_SESSION_START
+      mode: debug
+
+    # Agent makes a code edit between phases (Claude Code's Read/Edit), then:
+    - phase: HOT_RELOAD
+      capture: [debug_log, screenshot]
+
+    # Run a Patrol test (or flutter_test driver) against the live process.
+    - phase: UNDER_TEST
+      driver:
+        kind: flutter_test
+        target: integration_test/REPLACE_WITH_TEST_FILE.dart
+      capture: [screenshot, logs, debug_log]
+
+    # Tear down cleanly — important for the device-lock / debug-session
+    # housekeeping in multi-Claude factory runs.
+    - phase: DEV_SESSION_STOP
+
+  report:
+    format: junit

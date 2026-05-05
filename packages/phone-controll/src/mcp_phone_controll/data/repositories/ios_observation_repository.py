@@ -84,10 +84,33 @@ class IosObservationRepository(ObservationRepository):
         output_path.parent.mkdir(parents=True, exist_ok=True)
         result = await self._cli.screenshot(serial, output_path)
         if not result.ok or not output_path.exists():
+            stderr = result.stderr or ""
+            # Detect the canonical "no tunneld running" failure surface and
+            # emit a structured next_action so autonomous agents switch on it.
+            tunneld_hint = (
+                "Tunneld" in stderr
+                or "tunneld" in stderr
+                or "Unable to connect to Tunneld" in stderr
+            )
+            details: dict = {"stderr": stderr}
+            next_action = None
+            if tunneld_hint:
+                details["fix_command"] = (
+                    "sudo pymobiledevice3 remote tunneld   "
+                    "(leave running in a separate terminal)"
+                )
+                details["docs_url"] = "docs/ios_setup.md#tunneld"
+                next_action = "start_tunneld"
+            else:
+                details["hint"] = (
+                    "Run `sudo pymobiledevice3 remote tunneld` once; "
+                    "see docs/ios_setup.md."
+                )
             return err(
                 FlutterCliFailure(
                     message="iOS screenshot failed",
-                    details={"stderr": result.stderr, "hint": "Run `sudo pymobiledevice3 remote tunneld` once."},
+                    details=details,
+                    next_action=next_action,
                 )
             )
         return ok(output_path)

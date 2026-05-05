@@ -11,8 +11,13 @@ from .entities import (
     BuildMode,
     Device,
     CapabilityReport,
+    DebugLogEntry,
+    DebugSession,
+    DebugSessionState,
     DeviceLock,
     EnvironmentReport,
+    IdeKind,
+    IdeWindow,
     ImageDiff,
     LogEntry,
     LogLevel,
@@ -22,6 +27,7 @@ from .entities import (
     Platform,
     Pose,
     ProjectInfo,
+    ServiceExtensionResult,
     Session,
     SessionTrace,
     TestPlan,
@@ -265,3 +271,73 @@ class VirtualDeviceManager(Protocol):
     async def stop_virtual_device(self, serial: str) -> Result[None]: ...
     async def list_simulators(self, include_shutdown: bool = True) -> Result[list[Device]]: ...
     async def boot_simulator(self, name_or_udid: str) -> Result[Device]: ...
+
+
+@runtime_checkable
+class DebugSessionRepository(Protocol):
+    """Long-lived `flutter run --machine` sessions, one per (project, device).
+
+    Sessions are owned by the MCP process that started them; the device-lock
+    layer prevents two sessions thrashing the same phone.
+    """
+
+    async def start(
+        self,
+        project_path: Path,
+        device_serial: str,
+        mode: BuildMode = BuildMode.DEBUG,
+        flavor: str | None = None,
+        target: str | None = None,
+    ) -> Result[DebugSession]: ...
+    async def stop(self, session_id: str | None = None) -> Result[None]: ...
+    async def restart(
+        self, session_id: str | None = None, full_restart: bool = False
+    ) -> Result[DebugSession]: ...
+    async def attach(
+        self, vm_service_uri: str, project_path: Path
+    ) -> Result[DebugSession]: ...
+    async def list_sessions(self) -> Result[list[DebugSession]]: ...
+    async def read_log(
+        self,
+        session_id: str | None = None,
+        since_s: int = 30,
+        level: str = "all",
+        max_lines: int = 500,
+    ) -> Result[list[DebugLogEntry]]: ...
+    async def tail_log(
+        self,
+        session_id: str | None,
+        until_pattern: str,
+        timeout_s: float = 30.0,
+    ) -> Result[list[DebugLogEntry]]: ...
+    async def call_service_extension(
+        self,
+        session_id: str | None,
+        method: str,
+        args: dict | None = None,
+    ) -> Result[ServiceExtensionResult]: ...
+
+
+@runtime_checkable
+class IdeRepository(Protocol):
+    """Per-project IDE windows opened by this MCP process.
+
+    `open` always spawns a new window (`code -n <path>`) so multiple projects
+    can be open simultaneously. Tracking is per process — restarting the MCP
+    forgets earlier windows (they remain open in the user's IDE).
+    """
+
+    async def open_project(
+        self,
+        project_path: Path,
+        ide: IdeKind = IdeKind.VSCODE,
+        new_window: bool = True,
+    ) -> Result[IdeWindow]: ...
+    async def list_windows(self) -> Result[list[IdeWindow]]: ...
+    async def close_window(
+        self,
+        project_path: Path | None = None,
+        window_id: str | None = None,
+    ) -> Result[None]: ...
+    async def focus_window(self, project_path: Path) -> Result[None]: ...
+    async def is_available(self, ide: IdeKind = IdeKind.VSCODE) -> Result[str]: ...

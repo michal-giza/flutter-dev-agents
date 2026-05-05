@@ -55,8 +55,30 @@ Run `check_environment` from any Claude Code session — it returns a structured
 
 ## Status
 
-- `packages/phone-controll/`: 50+ tools live, 125+ tests passing, used in production-like factory workflow.
-- Dev-session module (debug session control + multi-window VS Code orchestration): in progress per [the active plan](https://github.com/anthropics/claude-code).
+- `packages/phone-controll/`: 67 tools live, 146+ tests passing.
+- **Real-developer dev-session module** (debug-session + multi-window VS Code orchestration + WDA setup) **shipped**: `start_debug_session`, `restart_debug_session`, `read_debug_log`, `dump_widget_tree`, `open_project_in_ide`, `setup_webdriveragent`, …
+- Cross-session device locking + emulator/simulator first-class support already in place.
+
+## Real-developer multi-project workflow
+
+A typical day on the factory laptop:
+
+```
+Claude #1 in checkaiapp/
+  → open_project_in_ide("checkaiapp")     # spawns its own VS Code window
+  → select_device(R3CYA05CHXB)            # acquires the lock on the Galaxy
+  → start_debug_session(project_path=...)  # `flutter run --machine`, returns vm_service_uri
+  → ...edit code, restart_debug_session, read_debug_log, repeat...
+  → run_patrol_test (or run_test_plan with dev_iteration.yaml)
+  → stop_debug_session, release_device, close_ide_window
+
+Claude #2 in another_app/                  → emulator-5554, its own VS Code, its own debug
+Claude #3 in third_app/                    → iPhone simulator UDID, its own VS Code, its own debug
+```
+
+Three independent debug sessions, three IDE windows, three locked devices, no collisions. The HTTP adapter exposes both the unified `/tools/*` surface and a focused `/dev-session/*` sub-router for agents that only care about the dev-iteration loop.
+
+See [`examples/templates/dev_iteration.yaml`](examples/templates/dev_iteration.yaml) for a runnable plan template; [`docs/ios_setup.md`](docs/ios_setup.md) for the iPhone prerequisites (Developer Mode, DDI, tunneld, WebDriverAgent).
 
 ## Contributing
 
