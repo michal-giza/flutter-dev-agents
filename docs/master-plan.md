@@ -38,9 +38,8 @@ Date stamp: **2026-05-07**.
   benchmark suite (I1) lands and we can measure deltas.
 
 ### Numbers
-- Tools: **94 → 100** (+6: `recall_corrective`, `promote_sequence`,
-  `list_skills`, `replay_skill`, plus the two pre-existing `recall` and
-  `index_project`).
+- Tools: **94 → 98** (+4: `recall_corrective`, `promote_sequence`,
+  `list_skills`, `replay_skill`).
 - Tests: **269 → 296**, all green, < 1.5 s wall-clock.
 - New use cases: 7. New repositories: 2. New scripts: 2.
 
@@ -197,7 +196,7 @@ agent that lets one person ship like a small studio.
 ```
 
 ### Three pillars (3-column section)
-1. **Open-source MCP** — 100 tools. Drives Patrol tests, hot reload,
+1. **Open-source MCP** — 98 tools. Drives Patrol tests, hot reload,
    debug sessions, multi-project workflows. MIT/Apache. Star on GitHub.
 2. **Paid course** — Build your own factory in 8 weekends. Ships with
    a private repo of working code. Module 0–8, $299 self-paced.
