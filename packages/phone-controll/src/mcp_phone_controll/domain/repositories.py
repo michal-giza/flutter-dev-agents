@@ -22,12 +22,14 @@ from .entities import (
     IdeKind,
     IdeWindow,
     ImageDiff,
+    IndexStats,
     LogEntry,
     LogLevel,
     MarkerDetection,
     PatrolTestFile,
     PlanRun,
     Platform,
+    RecallChunk,
     Pose,
     ProjectInfo,
     PubOutdatedEntry,
@@ -363,3 +365,37 @@ class IdeRepository(Protocol):
     ) -> Result[None]: ...
     async def focus_window(self, project_path: Path) -> Result[None]: ...
     async def is_available(self, ide: IdeKind = IdeKind.VSCODE) -> Result[str]: ...
+
+
+@runtime_checkable
+class RagRepository(Protocol):
+    """Vector-search backed retrieval over indexed text.
+
+    `recall(query, k, scope)` returns up to k chunks ranked by relevance to
+    the query. `scope` is a logical filter — e.g. "skill" surfaces only
+    chunks tagged as belonging to the SKILL doc collection, "trace" surfaces
+    session-trace chunks, "all" returns the union.
+
+    `index_collection` writes a batch of (text, source, metadata) triples
+    into a named collection, computing embeddings on the way in. Idempotent
+    on `source`: re-indexing the same source replaces its chunks.
+
+    Implementations must NOT raise — return RagUnavailableFailure when the
+    backend isn't reachable. The use case decides whether to surface that
+    or to fail open.
+    """
+
+    async def recall(
+        self,
+        query: str,
+        k: int = 3,
+        scope: str = "all",
+    ) -> Result[list[RecallChunk]]: ...
+
+    async def index_collection(
+        self,
+        collection: str,
+        items: list[tuple[str, str, dict]],
+    ) -> Result[IndexStats]: ...
+
+    async def is_available(self) -> Result[str]: ...

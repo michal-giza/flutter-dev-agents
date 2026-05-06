@@ -35,6 +35,12 @@ from ..domain.usecases.productivity import (
     SummarizeSession,
     SummarizeSessionParams,
 )
+from ..domain.usecases.recall import (
+    IndexProject,
+    IndexProjectParams,
+    Recall,
+    RecallParams,
+)
 from ..domain.usecases.base import NoParams
 from ..domain.usecases.build_install import (
     BuildApp,
@@ -523,6 +529,32 @@ def _params_find_flutter_widget(args: JsonDict) -> FindFlutterWidgetParams:
     )
 
 
+def _params_recall(args: JsonDict) -> RecallParams:
+    return RecallParams(
+        query=args["query"],
+        k=int(args.get("k", 3)),
+        scope=args.get("scope", "all"),
+    )
+
+
+def _params_index_project(args: JsonDict) -> IndexProjectParams:
+    return IndexProjectParams(
+        project_path=Path(args["project_path"]).expanduser(),
+        collection=args.get("collection", "phone-controll-default"),
+        include_globs=tuple(args.get("include_globs") or ("**/*.md", "**/*.dart", "**/*.py")),
+        exclude_globs=tuple(
+            args.get("exclude_globs")
+            or (
+                "**/.git/**",
+                "**/build/**",
+                "**/.dart_tool/**",
+                "**/node_modules/**",
+                "**/.venv/**",
+            )
+        ),
+    )
+
+
 def _params_narrate(args: JsonDict) -> NarrateParams:
     return NarrateParams(
         envelope=dict(args.get("envelope") or {}),
@@ -966,6 +998,8 @@ class UseCases:
     grep_logs: GrepLogs
     summarize_session: SummarizeSession
     find_flutter_widget: FindFlutterWidget
+    recall: Recall
+    index_project: IndexProject
     # Advanced AR / Vision
     calibrate_camera: CalibrateCamera
     assert_pose_stable: AssertPoseStable
@@ -2125,6 +2159,54 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             build_params=_params_find_flutter_widget,
             invoke=_bind(uc.find_flutter_widget, _params_find_flutter_widget),
         ),
+        ToolDescriptor(
+            name="recall",
+            description=(
+                "Retrieve top-k chunks matching a query (skill, docs, code, "
+                "or trace). Use instead of loading the whole SKILL — saves "
+                "context for 4B agents."
+            ),
+            input_schema=_schema(
+                {
+                    "query": _string("Natural-language query."),
+                    "k": _int("Top-k chunks (default 3, max 20)."),
+                    "scope": _enum(
+                        ["skill", "docs", "code", "trace", "all"],
+                        "Filter chunks by scope (default 'all').",
+                    ),
+                },
+                ["query"],
+            ),
+            build_params=_params_recall,
+            invoke=_bind(uc.recall, _params_recall),
+        ),
+        ToolDescriptor(
+            name="index_project",
+            description=(
+                "Walk a project, chunk md/dart/py files, push into Qdrant. "
+                "Idempotent on (collection, source). Run once per project, "
+                "or on a watcher."
+            ),
+            input_schema=_schema(
+                {
+                    "project_path": _string("Project root."),
+                    "collection": _string("Qdrant collection name."),
+                    "include_globs": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Glob patterns to include.",
+                    },
+                    "exclude_globs": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Glob patterns to exclude.",
+                    },
+                },
+                ["project_path"],
+            ),
+            build_params=_params_index_project,
+            invoke=_bind(uc.index_project, _params_index_project),
+        ),
         # ---- AR / Vision (advanced) -----------------------------------
         ToolDescriptor(
             name="calibrate_camera",
@@ -2321,6 +2403,7 @@ class ToolDispatcher:
         trace_repo=None,
         truncate_outputs: bool = True,
         rate_limiter=None,
+        auto_narrate_every: int = 0,
     ) -> None:
         self._by_name = {d.name: d for d in descriptors}
         self._trace_repo = trace_repo
@@ -2331,6 +2414,11 @@ class ToolDispatcher:
 
             rate_limiter = RateLimiter()
         self._rate_limiter = rate_limiter
+        # Auto-narrate every Nth call. 0 disables (default). Inspired by
+        # Reflexion (Shinn et al., 2023, arXiv 2303.11366) — periodic
+        # self-summary improves long-horizon agent performance.
+        self._auto_narrate_every = max(0, int(auto_narrate_every))
+        self._call_counter = 0
 
     @property
     def descriptors(self) -> list[ToolDescriptor]:
@@ -2392,6 +2480,15 @@ class ToolDispatcher:
             envelope = truncate_envelope(envelope)
         if self._trace_repo is not None:
             await self._record(name, args, envelope)
+        # Auto-narrate: attach a one-line summary every Nth call so a
+        # forgetful agent sees a recap without having to ask. The narrate
+        # field rides alongside `data` / `error`, never replaces them.
+        if self._auto_narrate_every > 0:
+            self._call_counter += 1
+            if self._call_counter % self._auto_narrate_every == 0:
+                from ..domain.usecases.narrate import narrate_envelope
+
+                envelope["narrate"] = narrate_envelope(envelope, tool=name)
         return envelope
 
     async def _dispatch_unrecorded(

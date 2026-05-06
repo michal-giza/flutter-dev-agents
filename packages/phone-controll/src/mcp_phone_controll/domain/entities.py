@@ -194,6 +194,11 @@ class CapabilityReport:
     # Empty tuple = "all tools" (the default at level=expert / unspecified).
     tool_subset: tuple[str, ...] = ()
     level: str = "expert"
+    # Recommended ordered sequence of tool calls for the most common task at
+    # this level. Empty when unspecified. Grounded in the ReAct pattern
+    # (Yao et al., 2022, arXiv 2210.03629): the model needs a strong prior on
+    # *what* to call first, not just *which* tools exist.
+    recommended_sequence: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -518,3 +523,31 @@ class QualityGateReport:
     unit_tests_passed: int
     unit_tests_failed: int
     overall_ok: bool
+
+
+# --- RAG retrieval --------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class RecallChunk:
+    """A single chunk surfaced by the RAG backend.
+
+    `score` is implementation-specific (cosine similarity for dense, BM25
+    score for sparse). `source` is a logical identifier (file path, doc
+    section, trace entry id) — the agent can ask `fetch_artifact` for the
+    full content if the chunk is enough to know "where to look next."
+    """
+
+    text: str
+    source: str
+    score: float
+    metadata: dict = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class IndexStats:
+    collection: str
+    files_indexed: int
+    chunks_indexed: int
+    skipped: tuple[str, ...] = ()
+    duration_ms: int = 0

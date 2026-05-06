@@ -78,6 +78,7 @@ from .domain.usecases.productivity import (
     ScaffoldFeature,
     SummarizeSession,
 )
+from .domain.usecases.recall import IndexProject, Recall
 from .domain.usecases.build_install import BuildApp, InstallApp, UninstallApp
 from .domain.usecases.devices import (
     ForceReleaseLock,
@@ -240,6 +241,12 @@ def _release_session_locks_atexit(lock_repo, session_id: str) -> None:
         return
 
 
+def _build_chunker():
+    from .data.chunker import LanguageAwareChunker
+
+    return LanguageAwareChunker()
+
+
 def _make_gate_runner(gate: "QualityGate"):
     """Adapter: PatchApplySafe expects `(project_path) -> Awaitable[Result[dict]]`.
 
@@ -374,6 +381,20 @@ def build_runtime(
         trace_repo = InMemorySessionTraceRepository()
     plan_loader = YamlPlanLoader()
     vision_repo = OpenCvVisionRepository()
+
+    # RAG: optional. Use Qdrant if `[rag]` extras importable; else a Null
+    # repo that returns informative `next_action: "install_rag_extra"`.
+    from .data.repositories.qdrant_rag_repository import (
+        QdrantRagRepository,
+        rag_extras_available,
+    )
+    from .data.repositories.null_rag_repository import NullRagRepository
+
+    rag_repo = (
+        QdrantRagRepository()
+        if rag_extras_available()
+        else NullRagRepository()
+    )
     virtual_devices = CompositeVirtualDeviceManager(emulator_cli, simctl, adb)
 
     # Lock repo first; dev-session repo depends on it.
@@ -419,7 +440,7 @@ def build_runtime(
         force_release_lock=ForceReleaseLock(lock_repo),
         check_environment=CheckEnvironment(env_repo),
         describe_capabilities=DescribeCapabilities(capabilities, _all_tool_names),
-        describe_tool=DescribeTool(_descriptor_lookup),
+        describe_tool=DescribeTool(_descriptor_lookup, traces=trace_repo),
         session_summary=SessionSummary(trace_repo),
         tool_usage_report=ToolUsageReportUseCase(trace_repo, _all_tool_names),
         inspect_project=InspectProject(inspector),
@@ -504,6 +525,9 @@ def build_runtime(
         grep_logs=GrepLogs(),
         summarize_session=SummarizeSession(trace_repo),
         find_flutter_widget=FindFlutterWidget(),
+        # RAG retrieval (Tier G — optional, gated by [rag] extras)
+        recall=Recall(rag_repo),
+        index_project=IndexProject(rag_repo, _build_chunker()),
         # Advanced AR / Vision
         calibrate_camera=CalibrateCamera(vision_repo),
         assert_pose_stable=AssertPoseStable(
@@ -520,7 +544,16 @@ def build_runtime(
     )
 
     descriptors = build_registry(use_cases)
-    dispatcher = ToolDispatcher(descriptors, trace_repo=trace_repo)
+    # Auto-narrate every Nth call when MCP_AUTO_NARRATE_EVERY is set.
+    # Recommended: 5 for 4B agents (Reflexion-style periodic self-summary),
+    # 0 (off) for Claude.
+    try:
+        _auto_narrate = int(os.environ.get("MCP_AUTO_NARRATE_EVERY", "0"))
+    except ValueError:
+        _auto_narrate = 0
+    dispatcher = ToolDispatcher(
+        descriptors, trace_repo=trace_repo, auto_narrate_every=_auto_narrate
+    )
     placeholder_dispatcher = dispatcher  # closes over the late-bound reference
     return use_cases, dispatcher
 

@@ -162,5 +162,23 @@ class IdeWindowNotFoundFailure(Failure):
 
 
 @dataclass(frozen=True, slots=True)
+class RagUnavailableFailure(Failure):
+    """The RAG backend (Qdrant, fastembed) isn't available in this process.
+
+    Carries `next_action="install_rag_extra"` or `"start_qdrant"` depending
+    on which dependency is missing.
+    """
+
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class RagIndexingFailure(Failure):
+    """Indexing a project into the RAG backend failed mid-pipeline."""
+
+    pass
+
+
+@dataclass(frozen=True, slots=True)
 class UnexpectedFailure(Failure):
     pass

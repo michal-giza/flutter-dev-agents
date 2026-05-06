@@ -37,6 +37,12 @@ http = [
 debug = [
     "websockets>=13.0",
 ]
+rag = [
+    # Vector store (single binary; runs as `docker run -p 6333:6333 qdrant/qdrant`)
+    "qdrant-client>=1.9",
+    # ONNX-served embeddings — no torch required.
+    "fastembed>=0.3",
+]
 
 [project.scripts]
 mcp-phone-controll = "mcp_phone_controll.__main__:main"

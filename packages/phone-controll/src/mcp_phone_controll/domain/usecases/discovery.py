@@ -8,7 +8,7 @@ from ..entities import CapabilityReport, SessionTrace
 from ..failures import InvalidArgumentFailure
 from ..repositories import CapabilitiesProvider, SessionTraceRepository
 from ..result import Err, Result, err, ok
-from ..tool_levels import tools_for_level
+from ..tool_levels import recommended_sequence_for_level, tools_for_level
 from .base import BaseUseCase, NoParams
 
 
@@ -48,11 +48,18 @@ class DescribeCapabilities(
             except Exception:  # noqa: BLE001
                 all_names = ()
         subset = tools_for_level(params.level, all_names)
+        sequence = recommended_sequence_for_level(params.level)
+        # Filter the recommended sequence to tools actually present in the
+        # subset — protects against drift if a tool is renamed or removed.
+        if subset:
+            permitted = set(subset)
+            sequence = tuple(name for name in sequence if name in permitted)
         return ok(
             replace(
                 report_res.value,
                 tool_subset=subset,
                 level=params.level,
+                recommended_sequence=sequence,
             )
         )
 
@@ -81,6 +88,12 @@ class ToolDetail:
     description: str
     input_schema: dict
     example: dict
+    # Up to 3 *real* successful invocations of this tool from the session
+    # trace. Grounding the agent in concrete, recently-successful examples
+    # is more reliable than synthetic ones — this is the in-context
+    # learning effect (Brown et al., 2020, arXiv 2005.14165) applied at the
+    # tool-discovery boundary.
+    replay: tuple[dict, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -173,15 +186,25 @@ class ToolUsageReportUseCase(BaseUseCase[ToolUsageReportParams, ToolUsageReport]
 
 
 class DescribeTool(BaseUseCase[DescribeToolParams, ToolDetail]):
-    """Full description + JSONSchema + corrected example for one tool.
+    """Full description + JSONSchema + corrected example + replay buffer.
 
     Lets small LLMs fetch verbose docs only for the tool they're about to
-    call, instead of carrying every tool's prose in context.
+    call, instead of carrying every tool's prose in context. The `replay`
+    buffer surfaces up to 3 recent successful invocations of the same
+    tool from the live session trace — a concrete prior on what good
+    arguments look like.
     """
 
-    def __init__(self, descriptor_lookup) -> None:
+    def __init__(
+        self,
+        descriptor_lookup,
+        traces: SessionTraceRepository | None = None,
+        replay_size: int = 3,
+    ) -> None:
         # descriptor_lookup: callable name -> {name, description, input_schema}
         self._lookup = descriptor_lookup
+        self._traces = traces
+        self._replay_size = replay_size
 
     async def execute(self, params: DescribeToolParams) -> Result[ToolDetail]:
         descriptor = self._lookup(params.name)
@@ -195,11 +218,30 @@ class DescribeTool(BaseUseCase[DescribeToolParams, ToolDetail]):
         # Local import to avoid circular dependency between domain and presentation.
         from ...presentation.argument_coercion import corrected_example
 
+        replay: tuple[dict, ...] = ()
+        if self._traces is not None and self._replay_size > 0:
+            summary_res = await self._traces.summary(None)
+            if not isinstance(summary_res, Err):
+                # Most-recent-first; only ok=True calls of THIS tool; cap at N.
+                successes: list[dict] = []
+                for entry in reversed(summary_res.value.entries):
+                    if entry.ok and entry.tool_name == params.name:
+                        successes.append(
+                            {
+                                "args": dict(entry.args),
+                                "summary": entry.summary,
+                            }
+                        )
+                        if len(successes) >= self._replay_size:
+                            break
+                replay = tuple(successes)
+
         return ok(
             ToolDetail(
                 name=descriptor["name"],
                 description=descriptor["description"],
                 input_schema=descriptor["input_schema"],
                 example=corrected_example(descriptor["input_schema"] or {}),
+                replay=replay,
             )
         )

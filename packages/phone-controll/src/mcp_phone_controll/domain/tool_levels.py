@@ -96,6 +96,50 @@ _BY_LEVEL = {
 }
 
 
+# Per-level recommended starting sequence — the canonical "happy path" the
+# agent should bias toward before exploring. Mirrors the autonomous-loop
+# checklist in examples/agent_loop_small_llm.py and the ReAct prior.
+_RECOMMENDED_SEQUENCE: dict[str, tuple[str, ...]] = {
+    "basic": (
+        "describe_capabilities",
+        "check_environment",
+        "inspect_project",
+        "list_devices",
+        "select_device",
+        "new_session",
+        "prepare_for_test",
+        "run_test_plan",
+        "summarize_session",
+        "release_device",
+    ),
+    "intermediate": (
+        "describe_capabilities",
+        "check_environment",
+        "inspect_project",
+        "list_devices",
+        "select_device",
+        "new_session",
+        "open_project_in_ide",
+        "start_debug_session",
+        "restart_debug_session",
+        "tap_and_verify",
+        "assert_no_errors_since",
+        "summarize_session",
+        "stop_debug_session",
+        "release_device",
+    ),
+}
+
+
+def recommended_sequence_for_level(level: str) -> tuple[str, ...]:
+    """Return the canonical tool order for the given level.
+
+    Empty tuple at expert level — Claude doesn't need a prescribed path; the
+    constraint is harmful at that capability tier.
+    """
+    return _RECOMMENDED_SEQUENCE.get(level, ())
+
+
 def tools_for_level(
     level: str, all_tool_names: tuple[str, ...]
 ) -> tuple[str, ...]:

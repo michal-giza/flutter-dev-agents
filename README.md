@@ -36,6 +36,10 @@ claude mcp add phone-controll -- \
   -m mcp_phone_controll
 ```
 
+For a step-by-step "open VS Code → drive a real phone" walkthrough that
+exercises every Tier A–F tool, see
+[`docs/walkthrough-vscode-test.md`](docs/walkthrough-vscode-test.md).
+
 ## External prerequisites
 
 See [`packages/phone-controll/README.md`](packages/phone-controll/README.md) for the full list. Briefly:
