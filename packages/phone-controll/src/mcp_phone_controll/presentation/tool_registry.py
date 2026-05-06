@@ -41,6 +41,17 @@ from ..domain.usecases.recall import (
     Recall,
     RecallParams,
 )
+from ..domain.usecases.crag import (
+    CorrectiveRecall,
+    CorrectiveRecallParams,
+)
+from ..domain.usecases.skill_library import (
+    ListSkills,
+    PromoteSequence,
+    PromoteSequenceParams,
+    ReplaySkill,
+    ReplaySkillParams,
+)
 from ..domain.usecases.base import NoParams
 from ..domain.usecases.build_install import (
     BuildApp,
@@ -537,6 +548,33 @@ def _params_recall(args: JsonDict) -> RecallParams:
     )
 
 
+def _params_recall_corrective(args: JsonDict) -> CorrectiveRecallParams:
+    return CorrectiveRecallParams(
+        query=args["query"],
+        k=int(args.get("k", 3)),
+        scope=args.get("scope", "all"),
+        confidence_threshold=float(args.get("confidence_threshold", 0.15)),
+        max_retries=int(args.get("max_retries", 1)),
+    )
+
+
+def _params_promote_sequence(args: JsonDict) -> PromoteSequenceParams:
+    return PromoteSequenceParams(
+        name=args["name"],
+        description=args.get("description", ""),
+        from_sequence=args.get("from_sequence"),
+        to_sequence=args.get("to_sequence"),
+        only_ok=bool(args.get("only_ok", True)),
+    )
+
+
+def _params_replay_skill(args: JsonDict) -> ReplaySkillParams:
+    return ReplaySkillParams(
+        name=args["name"],
+        overrides=args.get("overrides"),
+    )
+
+
 def _params_index_project(args: JsonDict) -> IndexProjectParams:
     return IndexProjectParams(
         project_path=Path(args["project_path"]).expanduser(),
@@ -999,7 +1037,11 @@ class UseCases:
     summarize_session: SummarizeSession
     find_flutter_widget: FindFlutterWidget
     recall: Recall
+    recall_corrective: CorrectiveRecall
     index_project: IndexProject
+    promote_sequence: PromoteSequence
+    list_skills: ListSkills
+    replay_skill: ReplaySkill
     # Advanced AR / Vision
     calibrate_camera: CalibrateCamera
     assert_pose_stable: AssertPoseStable
@@ -2181,6 +2223,33 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             invoke=_bind(uc.recall, _params_recall),
         ),
         ToolDescriptor(
+            name="recall_corrective",
+            description=(
+                "Recall + relevance grading + scope fallback. Use when the "
+                "agent needs an answer it can trust; returns confidence "
+                "and a diagnosis."
+            ),
+            input_schema=_schema(
+                {
+                    "query": _string("Natural-language query."),
+                    "k": _int("Top-k chunks (default 3)."),
+                    "scope": _enum(
+                        ["skill", "docs", "code", "trace", "all"],
+                        "Initial scope (default 'all').",
+                    ),
+                    "confidence_threshold": _number(
+                        "Mean lexical-overlap floor (default 0.15)."
+                    ),
+                    "max_retries": _int(
+                        "Scope-fallback retries (default 1, max 4)."
+                    ),
+                },
+                ["query"],
+            ),
+            build_params=_params_recall_corrective,
+            invoke=_bind(uc.recall_corrective, _params_recall_corrective),
+        ),
+        ToolDescriptor(
             name="index_project",
             description=(
                 "Walk a project, chunk md/dart/py files, push into Qdrant. "
@@ -2206,6 +2275,56 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             ),
             build_params=_params_index_project,
             invoke=_bind(uc.index_project, _params_index_project),
+        ),
+        ToolDescriptor(
+            name="promote_sequence",
+            description=(
+                "Tag a slice of the current session trace as a named, "
+                "reusable skill. Skill names are snake_case, no spaces. "
+                "Voyager-style skill library."
+            ),
+            input_schema=_schema(
+                {
+                    "name": _string("Skill identifier (snake_case)."),
+                    "description": _string("Human-readable summary."),
+                    "from_sequence": _int("Earliest trace seq to include."),
+                    "to_sequence": _int("Latest trace seq to include."),
+                    "only_ok": _bool("Only include ok=True steps (default true)."),
+                },
+                ["name", "description"],
+            ),
+            build_params=_params_promote_sequence,
+            invoke=_bind(uc.promote_sequence, _params_promote_sequence),
+        ),
+        ToolDescriptor(
+            name="list_skills",
+            description=(
+                "Return every named skill in the library, ordered by "
+                "use count. Use to discover what the agent has learned."
+            ),
+            input_schema=_schema({}),
+            build_params=_params_no,
+            invoke=_bind(uc.list_skills, _params_no),
+        ),
+        ToolDescriptor(
+            name="replay_skill",
+            description=(
+                "Re-execute a stored skill through the dispatcher. "
+                "Records success/failure on the library so high-success "
+                "skills get prioritised over time."
+            ),
+            input_schema=_schema(
+                {
+                    "name": _string("Skill name."),
+                    "overrides": {
+                        "type": "object",
+                        "description": "Placeholder substitutions for $-prefixed args.",
+                    },
+                },
+                ["name"],
+            ),
+            build_params=_params_replay_skill,
+            invoke=_bind(uc.replay_skill, _params_replay_skill),
         ),
         # ---- AR / Vision (advanced) -----------------------------------
         ToolDescriptor(

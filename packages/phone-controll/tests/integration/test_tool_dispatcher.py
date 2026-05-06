@@ -111,6 +111,15 @@ from mcp_phone_controll.domain.usecases.productivity import (
     SummarizeSession,
 )
 from mcp_phone_controll.domain.usecases.recall import IndexProject, Recall
+from mcp_phone_controll.domain.usecases.crag import CorrectiveRecall
+from mcp_phone_controll.domain.usecases.skill_library import (
+    ListSkills,
+    PromoteSequence,
+    ReplaySkill,
+)
+from mcp_phone_controll.data.repositories.sqlite_skill_library_repository import (
+    SqliteSkillLibraryRepository,
+)
 from mcp_phone_controll.domain.usecases.code_quality import (
     DartAnalyze,
     DartFix,
@@ -194,6 +203,10 @@ def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:
 
     _null_rag = NullRagRepository()
     _chunker = LanguageAwareChunker()
+    _skill_library = SqliteSkillLibraryRepository(tmp_path / "skill-library.db")
+
+    async def _noop_dispatch(_n, _a):
+        return {"ok": True, "data": None}
 
     from mcp_phone_controll.domain.usecases.preparation import PrepareForTest as _PrepFT
 
@@ -295,7 +308,11 @@ def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:
         summarize_session=SummarizeSession(trace),
         find_flutter_widget=FindFlutterWidget(),
         recall=Recall(_null_rag),
+        recall_corrective=CorrectiveRecall(Recall(_null_rag)),
         index_project=IndexProject(_null_rag, _chunker),
+        promote_sequence=PromoteSequence(trace, _skill_library),
+        list_skills=ListSkills(_skill_library),
+        replay_skill=ReplaySkill(_skill_library, _noop_dispatch),
         # Advanced AR / Vision
         calibrate_camera=CalibrateCamera(FakeVisionRepository()),
         assert_pose_stable=AssertPoseStable(
@@ -310,7 +327,7 @@ def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:
         get_artifacts_dir=GetArtifactsDir(artifacts),
         fetch_artifact=FetchArtifact(),
     )
-    return ToolDispatcher(build_registry(use_cases))
+    return ToolDispatcher(build_registry(use_cases), trace_repo=trace)
 
 
 @pytest.mark.asyncio
@@ -495,7 +512,11 @@ async def test_registry_covers_all_use_case_fields(tmp_path: Path):
         "summarize_session",
         "find_flutter_widget",
         "recall",
+        "recall_corrective",
         "index_project",
+        "promote_sequence",
+        "list_skills",
+        "replay_skill",
         "calibrate_camera",
         "assert_pose_stable",
         "wait_for_ar_session_ready",

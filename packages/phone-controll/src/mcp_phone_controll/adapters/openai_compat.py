@@ -49,8 +49,10 @@ def create_app(dispatcher=None, *, allow_agent_proxy: bool = True):
     )
 
     @app.get("/tools")
-    async def list_tools() -> list[dict[str, Any]]:
-        return to_openai_functions(dispatcher.descriptors)
+    async def list_tools(strict: bool | None = None) -> list[dict[str, Any]]:
+        # `?strict=true` opts into structured-output mode at the OpenAI
+        # function level — see adapters/schemas.py docstring.
+        return to_openai_functions(dispatcher.descriptors, strict=strict)
 
     @app.post("/tools/{name}")
     async def call_tool(name: str, args: dict[str, Any] | None = None):

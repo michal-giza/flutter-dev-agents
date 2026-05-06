@@ -25,6 +25,7 @@ _PLAN_SCHEMA = {
         "HOT_RELOAD",
         "DEV_SESSION_STOP",
         "AR_SCENE_READY",
+        "REFLECTION",
     ],
     "valid_driver_kinds": [
         "patrol_test", "flutter_test", "tap_text", "noop",

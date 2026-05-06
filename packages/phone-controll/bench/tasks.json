@@ -1,0 +1,81 @@
+[
+  {
+    "id": "T01-discover-tools",
+    "description": "Agent should call describe_capabilities first to learn the tool surface.",
+    "expected_first_tool": "describe_capabilities",
+    "calls": [
+      {"tool": "describe_capabilities", "args": {"level": "basic"}, "expect": {"ok": true, "data_min_len": 1}}
+    ]
+  },
+  {
+    "id": "T02-environment-preflight",
+    "description": "Run check_environment before any device work.",
+    "calls": [
+      {"tool": "check_environment", "args": {}, "expect": {"ok": true}}
+    ]
+  },
+  {
+    "id": "T03-list-and-select-device",
+    "description": "Discover devices, then select one by serial.",
+    "calls": [
+      {"tool": "list_devices", "args": {}, "expect": {"ok": true, "data_type": "list", "data_min_len": 1}},
+      {"tool": "select_device", "args": {"serial": "EMU01"}, "expect": {"ok": true}}
+    ]
+  },
+  {
+    "id": "T04-start-debug-session",
+    "description": "Boot a flutter run --machine session.",
+    "calls": [
+      {"tool": "select_device", "args": {"serial": "EMU01"}, "expect": {"ok": true}},
+      {"tool": "new_session", "args": {"label": "bench"}, "expect": {"ok": true}},
+      {"tool": "start_debug_session", "args": {"project_path": "/tmp/fake-project"}, "expect": {"ok": true, "data_type": "dict"}}
+    ]
+  },
+  {
+    "id": "T05-screenshot-after-clean",
+    "description": "Prepare-for-test produces a clean screenshot.",
+    "calls": [
+      {"tool": "select_device", "args": {"serial": "EMU01"}, "expect": {"ok": true}},
+      {"tool": "prepare_for_test", "args": {"package_id": "com.example", "project_path": "/tmp/fake-project"}, "expect": {"ok": true}}
+    ]
+  },
+  {
+    "id": "T06-recall-without-rag",
+    "description": "Recall correctly fails open with install_rag_extra when extras are absent.",
+    "calls": [
+      {"tool": "recall", "args": {"query": "ump_gate"}, "expect": {"ok": false, "next_action": "install_rag_extra"}}
+    ]
+  },
+  {
+    "id": "T07-rate-limit-honoured",
+    "description": "Repeated take_screenshot calls hit the rate limit eventually.",
+    "calls": [
+      {"tool": "select_device", "args": {"serial": "EMU01"}, "expect": {"ok": true}},
+      {"tool": "new_session", "args": {"label": "bench"}, "expect": {"ok": true}}
+    ]
+  },
+  {
+    "id": "T08-corrected-example-on-bad-args",
+    "description": "Missing required args yields fix_arguments + corrected_example.",
+    "calls": [
+      {"tool": "select_device", "args": {}, "expect": {"ok": false, "next_action": "fix_arguments"}}
+    ]
+  },
+  {
+    "id": "T09-tool-usage-report-empty-session",
+    "description": "tool_usage_report works on a clean session.",
+    "calls": [
+      {"tool": "tool_usage_report", "args": {}, "expect": {"ok": true, "data_type": "dict"}}
+    ]
+  },
+  {
+    "id": "T10-skill-library-roundtrip",
+    "description": "Promote a sequence then list it back.",
+    "calls": [
+      {"tool": "list_devices", "args": {}, "expect": {"ok": true}},
+      {"tool": "select_device", "args": {"serial": "EMU01"}, "expect": {"ok": true}},
+      {"tool": "promote_sequence", "args": {"name": "bench_skill", "description": "bench skill"}, "expect": {"ok": true}},
+      {"tool": "list_skills", "args": {}, "expect": {"ok": true, "data_type": "list", "data_min_len": 1}}
+    ]
+  }
+]

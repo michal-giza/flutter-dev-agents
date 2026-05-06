@@ -41,8 +41,32 @@ VALID_PHASES = (
     "VERDICT_DECLINED", "VERDICT_BLOCKED",
     "OPEN_IDE", "DEV_SESSION_START", "HOT_RELOAD", "DEV_SESSION_STOP",
     "AR_SCENE_READY",
+    "REFLECTION",
 )
 _TERMINAL_PHASES = ("VERDICT_DECLINED", "VERDICT_BLOCKED", "REPORT")
+
+# Phases where a Reflexion-style retry might recover. Pre-flight, lifecycle
+# and dev-session phases are NOT retryable — a failure there usually means
+# the env or device state is wrong and retrying just postpones the diagnosis.
+_REFLEXION_RETRYABLE = ("UNDER_TEST", "HOT_RELOAD")
+
+
+def _is_gate_phase(name: str) -> bool:
+    return name.endswith("_GATE")
+
+
+def _summarise_failure(outcome) -> str:
+    """One-sentence diagnosis the executor stamps onto a REFLECTION outcome.
+
+    Synthetic, deterministic — we don't call back into an LLM here; the
+    purpose is to give the agent a structured artefact to read on retry,
+    grounded in the actual error envelope.
+    """
+    code = outcome.error_code or "UnknownError"
+    msg = (outcome.error_message or "").strip()
+    if len(msg) > 200:
+        msg = msg[:197] + "…"
+    return f"phase={outcome.phase} failed: {code}: {msg}"
 
 
 class YamlPlanExecutor(PlanExecutor):
@@ -53,8 +77,14 @@ class YamlPlanExecutor(PlanExecutor):
     use case. The container wires this to the real ToolDispatcher.
     """
 
-    def __init__(self, dispatcher_call) -> None:
+    def __init__(
+        self, dispatcher_call, reflexion_retries: int = 0
+    ) -> None:
         self._call = dispatcher_call
+        # Reflexion-style retry budget per failed retryable phase. 0 = off.
+        # Shinn et al., 2023 (arXiv:2303.11366): self-critique-and-retry
+        # improves long-horizon task success.
+        self._reflexion_retries = max(0, int(reflexion_retries))
 
     async def run(self, plan: TestPlan) -> Result[PlanRun]:
         started = datetime.now()
@@ -88,6 +118,65 @@ class YamlPlanExecutor(PlanExecutor):
             outcomes.append(outcome)
 
             if not outcome.ok:
+                # Reflexion-style retry when configured and the failed phase
+                # is retryable. Each retry is preceded by a REFLECTION pseudo-
+                # phase whose `notes` capture the diagnosis from the prior
+                # attempt — that way the trace shows what the agent "thought"
+                # at each retry boundary.
+                retried_ok = False
+                if (
+                    self._reflexion_retries > 0
+                    and (
+                        phase.phase in _REFLEXION_RETRYABLE
+                        or _is_gate_phase(phase.phase)
+                    )
+                ):
+                    diagnosis = _summarise_failure(outcome)
+                    for attempt in range(1, self._reflexion_retries + 1):
+                        outcomes.append(
+                            PhaseOutcome(
+                                phase="REFLECTION",
+                                ok=True,
+                                planned_outcome=None,
+                                actual_outcome=f"retry_{attempt}_of_{self._reflexion_retries}",
+                                notes=diagnosis,
+                            )
+                        )
+                        retry_started = _asyncio.get_event_loop().time()
+                        retry_outcome = await self._run_phase(plan, phase)
+                        retry_duration_ms = int(
+                            (_asyncio.get_event_loop().time() - retry_started) * 1000
+                        )
+                        retry_outcome = replace(
+                            retry_outcome, duration_ms=retry_duration_ms
+                        )
+                        outcomes.append(retry_outcome)
+                        if retry_outcome.ok:
+                            retried_ok = True
+                            outcome = retry_outcome
+                            break
+                        diagnosis = _summarise_failure(retry_outcome)
+                if retried_ok:
+                    # Mark the original failure as recovered so overall_ok
+                    # treats the run as a pass while preserving the audit trail.
+                    original_idx = -(2 * self._reflexion_retries) - 1
+                    # Find the original failed outcome we recorded right
+                    # before the retries began. It's the most-recent ok=False
+                    # entry whose phase matches the retried one.
+                    for idx in range(len(outcomes) - 1, -1, -1):
+                        cand = outcomes[idx]
+                        if (
+                            cand.phase == phase.phase
+                            and not cand.ok
+                            and cand.actual_outcome != "retried_successfully"
+                        ):
+                            outcomes[idx] = replace(
+                                cand,
+                                actual_outcome="retried_successfully",
+                                notes=(cand.notes or "") + " | recovered via Reflexion retry",
+                            )
+                            break
+                    continue
                 outcomes.append(
                     PhaseOutcome(
                         phase="VERDICT_BLOCKED",
@@ -108,7 +197,12 @@ class YamlPlanExecutor(PlanExecutor):
                 terminal_reached = True
 
         finished = datetime.now()
-        overall_ok = all(o.ok for o in outcomes if o.phase not in ("VERDICT_BLOCKED",))
+        overall_ok = all(
+            o.ok
+            for o in outcomes
+            if o.phase not in ("VERDICT_BLOCKED",)
+            and o.actual_outcome != "retried_successfully"
+        )
         duration_ms = int((finished - started).total_seconds() * 1000)
         plan_run = PlanRun(
             plan_name=plan.name,

@@ -194,8 +194,13 @@ class QdrantRagRepository:
         fail = await self._ensure_ready()
         if fail is not None:
             return err(fail)
+        # Over-fetch dense, then re-rank with lexical fusion (RRF). Keeps
+        # us competitive on exact-token queries (`tap_text`, error codes)
+        # without requiring Qdrant sparse-vector config.
+        over_fetch = max(k * 4, 12)
         try:
             from qdrant_client.http import models as qm
+            from ..hybrid_rerank import hybrid_rerank
 
             vector = (
                 await asyncio.to_thread(
@@ -217,32 +222,33 @@ class QdrantRagRepository:
                         )
                     ]
                 )
-            chunks: list[RecallChunk] = []
+            all_hits: list[tuple[str, str, float, RecallChunk]] = []
             for name in collection_names:
                 hits = await asyncio.to_thread(
                     self._client.search,
                     collection_name=name,
                     query_vector=list(vector),
-                    limit=k,
+                    limit=over_fetch,
                     query_filter=scope_filter,
                 )
                 for hit in hits:
                     payload = hit.payload or {}
-                    chunks.append(
-                        RecallChunk(
-                            text=str(payload.get("text", "")),
-                            source=str(payload.get("source", name)),
-                            score=float(hit.score),
-                            metadata={
-                                "collection": name,
-                                **{
-                                    k: v
-                                    for k, v in payload.items()
-                                    if k not in {"text", "source"}
-                                },
+                    chunk_id = str(hit.id)
+                    text = str(payload.get("text", ""))
+                    chunk = RecallChunk(
+                        text=text,
+                        source=str(payload.get("source", name)),
+                        score=float(hit.score),
+                        metadata={
+                            "collection": name,
+                            **{
+                                k: v
+                                for k, v in payload.items()
+                                if k not in {"text", "source"}
                             },
-                        )
+                        },
                     )
+                    all_hits.append((chunk_id, text, float(hit.score), chunk))
         except Exception as exc:  # noqa: BLE001
             return err(
                 RagUnavailableFailure(
@@ -250,8 +256,13 @@ class QdrantRagRepository:
                     next_action="retry_with_backoff",
                 )
             )
-        chunks.sort(key=lambda c: c.score, reverse=True)
-        return ok(chunks[:k])
+        if not all_hits:
+            return ok([])
+        # Hybrid rerank — combine dense ranks with lexical ranks via RRF.
+        dense_triples = [(cid, text, score) for cid, text, score, _ in all_hits]
+        top_ids = hybrid_rerank(query, dense_triples, k)
+        by_id = {cid: chunk for cid, _, _, chunk in all_hits}
+        return ok([by_id[cid] for cid in top_ids if cid in by_id])
 
     # ---- internals ------------------------------------------------------
 

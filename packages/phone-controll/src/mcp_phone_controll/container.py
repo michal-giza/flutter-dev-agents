@@ -79,6 +79,12 @@ from .domain.usecases.productivity import (
     SummarizeSession,
 )
 from .domain.usecases.recall import IndexProject, Recall
+from .domain.usecases.crag import CorrectiveRecall
+from .domain.usecases.skill_library import (
+    ListSkills,
+    PromoteSequence,
+    ReplaySkill,
+)
 from .domain.usecases.build_install import BuildApp, InstallApp, UninstallApp
 from .domain.usecases.devices import (
     ForceReleaseLock,
@@ -359,9 +365,8 @@ def build_runtime(
     )
 
     # Cross-cutting
-    artifacts_repo = FilesystemArtifactRepository(
-        artifacts_root or Path.home() / ".mcp_phone_controll" / "sessions"
-    )
+    artifacts_root = artifacts_root or Path.home() / ".mcp_phone_controll" / "sessions"
+    artifacts_repo = FilesystemArtifactRepository(artifacts_root)
     state_repo = InMemorySessionStateRepository()
     env_repo = SystemEnvironmentRepository(adb, flutter, pmd3, patrol, ide_cli)
     capabilities = StaticCapabilitiesProvider()
@@ -395,6 +400,19 @@ def build_runtime(
         if rag_extras_available()
         else NullRagRepository()
     )
+
+    # Skill library — SQLite-persistent. Path defaults to artifacts root;
+    # MCP_SKILL_LIBRARY_DB lets the user override (e.g. share across machines).
+    from .data.repositories.sqlite_skill_library_repository import (
+        SqliteSkillLibraryRepository,
+    )
+
+    _skill_db = os.environ.get("MCP_SKILL_LIBRARY_DB")
+    skill_library_repo = SqliteSkillLibraryRepository(
+        Path(_skill_db).expanduser()
+        if _skill_db
+        else (artifacts_root / "skill-library.db")
+    )
     virtual_devices = CompositeVirtualDeviceManager(emulator_cli, simctl, adb)
 
     # Lock repo first; dev-session repo depends on it.
@@ -412,7 +430,13 @@ def build_runtime(
         assert placeholder_dispatcher is not None
         return await placeholder_dispatcher.dispatch(name, args)
 
-    plan_executor = YamlPlanExecutor(_dispatch)
+    try:
+        _reflexion_retries = int(os.environ.get("MCP_REFLEXION_RETRIES", "0"))
+    except ValueError:
+        _reflexion_retries = 0
+    plan_executor = YamlPlanExecutor(
+        _dispatch, reflexion_retries=_reflexion_retries
+    )
 
     # Late-binding lookups so DescribeCapabilities/DescribeTool see the
     # dispatcher's full registry (which doesn't exist yet at this point).
@@ -527,7 +551,11 @@ def build_runtime(
         find_flutter_widget=FindFlutterWidget(),
         # RAG retrieval (Tier G — optional, gated by [rag] extras)
         recall=Recall(rag_repo),
+        recall_corrective=CorrectiveRecall(Recall(rag_repo)),
         index_project=IndexProject(rag_repo, _build_chunker()),
+        promote_sequence=PromoteSequence(trace_repo, skill_library_repo),
+        list_skills=ListSkills(skill_library_repo),
+        replay_skill=ReplaySkill(skill_library_repo, _dispatch),
         # Advanced AR / Vision
         calibrate_camera=CalibrateCamera(vision_repo),
         assert_pose_stable=AssertPoseStable(
