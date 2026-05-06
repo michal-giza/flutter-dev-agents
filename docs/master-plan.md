@@ -115,31 +115,18 @@ You're authenticated as `michal-giza` (verified via `gh auth status`).
 Tokens have `repo`, `workflow`, `gist`, `read:org` — sufficient for
 public repo creation, push, and CI.
 
-### Step-by-step (run in this order)
+### Status (as of 2026-05-07)
 
-```bash
-# 1. flutter-dev-agents — the MCP
-cd ~/Desktop/flutter-dev-agents
-gh repo create flutter-dev-agents \
-  --public \
-  --description "MCP server for autonomous Flutter dev. 100 tools, 4-tier test suite, multi-project loop." \
-  --source . \
-  --remote origin \
-  --push
+Both repos are live and public:
+- **`michal-giza/flutter-dev-agents`** — pushed tonight by Tier H+I batch.
+  https://github.com/michal-giza/flutter-dev-agents
+- **`michal-giza/rag-to-agents`** — already on GitHub (course-side
+  was pushed earlier).
+  https://github.com/michal-giza/rag-to-agents
 
-# 2. rag-search — the course (after you confirm it's ready)
-cd ~/Desktop/projects/rag-search
-gh repo create rag-search \
-  --public \
-  --description "RAG-to-agents course: 4 modules + production capstone. Companion to flutter-dev-agents." \
-  --source . \
-  --remote origin \
-  --push
-
-# 3. Sanity check both
-gh repo view flutter-dev-agents --web
-gh repo view rag-search --web
-```
+Note: the course was titled `rag-to-agents` on GitHub, not `rag-search`.
+Decide whether to keep that name or rename + redirect; "rag-to-agents"
+is actually a stronger marketing name (it describes the journey).
 
 ### After the push
 - **Add README badges** (build status, license, tests passing). The
