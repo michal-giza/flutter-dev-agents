@@ -68,7 +68,16 @@ from .data.repositories.uiautomator2_ui_repository import UiAutomator2UiReposito
 from .data.repositories.wda_ui_repository import WdaUiRepository
 from .data.repositories.yaml_plan_executor import YamlPlanExecutor
 from .domain.entities import TestFramework
-from .domain.usecases.artifacts import GetArtifactsDir, NewSession
+from .domain.usecases.artifacts import FetchArtifact, GetArtifactsDir, NewSession
+from .domain.usecases.patch_safe import PatchApplySafe
+from .domain.usecases.narrate import Narrate
+from .domain.usecases.productivity import (
+    FindFlutterWidget,
+    GrepLogs,
+    RunQuickCheck,
+    ScaffoldFeature,
+    SummarizeSession,
+)
 from .domain.usecases.build_install import BuildApp, InstallApp, UninstallApp
 from .domain.usecases.devices import (
     ForceReleaseLock,
@@ -78,7 +87,12 @@ from .domain.usecases.devices import (
     ReleaseDevice,
     SelectDevice,
 )
-from .domain.usecases.discovery import DescribeCapabilities, SessionSummary
+from .domain.usecases.discovery import (
+    DescribeCapabilities,
+    DescribeTool,
+    SessionSummary,
+    ToolUsageReportUseCase,
+)
 from .domain.usecases.doctor import CheckEnvironment
 from .domain.usecases.lifecycle import (
     ClearAppData,
@@ -104,6 +118,7 @@ from .domain.usecases.projects import InspectProject
 from .domain.usecases.testing import RunIntegrationTests, RunUnitTests
 from .domain.usecases.ui_input import PressKey, Swipe, Tap, TapText, TypeText
 from .domain.usecases.ui_query import AssertVisible, DumpUi, FindElement, WaitForElement
+from .domain.usecases.ui_verify import AssertNoErrorsSince, TapAndVerify
 from .domain.usecases.virtual_devices import (
     BootSimulator,
     ListAvds,
@@ -152,8 +167,28 @@ from .domain.usecases.ide import (
     IsIdeAvailable,
     ListIdeWindows,
     OpenProjectInIde,
+    WriteVscodeLaunchConfig,
 )
 from .domain.usecases.wda_setup import SetupWebDriverAgent
+from .domain.usecases.code_quality import (
+    DartAnalyze,
+    DartFix,
+    DartFormat,
+    FlutterPubGet,
+    FlutterPubOutdated,
+    QualityGate,
+)
+from .domain.usecases.vision_advanced import (
+    AssertPoseStable,
+    CalibrateCamera,
+    SaveGoldenImage,
+    WaitForArSessionReady,
+)
+from .domain.usecases.debug_inspect import VmEvaluate, VmListIsolates
+from .data.repositories.dart_code_quality_repository import (
+    DartCodeQualityRepository,
+)
+from .infrastructure.dart_cli import DartCli, FlutterPubCli
 from .presentation.tool_registry import ToolDispatcher, UseCases, build_registry
 
 
@@ -205,6 +240,35 @@ def _release_session_locks_atexit(lock_repo, session_id: str) -> None:
         return
 
 
+def _make_gate_runner(gate: "QualityGate"):
+    """Adapter: PatchApplySafe expects `(project_path) -> Awaitable[Result[dict]]`.
+
+    QualityGate returns a dataclass; we map it into a small dict the patch
+    use case can read.
+    """
+    from .domain.usecases.code_quality import QualityGateParams
+    from .domain.result import ok as _ok, Err as _Err
+
+    async def _run(project_path):
+        res = await gate.execute(QualityGateParams(project_path=project_path))
+        if isinstance(res, _Err):
+            return res
+        report = res.value
+        return _ok(
+            {
+                "ok": getattr(report, "overall_ok", True),
+                "summary": (
+                    f"errors={getattr(report, 'analyzer_errors', '?')} "
+                    f"warnings={getattr(report, 'analyzer_warnings', '?')} "
+                    f"tests_passed={getattr(report, 'tests_passed', '?')} "
+                    f"tests_failed={getattr(report, 'tests_failed', '?')}"
+                ),
+            }
+        )
+
+    return _run
+
+
 def build_runtime(
     artifacts_root: Path | None = None,
     session_id: str | None = None,
@@ -232,6 +296,8 @@ def build_runtime(
     wda_factory = CachingWdaFactory()
     ide_cli = IdeCli(runner)
     wda_setup_cli = WdaSetupCli(runner)
+    dart_cli = DartCli(runner)
+    flutter_pub_cli = FlutterPubCli(runner)
 
     # Per-platform repositories
     android_devices = AdbDeviceRepository(adb)
@@ -292,7 +358,20 @@ def build_runtime(
     state_repo = InMemorySessionStateRepository()
     env_repo = SystemEnvironmentRepository(adb, flutter, pmd3, patrol, ide_cli)
     capabilities = StaticCapabilitiesProvider()
-    trace_repo = InMemorySessionTraceRepository()
+    # Persistent trace if MCP_TRACE_DB is set (path to a sqlite file); else
+    # in-memory ring. Persistence survives MCP-process restarts and can feed
+    # post-mortem analysis through tool_usage_report.
+    _trace_db = os.environ.get("MCP_TRACE_DB")
+    if _trace_db:
+        from .data.repositories.sqlite_session_trace_repository import (
+            SqliteSessionTraceRepository,
+        )
+
+        trace_repo = SqliteSessionTraceRepository(
+            db_path=Path(_trace_db).expanduser(), session_id=session_id
+        )
+    else:
+        trace_repo = InMemorySessionTraceRepository()
     plan_loader = YamlPlanLoader()
     vision_repo = OpenCvVisionRepository()
     virtual_devices = CompositeVirtualDeviceManager(emulator_cli, simctl, adb)
@@ -301,6 +380,7 @@ def build_runtime(
     lock_repo = FilesystemDeviceLockRepository(root=lock_root)
     debug_repo = FlutterDebugSessionRepository(flutter, lock_repo, session_id)
     ide_repo = VsCodeIdeRepository(ide_cli)
+    quality_repo = DartCodeQualityRepository(dart_cli, flutter_pub_cli)
     atexit.register(_release_session_locks_atexit, lock_repo, session_id)
     atexit.register(_stop_debug_sessions_atexit, debug_repo)
 
@@ -313,6 +393,23 @@ def build_runtime(
 
     plan_executor = YamlPlanExecutor(_dispatch)
 
+    # Late-binding lookups so DescribeCapabilities/DescribeTool see the
+    # dispatcher's full registry (which doesn't exist yet at this point).
+    def _all_tool_names():
+        assert placeholder_dispatcher is not None
+        return [d.name for d in placeholder_dispatcher.descriptors]
+
+    def _descriptor_lookup(name: str):
+        assert placeholder_dispatcher is not None
+        for d in placeholder_dispatcher.descriptors:
+            if d.name == name:
+                return {
+                    "name": d.name,
+                    "description": d.description,
+                    "input_schema": d.input_schema,
+                }
+        return None
+
     use_cases = UseCases(
         list_devices=ListDevices(devices_repo),
         select_device=SelectDevice(devices_repo, state_repo, lock_repo, session_id),
@@ -321,8 +418,10 @@ def build_runtime(
         list_locks=ListLocks(lock_repo),
         force_release_lock=ForceReleaseLock(lock_repo),
         check_environment=CheckEnvironment(env_repo),
-        describe_capabilities=DescribeCapabilities(capabilities),
+        describe_capabilities=DescribeCapabilities(capabilities, _all_tool_names),
+        describe_tool=DescribeTool(_descriptor_lookup),
         session_summary=SessionSummary(trace_repo),
+        tool_usage_report=ToolUsageReportUseCase(trace_repo, _all_tool_names),
         inspect_project=InspectProject(inspector),
         prepare_for_test=PrepareForTest(
             lifecycle_repo, ui_repo, observation_repo, artifacts_repo, state_repo
@@ -345,6 +444,8 @@ def build_runtime(
         wait_for_element=WaitForElement(ui_repo, state_repo),
         dump_ui=DumpUi(ui_repo, state_repo),
         assert_visible=AssertVisible(ui_repo, state_repo),
+        tap_and_verify=TapAndVerify(ui_repo, state_repo),
+        assert_no_errors_since=AssertNoErrorsSince(observation_repo, state_repo),
         take_screenshot=TakeScreenshot(observation_repo, artifacts_repo, state_repo),
         start_recording=StartRecording(observation_repo, artifacts_repo, state_repo),
         stop_recording=StopRecording(observation_repo, artifacts_repo, state_repo),
@@ -384,10 +485,38 @@ def build_runtime(
         close_ide_window=CloseIdeWindow(ide_repo),
         focus_ide_window=FocusIdeWindow(ide_repo),
         is_ide_available=IsIdeAvailable(ide_repo),
+        write_vscode_launch_config=WriteVscodeLaunchConfig(),
         # WDA setup
         setup_webdriveragent=SetupWebDriverAgent(wda_setup_cli),
+        # Code quality
+        dart_analyze=DartAnalyze(quality_repo),
+        dart_format=DartFormat(quality_repo),
+        dart_fix=DartFix(quality_repo),
+        flutter_pub_get=FlutterPubGet(quality_repo),
+        flutter_pub_outdated=FlutterPubOutdated(quality_repo),
+        quality_gate=QualityGate(quality_repo, test_repo),
+        patch_apply_safe=PatchApplySafe(
+            gate_runner=_make_gate_runner(QualityGate(quality_repo, test_repo))
+        ),
+        narrate=Narrate(),
+        scaffold_feature=ScaffoldFeature(),
+        run_quick_check=RunQuickCheck(quality_repo),
+        grep_logs=GrepLogs(),
+        summarize_session=SummarizeSession(trace_repo),
+        find_flutter_widget=FindFlutterWidget(),
+        # Advanced AR / Vision
+        calibrate_camera=CalibrateCamera(vision_repo),
+        assert_pose_stable=AssertPoseStable(
+            vision_repo, observation_repo, artifacts_repo, state_repo
+        ),
+        wait_for_ar_session_ready=WaitForArSessionReady(observation_repo, state_repo),
+        save_golden_image=SaveGoldenImage(observation_repo, artifacts_repo, state_repo),
+        # DAP-lite
+        vm_list_isolates=VmListIsolates(debug_repo),
+        vm_evaluate=VmEvaluate(debug_repo),
         new_session=NewSession(artifacts_repo),
         get_artifacts_dir=GetArtifactsDir(artifacts_repo),
+        fetch_artifact=FetchArtifact(),
     )
 
     descriptors = build_registry(use_cases)

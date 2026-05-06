@@ -131,6 +131,33 @@ class FakeIdeRepository:
         return ok("Code 1.95.0")
 
 
+class FakeCodeQualityRepository:
+    """Stub returning passing reports for all checks. Tests that exercise
+    real Dart-CLI behaviour use the real repo against a fixture project."""
+
+    async def analyze(self, project_path):
+        from mcp_phone_controll.domain.entities import AnalyzerReport
+        return ok(AnalyzerReport(project_path=project_path, issues=()))
+
+    async def format(self, target_path, dry_run=False):
+        from mcp_phone_controll.domain.entities import FormatReport
+        return ok(FormatReport(
+            target_path=target_path, files_changed=0, files_unchanged=1
+        ))
+
+    async def fix(self, project_path, apply=False):
+        from mcp_phone_controll.domain.entities import FixReport
+        return ok(FixReport(
+            project_path=project_path, fixes_applied=0, files_changed=0
+        ))
+
+    async def pub_get(self, project_path):
+        return ok(None)
+
+    async def pub_outdated(self, project_path):
+        return ok([])
+
+
 class FakeWdaSetupCli:
     """Pretends to clone + xcodebuild without doing anything."""
 

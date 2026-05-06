@@ -1,0 +1,27 @@
+[
+  {
+    "name": "Self-correcting argument errors",
+    "rationale": "A 4B model passes a string where a bool is expected, then omits a required field. The dispatcher must coerce the bool AND surface a corrected_example for the missing field. If either drifts, small-LLM agents start failing."
+  },
+  {
+    "tool": "select_device",
+    "args": {"serial": "EMU01", "force": "true"},
+    "expect": {"ok": true},
+    "note": "force='true' (string) must be coerced to True"
+  },
+  {
+    "tool": "select_device",
+    "args": {},
+    "expect": {
+      "ok": false,
+      "error_code": "InvalidArgumentFailure",
+      "next_action": "fix_arguments"
+    },
+    "envelope_must_contain": {"error.details.corrected_example": "object"}
+  },
+  {
+    "tool": "release_device",
+    "args": {},
+    "expect": {"ok": true}
+  }
+]

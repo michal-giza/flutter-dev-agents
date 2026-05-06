@@ -1,0 +1,36 @@
+[
+  {
+    "name": "Small-LLM basic smoke loop",
+    "rationale": "Covers the recommended sequence in SKILL-BASIC.md. If this transcript drifts, the small-model checklist is broken."
+  },
+  {
+    "tool": "describe_capabilities",
+    "args": {"level": "basic"},
+    "expect": {"ok": true, "data_type": "dict"}
+  },
+  {
+    "tool": "list_devices",
+    "args": {},
+    "expect": {"ok": true, "data_type": "list"}
+  },
+  {
+    "tool": "select_device",
+    "args": {"serial": "EMU01"},
+    "expect": {"ok": true, "data_type": "dict"}
+  },
+  {
+    "tool": "new_session",
+    "args": {"label": "smoke-replay"},
+    "expect": {"ok": true, "data_type": "dict"}
+  },
+  {
+    "tool": "take_screenshot",
+    "args": {"label": "after-select"},
+    "expect": {"ok": true, "data_type": "str"}
+  },
+  {
+    "tool": "release_device",
+    "args": {},
+    "expect": {"ok": true}
+  }
+]

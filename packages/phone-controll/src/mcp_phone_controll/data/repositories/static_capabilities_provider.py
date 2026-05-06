@@ -24,6 +24,7 @@ _PLAN_SCHEMA = {
         "DEV_SESSION_START",
         "HOT_RELOAD",
         "DEV_SESSION_STOP",
+        "AR_SCENE_READY",
     ],
     "valid_driver_kinds": [
         "patrol_test", "flutter_test", "tap_text", "noop",
@@ -41,6 +42,10 @@ _PLAN_SCHEMA = {
         "DEV_SESSION_START": {"required": [], "optional": ["mode", "flavor", "target"]},
         "HOT_RELOAD": {"required": [], "optional": ["full_restart", "capture"]},
         "DEV_SESSION_STOP": {"required": [], "optional": []},
+        "AR_SCENE_READY": {
+            "required": [],
+            "optional": ["timeout_s", "marker_id", "samples", "marker_size_m"],
+        },
     },
     "driver_kinds": {
         "patrol_test": {

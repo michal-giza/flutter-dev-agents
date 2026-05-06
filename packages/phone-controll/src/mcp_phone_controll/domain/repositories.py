@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 from .entities import (
+    AnalyzerReport,
     AppBundle,
     Artifact,
     BuildMode,
@@ -16,6 +17,8 @@ from .entities import (
     DebugSessionState,
     DeviceLock,
     EnvironmentReport,
+    FixReport,
+    FormatReport,
     IdeKind,
     IdeWindow,
     ImageDiff,
@@ -27,6 +30,8 @@ from .entities import (
     Platform,
     Pose,
     ProjectInfo,
+    PubOutdatedEntry,
+    QualityGateReport,
     ServiceExtensionResult,
     Session,
     SessionTrace,
@@ -316,6 +321,23 @@ class DebugSessionRepository(Protocol):
         method: str,
         args: dict | None = None,
     ) -> Result[ServiceExtensionResult]: ...
+
+
+@runtime_checkable
+class CodeQualityRepository(Protocol):
+    """Static analysis, formatting, automated fixes, dependency hygiene."""
+
+    async def analyze(self, project_path: Path) -> Result[AnalyzerReport]: ...
+    async def format(
+        self, target_path: Path, dry_run: bool = False
+    ) -> Result[FormatReport]: ...
+    async def fix(
+        self, project_path: Path, apply: bool = False
+    ) -> Result[FixReport]: ...
+    async def pub_get(self, project_path: Path) -> Result[None]: ...
+    async def pub_outdated(
+        self, project_path: Path
+    ) -> Result[list[PubOutdatedEntry]]: ...
 
 
 @runtime_checkable

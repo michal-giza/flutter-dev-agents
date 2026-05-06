@@ -11,7 +11,30 @@ from typing import Any, Awaitable, Callable
 
 from ..domain.entities import BuildMode, LogLevel, Platform
 from ..domain.result import Err, Result
-from ..domain.usecases.artifacts import GetArtifactsDir, NewSession, NewSessionParams
+from ..domain.usecases.artifacts import (
+    FetchArtifact,
+    FetchArtifactParams,
+    GetArtifactsDir,
+    NewSession,
+    NewSessionParams,
+)
+from ..domain.usecases.patch_safe import (
+    PatchApplySafe,
+    PatchApplySafeParams,
+)
+from ..domain.usecases.narrate import Narrate, NarrateParams
+from ..domain.usecases.productivity import (
+    FindFlutterWidget,
+    FindFlutterWidgetParams,
+    GrepLogs,
+    GrepLogsParams,
+    RunQuickCheck,
+    RunQuickCheckParams,
+    ScaffoldFeature,
+    ScaffoldFeatureParams,
+    SummarizeSession,
+    SummarizeSessionParams,
+)
 from ..domain.usecases.base import NoParams
 from ..domain.usecases.build_install import (
     BuildApp,
@@ -56,8 +79,13 @@ from ..domain.usecases.observation import (
 )
 from ..domain.usecases.discovery import (
     DescribeCapabilities,
+    DescribeCapabilitiesParams,
+    DescribeTool,
+    DescribeToolParams,
     SessionSummary,
     SessionSummaryParams,
+    ToolUsageReportParams,
+    ToolUsageReportUseCase,
 )
 from ..domain.usecases.doctor import CheckEnvironment
 from ..domain.usecases.patrol import (
@@ -104,6 +132,37 @@ from ..domain.usecases.vision import (
     WaitForMarker,
     WaitForMarkerParams,
 )
+from ..domain.usecases.debug_inspect import (
+    VmEvaluate,
+    VmEvaluateParams,
+    VmListIsolates,
+    VmListIsolatesParams,
+)
+from ..domain.usecases.vision_advanced import (
+    AssertPoseStable,
+    AssertPoseStableParams,
+    CalibrateCamera,
+    CalibrateCameraParams,
+    SaveGoldenImage,
+    SaveGoldenImageParams,
+    WaitForArSessionReady,
+    WaitForArSessionReadyParams,
+)
+from ..domain.usecases.code_quality import (
+    DartAnalyze,
+    DartAnalyzeParams,
+    DartFix,
+    DartFixParams,
+    DartFormat,
+    DartFormatParams,
+    FlutterPubGet,
+    FlutterPubGetParams,
+    FlutterPubOutdated,
+    FlutterPubOutdatedParams,
+    QualityGate,
+    QualityGateParams,
+)
+from ..domain.entities import AnalyzerSeverity as _AnalyzerSeverity
 from ..domain.usecases.virtual_devices import (
     BootSimulator,
     BootSimulatorParams,
@@ -147,6 +206,8 @@ from ..domain.usecases.ide import (
     ListIdeWindows,
     OpenProjectInIde,
     OpenProjectInIdeParams,
+    WriteVscodeLaunchConfig,
+    WriteVscodeLaunchConfigParams,
 )
 from ..domain.usecases.wda_setup import (
     SetupWebDriverAgent,
@@ -162,6 +223,12 @@ from ..domain.usecases.ui_query import (
     FindElementParams,
     WaitForElement,
     WaitForElementParams,
+)
+from ..domain.usecases.ui_verify import (
+    AssertNoErrorsSince,
+    AssertNoErrorsSinceParams,
+    TapAndVerify,
+    TapAndVerifyParams,
 )
 from .serialization import to_jsonable
 
@@ -344,6 +411,25 @@ def _params_assert_visible(args: JsonDict) -> AssertVisibleParams:
     )
 
 
+def _params_tap_and_verify(args: JsonDict) -> TapAndVerifyParams:
+    return TapAndVerifyParams(
+        text=args["text"],
+        expect_text=args.get("expect_text"),
+        expect_resource_id=args.get("expect_resource_id"),
+        timeout_s=float(args.get("timeout_s", 5.0)),
+        exact=bool(args.get("exact", False)),
+        serial=args.get("serial"),
+    )
+
+
+def _params_assert_no_errors(args: JsonDict) -> AssertNoErrorsSinceParams:
+    return AssertNoErrorsSinceParams(
+        since_s=int(args.get("since_s", 30)),
+        tag=args.get("tag"),
+        serial=args.get("serial"),
+    )
+
+
 def _params_screenshot(args: JsonDict) -> TakeScreenshotParams:
     return TakeScreenshotParams(label=args.get("label"), serial=args.get("serial"))
 
@@ -391,6 +477,68 @@ def _params_new_session(args: JsonDict) -> NewSessionParams:
     return NewSessionParams(label=args.get("label"))
 
 
+def _params_fetch_artifact(args: JsonDict) -> FetchArtifactParams:
+    return FetchArtifactParams(
+        path=Path(args["path"]).expanduser(),
+        max_bytes=int(args.get("max_bytes", 64_000)),
+        encoding=args.get("encoding", "utf-8"),
+    )
+
+
+def _params_scaffold_feature(args: JsonDict) -> ScaffoldFeatureParams:
+    return ScaffoldFeatureParams(
+        project_path=Path(args["project_path"]).expanduser(),
+        feature_name=args["feature_name"],
+        overwrite=bool(args.get("overwrite", False)),
+    )
+
+
+def _params_run_quick_check(args: JsonDict) -> RunQuickCheckParams:
+    return RunQuickCheckParams(
+        project_path=Path(args["project_path"]).expanduser()
+    )
+
+
+def _params_grep_logs(args: JsonDict) -> GrepLogsParams:
+    return GrepLogsParams(
+        path=Path(args["path"]).expanduser(),
+        pattern=args["pattern"],
+        context_lines=int(args.get("context_lines", 2)),
+        max_matches=int(args.get("max_matches", 50)),
+    )
+
+
+def _params_summarize_session(args: JsonDict) -> SummarizeSessionParams:
+    return SummarizeSessionParams(
+        session_id=args.get("session_id"),
+        top_facts=int(args.get("top_facts", 5)),
+    )
+
+
+def _params_find_flutter_widget(args: JsonDict) -> FindFlutterWidgetParams:
+    return FindFlutterWidgetParams(
+        project_path=Path(args["project_path"]).expanduser(),
+        name_pattern=args.get("name_pattern", ".*"),
+        max_results=int(args.get("max_results", 50)),
+    )
+
+
+def _params_narrate(args: JsonDict) -> NarrateParams:
+    return NarrateParams(
+        envelope=dict(args.get("envelope") or {}),
+        tool=args.get("tool"),
+    )
+
+
+def _params_patch_apply_safe(args: JsonDict) -> PatchApplySafeParams:
+    return PatchApplySafeParams(
+        project_path=Path(args["project_path"]).expanduser(),
+        diff=args["diff"],
+        skip_gate=bool(args.get("skip_gate", False)),
+        force=bool(args.get("force", False)),
+    )
+
+
 def _params_inspect_project(args: JsonDict) -> InspectProjectParams:
     return InspectProjectParams(project_path=Path(args["project_path"]).expanduser())
 
@@ -409,8 +557,23 @@ def _params_run_patrol_test(args: JsonDict) -> RunPatrolTestParams:
     )
 
 
+def _params_describe_capabilities(args: JsonDict) -> DescribeCapabilitiesParams:
+    return DescribeCapabilitiesParams(level=args.get("level", "expert"))
+
+
+def _params_describe_tool(args: JsonDict) -> DescribeToolParams:
+    return DescribeToolParams(name=args["name"])
+
+
 def _params_session_summary(args: JsonDict) -> SessionSummaryParams:
     return SessionSummaryParams(session_id=args.get("session_id"))
+
+
+def _params_tool_usage_report(args: JsonDict) -> ToolUsageReportParams:
+    return ToolUsageReportParams(
+        session_id=args.get("session_id"),
+        top_n=int(args.get("top_n", 10)),
+    )
 
 
 def _params_prepare_for_test(args: JsonDict) -> PrepareForTestParams:
@@ -539,12 +702,118 @@ def _params_is_ide_available(args: JsonDict) -> IsIdeAvailableParams:
     return IsIdeAvailableParams(ide=_IdeKind(args.get("ide", "vscode")))
 
 
+def _params_write_vscode_launch_config(
+    args: JsonDict,
+) -> WriteVscodeLaunchConfigParams:
+    return WriteVscodeLaunchConfigParams(
+        project_path=Path(args["project_path"]).expanduser(),
+        flavor=args.get("flavor"),
+        target=args.get("target", "lib/main.dart"),
+        debug_mode=args.get("debug_mode", "debug"),
+        overwrite=bool(args.get("overwrite", False)),
+    )
+
+
+def _params_vm_list_isolates(args: JsonDict) -> VmListIsolatesParams:
+    return VmListIsolatesParams(session_id=args.get("session_id"))
+
+
+def _params_vm_evaluate(args: JsonDict) -> VmEvaluateParams:
+    return VmEvaluateParams(
+        expression=args["expression"],
+        isolate_id=args.get("isolate_id"),
+        frame_index=int(args.get("frame_index", 0)),
+        session_id=args.get("session_id"),
+    )
+
+
+def _params_calibrate_camera(args: JsonDict) -> CalibrateCameraParams:
+    return CalibrateCameraParams(
+        image_paths=[Path(p).expanduser() for p in (args.get("image_paths") or [])],
+        board_cols=int(args.get("board_cols", 9)),
+        board_rows=int(args.get("board_rows", 6)),
+        square_size_m=float(args.get("square_size_m", 0.025)),
+    )
+
+
+def _params_assert_pose_stable(args: JsonDict) -> AssertPoseStableParams:
+    return AssertPoseStableParams(
+        marker_id=int(args["marker_id"]),
+        samples=int(args.get("samples", 10)),
+        sample_interval_s=float(args.get("sample_interval_s", 0.2)),
+        max_translation_m=float(args.get("max_translation_m", 0.005)),
+        max_rotation_deg=float(args.get("max_rotation_deg", 2.0)),
+        marker_size_m=float(args.get("marker_size_m", 0.05)),
+        serial=args.get("serial"),
+    )
+
+
+def _params_wait_for_ar_session_ready(args: JsonDict) -> WaitForArSessionReadyParams:
+    return WaitForArSessionReadyParams(
+        timeout_s=float(args.get("timeout_s", 30.0)),
+        serial=args.get("serial"),
+    )
+
+
+def _params_save_golden_image(args: JsonDict) -> SaveGoldenImageParams:
+    return SaveGoldenImageParams(
+        label=args["label"],
+        project_path=Path(args["project_path"]).expanduser()
+        if args.get("project_path")
+        else None,
+        serial=args.get("serial"),
+    )
+
+
+def _params_dart_analyze(args: JsonDict) -> DartAnalyzeParams:
+    sev = args.get("min_severity")
+    return DartAnalyzeParams(
+        project_path=Path(args["project_path"]).expanduser(),
+        min_severity=_AnalyzerSeverity(sev) if sev else None,
+    )
+
+
+def _params_dart_format(args: JsonDict) -> DartFormatParams:
+    return DartFormatParams(
+        target_path=Path(args["target_path"]).expanduser(),
+        dry_run=bool(args.get("dry_run", False)),
+    )
+
+
+def _params_dart_fix(args: JsonDict) -> DartFixParams:
+    return DartFixParams(
+        project_path=Path(args["project_path"]).expanduser(),
+        apply=bool(args.get("apply", False)),
+    )
+
+
+def _params_flutter_pub_get(args: JsonDict) -> FlutterPubGetParams:
+    return FlutterPubGetParams(
+        project_path=Path(args["project_path"]).expanduser()
+    )
+
+
+def _params_flutter_pub_outdated(args: JsonDict) -> FlutterPubOutdatedParams:
+    return FlutterPubOutdatedParams(
+        project_path=Path(args["project_path"]).expanduser()
+    )
+
+
+def _params_quality_gate(args: JsonDict) -> QualityGateParams:
+    return QualityGateParams(
+        project_path=Path(args["project_path"]).expanduser(),
+        require_format_clean=bool(args.get("require_format_clean", True)),
+        run_unit_tests=bool(args.get("run_unit_tests", True)),
+    )
+
+
 def _params_setup_wda(args: JsonDict) -> SetupWebDriverAgentParams:
     return SetupWebDriverAgentParams(
         udid=args["udid"],
         wda_dir=Path(args["wda_dir"]).expanduser() if args.get("wda_dir") else None,
         repo_url=args.get("repo_url", "https://github.com/appium/WebDriverAgent.git"),
         scheme=args.get("scheme", "WebDriverAgentRunner"),
+        skip_if_built=bool(args.get("skip_if_built", True)),
     )
 
 
@@ -618,7 +887,9 @@ class UseCases:
     force_release_lock: ForceReleaseLock
     check_environment: CheckEnvironment
     describe_capabilities: DescribeCapabilities
+    describe_tool: DescribeTool
     session_summary: SessionSummary
+    tool_usage_report: ToolUsageReportUseCase
     inspect_project: InspectProject
     prepare_for_test: PrepareForTest
     run_test_plan: RunTestPlan
@@ -639,6 +910,8 @@ class UseCases:
     wait_for_element: WaitForElement
     dump_ui: DumpUi
     assert_visible: AssertVisible
+    tap_and_verify: TapAndVerify
+    assert_no_errors_since: AssertNoErrorsSince
     take_screenshot: TakeScreenshot
     start_recording: StartRecording
     stop_recording: StopRecording
@@ -676,10 +949,34 @@ class UseCases:
     close_ide_window: CloseIdeWindow
     focus_ide_window: FocusIdeWindow
     is_ide_available: IsIdeAvailable
+    write_vscode_launch_config: WriteVscodeLaunchConfig
     # WDA setup
     setup_webdriveragent: SetupWebDriverAgent
+    # Code quality
+    dart_analyze: DartAnalyze
+    dart_format: DartFormat
+    dart_fix: DartFix
+    flutter_pub_get: FlutterPubGet
+    flutter_pub_outdated: FlutterPubOutdated
+    quality_gate: QualityGate
+    patch_apply_safe: PatchApplySafe
+    narrate: Narrate
+    scaffold_feature: ScaffoldFeature
+    run_quick_check: RunQuickCheck
+    grep_logs: GrepLogs
+    summarize_session: SummarizeSession
+    find_flutter_widget: FindFlutterWidget
+    # Advanced AR / Vision
+    calibrate_camera: CalibrateCamera
+    assert_pose_stable: AssertPoseStable
+    wait_for_ar_session_ready: WaitForArSessionReady
+    save_golden_image: SaveGoldenImage
+    # DAP-lite
+    vm_list_isolates: VmListIsolates
+    vm_evaluate: VmEvaluate
     new_session: NewSession
     get_artifacts_dir: GetArtifactsDir
+    fetch_artifact: FetchArtifact
 
 
 def _bind(uc, params_builder):
@@ -708,13 +1005,31 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
         ToolDescriptor(
             name="describe_capabilities",
             description=(
-                "Return a structured roll-up of platforms, frameworks, gates, and "
-                "vision ops this server supports. Autonomous agents call this first "
-                "before planning."
+                "Return platforms, frameworks, gates, vision ops, plan_schema, and "
+                "the tool subset for the given level (basic/intermediate/expert). "
+                "Call first before planning. 4B models should pass level='basic'."
             ),
-            input_schema=_schema({}),
-            build_params=_params_no,
-            invoke=_bind(uc.describe_capabilities, _params_no),
+            input_schema=_schema(
+                {
+                    "level": _enum(["basic", "intermediate", "expert"]),
+                }
+            ),
+            build_params=_params_describe_capabilities,
+            invoke=_bind(uc.describe_capabilities, _params_describe_capabilities),
+        ),
+        ToolDescriptor(
+            name="describe_tool",
+            description=(
+                "Full description, JSONSchema, and a copy-pasteable example for "
+                "ONE tool. Fetch this only for the tool you're about to call to "
+                "save context for small LLMs."
+            ),
+            input_schema=_schema(
+                {"name": _string("Tool name (e.g. 'select_device').")},
+                ["name"],
+            ),
+            build_params=_params_describe_tool,
+            invoke=_bind(uc.describe_tool, _params_describe_tool),
         ),
         ToolDescriptor(
             name="session_summary",
@@ -725,6 +1040,21 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             input_schema=_schema({"session_id": _string("Defaults to current.")}),
             build_params=_params_session_summary,
             invoke=_bind(uc.session_summary, _params_session_summary),
+        ),
+        ToolDescriptor(
+            name="tool_usage_report",
+            description=(
+                "Aggregate the session trace into per-tool usage stats. "
+                "Surfaces dead tools, top-N callers, and per-tool error rates."
+            ),
+            input_schema=_schema(
+                {
+                    "session_id": _string("Defaults to current."),
+                    "top_n": _int("Top-N rows to include (default 10)."),
+                }
+            ),
+            build_params=_params_tool_usage_report,
+            invoke=_bind(uc.tool_usage_report, _params_tool_usage_report),
         ),
         ToolDescriptor(
             name="prepare_for_test",
@@ -1036,14 +1366,47 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             invoke=_bind(uc.assert_visible, _params_assert_visible),
         ),
         ToolDescriptor(
+            name="tap_and_verify",
+            description=(
+                "Tap text then assert an expected element appears within "
+                "timeout_s. Use for any tap that should produce visible state."
+            ),
+            input_schema=_schema(
+                {
+                    "text": _string("Text to tap."),
+                    "expect_text": _string("Text that must appear after tap."),
+                    "expect_resource_id": _string("Resource id alternative."),
+                    "timeout_s": _number("Verification timeout (default 5)."),
+                    "exact": _bool(""),
+                    **serial_prop,
+                },
+                required=["text"],
+            ),
+            build_params=_params_tap_and_verify,
+            invoke=_bind(uc.tap_and_verify, _params_tap_and_verify),
+        ),
+        ToolDescriptor(
+            name="assert_no_errors_since",
+            description=(
+                "Fail if any ERROR-level log entries appeared in the last "
+                "since_s seconds. Use as a checkpoint after each test step."
+            ),
+            input_schema=_schema(
+                {
+                    "since_s": _int("Lookback window in seconds (default 30)."),
+                    "tag": _string("Optional log tag filter."),
+                    **serial_prop,
+                }
+            ),
+            build_params=_params_assert_no_errors,
+            invoke=_bind(uc.assert_no_errors_since, _params_assert_no_errors),
+        ),
+        ToolDescriptor(
             name="take_screenshot",
             description=(
-                "Capture a PNG screenshot to the artifacts dir. "
-                "DISCIPLINE: only call at phase boundaries (PRE_FLIGHT, gate-exit, "
-                "UNDER_TEST assertion, VERDICT). Label MUST follow "
-                "<session>-<PHASE>-<outcome> (e.g. 'UMP_GATE-declined', "
-                "'UNDER_TEST-anchor-placed'). Do NOT screenshot speculatively, "
-                "after a tool returned ok:false, or after a decline branch."
+                "Capture a PNG screenshot to the artifacts dir. Call only at "
+                "phase boundaries; label as <PHASE>-<outcome>. Don't shoot "
+                "speculatively or after a failed tool call."
             ),
             input_schema=_schema(
                 {
@@ -1513,11 +1876,37 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             invoke=_bind(uc.is_ide_available, _params_is_ide_available),
         ),
         ToolDescriptor(
+            name="write_vscode_launch_config",
+            description=(
+                "Write `.vscode/launch.json` for a Flutter project so F5 in "
+                "VS Code mirrors the agent's debug session. Idempotent unless "
+                "overwrite=true."
+            ),
+            input_schema=_schema(
+                {
+                    "project_path": _string("Flutter project root."),
+                    "flavor": _string("Optional Flutter flavor."),
+                    "target": _string("Entry-point Dart file (default lib/main.dart)."),
+                    "debug_mode": _enum(
+                        ["debug", "profile", "release"],
+                        "Default mode reflected in the active configuration.",
+                    ),
+                    "overwrite": _bool("Replace an existing file if true."),
+                },
+                ["project_path"],
+            ),
+            build_params=_params_write_vscode_launch_config,
+            invoke=_bind(
+                uc.write_vscode_launch_config, _params_write_vscode_launch_config
+            ),
+        ),
+        ToolDescriptor(
             name="setup_webdriveragent",
             description=(
-                "Build WebDriverAgent for an iOS device (one-time per device, "
-                "long-running). Clones the Appium WDA repo if `wda_dir` not "
-                "given, then `xcodebuild build-for-testing`."
+                "Build WebDriverAgent for an iOS device (one-time per device). "
+                "Clones the repo if needed, runs `xcodebuild build-for-testing`. "
+                "Short-circuits if a previous successful build is recorded "
+                "(unless skip_if_built=false)."
             ),
             input_schema=_schema(
                 {
@@ -1525,11 +1914,321 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
                     "wda_dir": _string("Existing WDA checkout (skip clone)."),
                     "repo_url": _string(""),
                     "scheme": _string("Default WebDriverAgentRunner."),
+                    "skip_if_built": _bool("Default true; set false to force rebuild."),
                 },
                 ["udid"],
             ),
             build_params=_params_setup_wda,
             invoke=_bind(uc.setup_webdriveragent, _params_setup_wda),
+        ),
+        # ---- code quality ---------------------------------------------
+        ToolDescriptor(
+            name="dart_analyze",
+            description=(
+                "Run `dart analyze --format=json` and return structured issues "
+                "(severity, code, message, file, line, column). Optional "
+                "min_severity filter."
+            ),
+            input_schema=_schema(
+                {
+                    "project_path": _string(""),
+                    "min_severity": _enum(["info", "warning", "error"]),
+                },
+                ["project_path"],
+            ),
+            build_params=_params_dart_analyze,
+            invoke=_bind(uc.dart_analyze, _params_dart_analyze),
+        ),
+        ToolDescriptor(
+            name="dart_format",
+            description=(
+                "Run `dart format` on a file or directory. dry_run=true reports "
+                "what would change without rewriting."
+            ),
+            input_schema=_schema(
+                {
+                    "target_path": _string(""),
+                    "dry_run": _bool("Default false."),
+                },
+                ["target_path"],
+            ),
+            build_params=_params_dart_format,
+            invoke=_bind(uc.dart_format, _params_dart_format),
+        ),
+        ToolDescriptor(
+            name="dart_fix",
+            description=(
+                "Run `dart fix`. apply=false (default) is a dry-run; apply=true "
+                "modifies files. Returns count of fixes + files changed."
+            ),
+            input_schema=_schema(
+                {
+                    "project_path": _string(""),
+                    "apply": _bool("Default false (dry-run)."),
+                },
+                ["project_path"],
+            ),
+            build_params=_params_dart_fix,
+            invoke=_bind(uc.dart_fix, _params_dart_fix),
+        ),
+        ToolDescriptor(
+            name="flutter_pub_get",
+            description="Run `flutter pub get` to refresh dependencies.",
+            input_schema=_schema(
+                {"project_path": _string("")}, ["project_path"]
+            ),
+            build_params=_params_flutter_pub_get,
+            invoke=_bind(uc.flutter_pub_get, _params_flutter_pub_get),
+        ),
+        ToolDescriptor(
+            name="flutter_pub_outdated",
+            description="Run `flutter pub outdated` to see stale dependencies.",
+            input_schema=_schema(
+                {"project_path": _string("")}, ["project_path"]
+            ),
+            build_params=_params_flutter_pub_outdated,
+            invoke=_bind(uc.flutter_pub_outdated, _params_flutter_pub_outdated),
+        ),
+        ToolDescriptor(
+            name="quality_gate",
+            description=(
+                "Composite check before claiming 'done': dart analyze + dart "
+                "format check + flutter unit tests. Returns overall_ok=true only "
+                "when zero analyzer errors, format-clean (if required), and "
+                "passing tests."
+            ),
+            input_schema=_schema(
+                {
+                    "project_path": _string(""),
+                    "require_format_clean": _bool("Default true."),
+                    "run_unit_tests": _bool("Default true."),
+                },
+                ["project_path"],
+            ),
+            build_params=_params_quality_gate,
+            invoke=_bind(uc.quality_gate, _params_quality_gate),
+        ),
+        ToolDescriptor(
+            name="patch_apply_safe",
+            description=(
+                "Apply a unified diff to a git project; auto-rollback if "
+                "quality_gate fails. Requires a clean working tree (or "
+                "force=true). Leaves changes uncommitted for human review."
+            ),
+            input_schema=_schema(
+                {
+                    "project_path": _string("Git project root."),
+                    "diff": _string("Unified diff content."),
+                    "skip_gate": _bool("Skip quality_gate (default false)."),
+                    "force": _bool("Apply even if working tree is dirty."),
+                },
+                ["project_path", "diff"],
+            ),
+            build_params=_params_patch_apply_safe,
+            invoke=_bind(uc.patch_apply_safe, _params_patch_apply_safe),
+        ),
+        ToolDescriptor(
+            name="narrate",
+            description=(
+                "Turn an MCP envelope into a one-line prose summary. "
+                "Useful for small models that need to echo results back to "
+                "the user without re-parsing JSON."
+            ),
+            input_schema=_schema(
+                {
+                    "envelope": {"type": "object", "description": "MCP envelope."},
+                    "tool": _string("Optional tool name for richer phrasing."),
+                },
+                ["envelope"],
+            ),
+            build_params=_params_narrate,
+            invoke=_bind(uc.narrate, _params_narrate),
+        ),
+        ToolDescriptor(
+            name="scaffold_feature",
+            description=(
+                "Generate a Clean-Architecture skeleton (entity, failure, "
+                "repo, use case, BLoC, page, tests) for a feature_name in "
+                "snake_case. Idempotent unless overwrite=true."
+            ),
+            input_schema=_schema(
+                {
+                    "project_path": _string("Flutter project root."),
+                    "feature_name": _string("snake_case feature id."),
+                    "overwrite": _bool(""),
+                },
+                ["project_path", "feature_name"],
+            ),
+            build_params=_params_scaffold_feature,
+            invoke=_bind(uc.scaffold_feature, _params_scaffold_feature),
+        ),
+        ToolDescriptor(
+            name="run_quick_check",
+            description=(
+                "Fast health check: dart analyze + format check + git "
+                "status. Skips unit tests; use quality_gate for the full bar."
+            ),
+            input_schema=_schema(
+                {"project_path": _string("Flutter project root.")},
+                ["project_path"],
+            ),
+            build_params=_params_run_quick_check,
+            invoke=_bind(uc.run_quick_check, _params_run_quick_check),
+        ),
+        ToolDescriptor(
+            name="grep_logs",
+            description=(
+                "Grep a saved log artifact for a regex with line context. "
+                "Returns line numbers + before/after context for each match."
+            ),
+            input_schema=_schema(
+                {
+                    "path": _string("Path to log artifact."),
+                    "pattern": _string("Regex."),
+                    "context_lines": _int(""),
+                    "max_matches": _int(""),
+                },
+                ["path", "pattern"],
+            ),
+            build_params=_params_grep_logs,
+            invoke=_bind(uc.grep_logs, _params_grep_logs),
+        ),
+        ToolDescriptor(
+            name="summarize_session",
+            description=(
+                "Boil the session trace down to a 3-line elevator pitch: "
+                "headline, recent successes, recent errors."
+            ),
+            input_schema=_schema(
+                {
+                    "session_id": _string("Defaults to current."),
+                    "top_facts": _int(""),
+                }
+            ),
+            build_params=_params_summarize_session,
+            invoke=_bind(uc.summarize_session, _params_summarize_session),
+        ),
+        ToolDescriptor(
+            name="find_flutter_widget",
+            description=(
+                "Scan lib/ for widget classes whose name matches a regex. "
+                "Returns file paths + line numbers."
+            ),
+            input_schema=_schema(
+                {
+                    "project_path": _string(""),
+                    "name_pattern": _string("Regex on class name."),
+                    "max_results": _int(""),
+                },
+                ["project_path", "name_pattern"],
+            ),
+            build_params=_params_find_flutter_widget,
+            invoke=_bind(uc.find_flutter_widget, _params_find_flutter_widget),
+        ),
+        # ---- AR / Vision (advanced) -----------------------------------
+        ToolDescriptor(
+            name="calibrate_camera",
+            description=(
+                "Calibrate camera intrinsics from chessboard images. Needs ≥3 "
+                "images with a detected (cols x rows) inner-corner pattern. "
+                "Returns fx/fy/cx/cy + distortion + reprojection error."
+            ),
+            input_schema=_schema(
+                {
+                    "image_paths": {"type": "array", "items": {"type": "string"}},
+                    "board_cols": _int("Inner corner columns. Default 9."),
+                    "board_rows": _int("Inner corner rows. Default 6."),
+                    "square_size_m": _number("Square size in meters. Default 0.025."),
+                },
+                ["image_paths"],
+            ),
+            build_params=_params_calibrate_camera,
+            invoke=_bind(uc.calibrate_camera, _params_calibrate_camera),
+        ),
+        ToolDescriptor(
+            name="assert_pose_stable",
+            description=(
+                "Capture N pose samples of one ArUco marker and assert "
+                "frame-to-frame stability under translation + rotation thresholds. "
+                "Use to filter single-frame outliers before AR placement assertions."
+            ),
+            input_schema=_schema(
+                {
+                    "marker_id": _int(""),
+                    "samples": _int("Default 10."),
+                    "sample_interval_s": _number("Default 0.2."),
+                    "max_translation_m": _number("Default 0.005."),
+                    "max_rotation_deg": _number("Default 2.0."),
+                    "marker_size_m": _number("Default 0.05."),
+                    "serial": _string("Defaults to selected device."),
+                },
+                ["marker_id"],
+            ),
+            build_params=_params_assert_pose_stable,
+            invoke=_bind(uc.assert_pose_stable, _params_assert_pose_stable),
+        ),
+        ToolDescriptor(
+            name="wait_for_ar_session_ready",
+            description=(
+                "Tail device logs until ARKit/ARCore reports normal tracking. "
+                "Use as a gate before AR placement assertions."
+            ),
+            input_schema=_schema(
+                {
+                    "timeout_s": _number("Default 30."),
+                    "serial": _string("Defaults to selected device."),
+                }
+            ),
+            build_params=_params_wait_for_ar_session_ready,
+            invoke=_bind(uc.wait_for_ar_session_ready, _params_wait_for_ar_session_ready),
+        ),
+        ToolDescriptor(
+            name="vm_list_isolates",
+            description=(
+                "List Dart isolates in the active debug session via the VM "
+                "service WebSocket. Requires the [debug] extra (websockets)."
+            ),
+            input_schema=_schema({"session_id": _string("")}),
+            build_params=_params_vm_list_isolates,
+            invoke=_bind(uc.vm_list_isolates, _params_vm_list_isolates),
+        ),
+        ToolDescriptor(
+            name="vm_evaluate",
+            description=(
+                "Evaluate a Dart expression at a frame in an isolate of the "
+                "active debug session. Defaults to the first runnable isolate "
+                "and frame 0. Requires the [debug] extra."
+            ),
+            input_schema=_schema(
+                {
+                    "expression": _string("Dart expression."),
+                    "isolate_id": _string("Optional; defaults to first runnable."),
+                    "frame_index": _int("Default 0."),
+                    "session_id": _string(""),
+                },
+                ["expression"],
+            ),
+            build_params=_params_vm_evaluate,
+            invoke=_bind(uc.vm_evaluate, _params_vm_evaluate),
+        ),
+        ToolDescriptor(
+            name="save_golden_image",
+            description=(
+                "Capture a screenshot and save it under "
+                "<project>/tests/fixtures/golden/<label>.png (or under the "
+                "session artifacts if no project_path). Bootstraps goldens "
+                "for compare_screenshot regression tests."
+            ),
+            input_schema=_schema(
+                {
+                    "label": _string(""),
+                    "project_path": _string("Optional; defaults to artifacts dir."),
+                    "serial": _string("Defaults to selected device."),
+                },
+                ["label"],
+            ),
+            build_params=_params_save_golden_image,
+            invoke=_bind(uc.save_golden_image, _params_save_golden_image),
         ),
         ToolDescriptor(
             name="new_session",
@@ -1537,6 +2236,24 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             input_schema=_schema({"label": _string("")}),
             build_params=_params_new_session,
             invoke=_bind(uc.new_session, _params_new_session),
+        ),
+        ToolDescriptor(
+            name="fetch_artifact",
+            description=(
+                "Read a previously emitted artifact by path. Returns text "
+                "content or, for binary files, metadata + sha256. Use after "
+                "a tool returned data_truncated=true."
+            ),
+            input_schema=_schema(
+                {
+                    "path": _string("Absolute path returned by an earlier tool."),
+                    "max_bytes": _int("Cap on text content (default 64000)."),
+                    "encoding": _string("Text encoding (default utf-8)."),
+                },
+                ["path"],
+            ),
+            build_params=_params_fetch_artifact,
+            invoke=_bind(uc.fetch_artifact, _params_fetch_artifact),
         ),
         ToolDescriptor(
             name="get_artifacts_dir",
@@ -1548,19 +2265,72 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
     ]
 
 
+def _maybe_coerce_args(
+    args: JsonDict | None, schema: JsonDict | None
+) -> JsonDict:
+    """Wrap argument_coercion.coerce_args with safe defaults."""
+    from .argument_coercion import coerce_args
+
+    return coerce_args(args or {}, schema or {})
+
+
+def _example_for(descriptor: ToolDescriptor) -> dict:
+    from .argument_coercion import corrected_example
+
+    return corrected_example(descriptor.input_schema or {})
+
+
+def _missing_arg_envelope(descriptor: ToolDescriptor, missing_key: str) -> JsonDict:
+    """Build an InvalidArgumentFailure envelope with a corrected_example so
+    a small LLM can copy a known-good shape into its next call."""
+    return {
+        "ok": False,
+        "error": {
+            "code": "InvalidArgumentFailure",
+            "message": f"Missing required argument: {missing_key}",
+            "next_action": "fix_arguments",
+            "details": {
+                "missing_key": missing_key,
+                "tool_name": descriptor.name,
+                "corrected_example": _example_for(descriptor),
+            },
+        },
+    }
+
+
 class ToolDispatcher:
     """Generic dispatcher: name → ToolDescriptor → uniform JSON envelope.
 
     Records every call into an optional SessionTraceRepository for autonomy.
+    With `truncate_outputs=True` (default), long results are capped so 4B-class
+    models stay within context — the envelope picks up `data_truncated: true`
+    and `next_action: "fetch_full_artifact_if_needed"`.
     """
+
+    # Tools that put the device into a "Patrol-driven" mode. After any of these
+    # runs, raw tap_text on app UI is refused (system UI excepted via system=true)
+    # because Patrol selectors are locale-independent and survive layout changes.
+    _PATROL_ACTIVATING = frozenset(
+        {"prepare_for_test", "run_patrol_test", "run_patrol_suite", "run_test_plan"}
+    )
+    _PATROL_DEACTIVATING = frozenset({"release_device", "stop_app", "new_session"})
 
     def __init__(
         self,
         descriptors: list[ToolDescriptor],
         trace_repo=None,
+        truncate_outputs: bool = True,
+        rate_limiter=None,
     ) -> None:
         self._by_name = {d.name: d for d in descriptors}
         self._trace_repo = trace_repo
+        self._truncate_outputs = truncate_outputs
+        self._patrol_active = False
+        if rate_limiter is None:
+            from .rate_limiter import RateLimiter
+
+            rate_limiter = RateLimiter()
+        self._rate_limiter = rate_limiter
 
     @property
     def descriptors(self) -> list[ToolDescriptor]:
@@ -1570,7 +2340,56 @@ class ToolDispatcher:
         return name in self._by_name
 
     async def dispatch(self, name: str, args: JsonDict | None) -> JsonDict:
+        # Refuse raw tap_text on app UI once Patrol owns the session — small
+        # models reach for it instinctively and break locale-dependent flows.
+        if (
+            name == "tap_text"
+            and self._patrol_active
+            and not bool((args or {}).get("system", False))
+        ):
+            return {
+                "ok": False,
+                "error": {
+                    "code": "TapTextRefused",
+                    "message": (
+                        "tap_text is refused while a Patrol-driven session is "
+                        "active. Use run_patrol_test for app UI; pass "
+                        "system=true only for OS-level dialogs."
+                    ),
+                    "next_action": "use_patrol",
+                    "details": {
+                        "reason": "patrol_session_active",
+                        "alternatives": [
+                            "run_patrol_test",
+                            "tap_and_verify (with Patrol-managed UI)",
+                        ],
+                    },
+                },
+            }
+        # Rate-limit / circuit-breaker guard. Discovery + introspection tools
+        # bypass it so an agent can always inspect its own state.
+        if name not in {
+            "describe_capabilities",
+            "describe_tool",
+            "session_summary",
+            "tool_usage_report",
+        }:
+            guard = self._rate_limiter.check(name)
+            if guard is not None:
+                if self._trace_repo is not None:
+                    await self._record(name, args, guard)
+                return guard
         envelope = await self._dispatch_unrecorded(name, args)
+        ok_flag = bool(envelope.get("ok"))
+        self._rate_limiter.record(name, ok_flag)
+        if ok_flag and name in self._PATROL_ACTIVATING:
+            self._patrol_active = True
+        elif ok_flag and name in self._PATROL_DEACTIVATING:
+            self._patrol_active = False
+        if self._truncate_outputs:
+            from .output_truncation import truncate_envelope
+
+            envelope = truncate_envelope(envelope)
         if self._trace_repo is not None:
             await self._record(name, args, envelope)
         return envelope
@@ -1586,19 +2405,18 @@ class ToolDispatcher:
                     "code": "UnknownTool",
                     "message": name,
                     "next_action": "describe_capabilities",
+                    "details": {
+                        "hint": "call describe_capabilities to see all available tools",
+                    },
                 },
             }
+        # Small-LLM resilience: coerce loose argument types BEFORE invoking,
+        # so '"true"' / '"5"' / single-string-where-array-expected don't fail.
+        coerced_args = _maybe_coerce_args(args, descriptor.input_schema)
         try:
-            result = await descriptor.invoke(args or {})
+            result = await descriptor.invoke(coerced_args)
         except KeyError as e:
-            return {
-                "ok": False,
-                "error": {
-                    "code": "InvalidArgumentFailure",
-                    "message": f"Missing required argument: {e.args[0]}",
-                    "next_action": "fix_arguments",
-                },
-            }
+            return _missing_arg_envelope(descriptor, str(e.args[0]))
         except (TypeError, ValueError) as e:
             return {
                 "ok": False,
@@ -1606,6 +2424,7 @@ class ToolDispatcher:
                     "code": "InvalidArgumentFailure",
                     "message": str(e),
                     "next_action": "fix_arguments",
+                    "details": {"corrected_example": _example_for(descriptor)},
                 },
             }
         if isinstance(result, Err):

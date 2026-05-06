@@ -34,6 +34,9 @@ http = [
     "uvicorn>=0.27",
     "httpx>=0.27",
 ]
+debug = [
+    "websockets>=13.0",
+]
 
 [project.scripts]
 mcp-phone-controll = "mcp_phone_controll.__main__:main"

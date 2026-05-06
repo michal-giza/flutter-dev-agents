@@ -6,7 +6,11 @@ from pathlib import Path
 
 import pytest
 
-from mcp_phone_controll.domain.usecases.artifacts import GetArtifactsDir, NewSession
+from mcp_phone_controll.domain.usecases.artifacts import (
+    FetchArtifact,
+    GetArtifactsDir,
+    NewSession,
+)
 from mcp_phone_controll.domain.usecases.build_install import (
     BuildApp,
     InstallApp,
@@ -38,7 +42,9 @@ from mcp_phone_controll.domain.usecases.observation import (
 )
 from mcp_phone_controll.domain.usecases.discovery import (
     DescribeCapabilities,
+    DescribeTool,
     SessionSummary,
+    ToolUsageReportUseCase,
 )
 from mcp_phone_controll.domain.usecases.doctor import CheckEnvironment
 from mcp_phone_controll.domain.usecases.patrol import (
@@ -73,11 +79,67 @@ from mcp_phone_controll.domain.usecases.ui_input import (
     TapText,
     TypeText,
 )
+from mcp_phone_controll.domain.usecases.dev_session import (
+    AttachDebugSession,
+    CallServiceExtension,
+    DumpRenderTree,
+    DumpWidgetTree,
+    ListDebugSessions,
+    ReadDebugLog,
+    RestartDebugSession,
+    StartDebugSession,
+    StopDebugSession,
+    TailDebugLog,
+    ToggleInspector,
+)
+from mcp_phone_controll.domain.usecases.ide import (
+    CloseIdeWindow,
+    FocusIdeWindow,
+    IsIdeAvailable,
+    ListIdeWindows,
+    OpenProjectInIde,
+    WriteVscodeLaunchConfig,
+)
+from mcp_phone_controll.domain.usecases.wda_setup import SetupWebDriverAgent
+from mcp_phone_controll.domain.usecases.patch_safe import PatchApplySafe
+from mcp_phone_controll.domain.usecases.narrate import Narrate
+from mcp_phone_controll.domain.usecases.productivity import (
+    FindFlutterWidget,
+    GrepLogs,
+    RunQuickCheck,
+    ScaffoldFeature,
+    SummarizeSession,
+)
+from mcp_phone_controll.domain.usecases.code_quality import (
+    DartAnalyze,
+    DartFix,
+    DartFormat,
+    FlutterPubGet,
+    FlutterPubOutdated,
+    QualityGate,
+)
+from mcp_phone_controll.domain.usecases.vision_advanced import (
+    AssertPoseStable,
+    CalibrateCamera,
+    SaveGoldenImage,
+    WaitForArSessionReady,
+)
+from mcp_phone_controll.domain.usecases.debug_inspect import VmEvaluate, VmListIsolates
+from tests.fakes.fake_dev_session import (
+    FakeCodeQualityRepository,
+    FakeDebugSessionRepository,
+    FakeIdeRepository,
+    FakeWdaSetupCli,
+)
 from mcp_phone_controll.domain.usecases.ui_query import (
     AssertVisible,
     DumpUi,
     FindElement,
     WaitForElement,
+)
+from mcp_phone_controll.domain.usecases.ui_verify import (
+    AssertNoErrorsSince,
+    TapAndVerify,
 )
 from mcp_phone_controll.presentation.tool_registry import (
     ToolDispatcher,
@@ -129,6 +191,9 @@ def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:
     locks = InMemoryDeviceLockRepository()
     session_id = "test-session-1"
 
+    debug_repo = FakeDebugSessionRepository()
+    ide_repo = FakeIdeRepository()
+
     use_cases = UseCases(
         list_devices=ListDevices(devices),
         select_device=SelectDevice(devices, state, locks, session_id),
@@ -138,7 +203,9 @@ def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:
         force_release_lock=ForceReleaseLock(locks),
         check_environment=CheckEnvironment(environment),
         describe_capabilities=DescribeCapabilities(capabilities),
+        describe_tool=DescribeTool(lambda name: None),
         session_summary=SessionSummary(trace),
+        tool_usage_report=ToolUsageReportUseCase(trace, lambda: ()),
         inspect_project=InspectProject(inspector),
         prepare_for_test=_PrepFT(lifecycle, ui, observation, artifacts, state),
         run_test_plan=RunTestPlan(plan_executor, plan_loader),
@@ -159,6 +226,8 @@ def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:
         wait_for_element=WaitForElement(ui, state),
         dump_ui=DumpUi(ui, state),
         assert_visible=AssertVisible(ui, state),
+        tap_and_verify=TapAndVerify(ui, state),
+        assert_no_errors_since=AssertNoErrorsSince(observation, state),
         take_screenshot=TakeScreenshot(observation, artifacts, state),
         start_recording=StartRecording(observation, artifacts, state),
         stop_recording=StopRecording(observation, artifacts, state),
@@ -180,97 +249,55 @@ def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:
         stop_virtual_device=StopVirtualDevice(FakeVirtualDeviceManager()),
         list_simulators=ListSimulators(FakeVirtualDeviceManager()),
         boot_simulator=BootSimulator(FakeVirtualDeviceManager()),
-        # dev-session
-        start_debug_session=__import__(
-            "mcp_phone_controll.domain.usecases.dev_session", fromlist=["StartDebugSession"]
-        ).StartDebugSession(
-            __import__("tests.fakes.fake_dev_session", fromlist=["FakeDebugSessionRepository"]).FakeDebugSessionRepository(),
-            state,
-        ),
-        stop_debug_session=__import__(
-            "mcp_phone_controll.domain.usecases.dev_session", fromlist=["StopDebugSession"]
-        ).StopDebugSession(
-            __import__("tests.fakes.fake_dev_session", fromlist=["FakeDebugSessionRepository"]).FakeDebugSessionRepository()
-        ),
-        restart_debug_session=__import__(
-            "mcp_phone_controll.domain.usecases.dev_session", fromlist=["RestartDebugSession"]
-        ).RestartDebugSession(
-            __import__("tests.fakes.fake_dev_session", fromlist=["FakeDebugSessionRepository"]).FakeDebugSessionRepository()
-        ),
-        list_debug_sessions=__import__(
-            "mcp_phone_controll.domain.usecases.dev_session", fromlist=["ListDebugSessions"]
-        ).ListDebugSessions(
-            __import__("tests.fakes.fake_dev_session", fromlist=["FakeDebugSessionRepository"]).FakeDebugSessionRepository()
-        ),
-        attach_debug_session=__import__(
-            "mcp_phone_controll.domain.usecases.dev_session", fromlist=["AttachDebugSession"]
-        ).AttachDebugSession(
-            __import__("tests.fakes.fake_dev_session", fromlist=["FakeDebugSessionRepository"]).FakeDebugSessionRepository()
-        ),
-        read_debug_log=__import__(
-            "mcp_phone_controll.domain.usecases.dev_session", fromlist=["ReadDebugLog"]
-        ).ReadDebugLog(
-            __import__("tests.fakes.fake_dev_session", fromlist=["FakeDebugSessionRepository"]).FakeDebugSessionRepository()
-        ),
-        tail_debug_log=__import__(
-            "mcp_phone_controll.domain.usecases.dev_session", fromlist=["TailDebugLog"]
-        ).TailDebugLog(
-            __import__("tests.fakes.fake_dev_session", fromlist=["FakeDebugSessionRepository"]).FakeDebugSessionRepository()
-        ),
-        call_service_extension=__import__(
-            "mcp_phone_controll.domain.usecases.dev_session", fromlist=["CallServiceExtension"]
-        ).CallServiceExtension(
-            __import__("tests.fakes.fake_dev_session", fromlist=["FakeDebugSessionRepository"]).FakeDebugSessionRepository()
-        ),
-        dump_widget_tree=__import__(
-            "mcp_phone_controll.domain.usecases.dev_session", fromlist=["DumpWidgetTree"]
-        ).DumpWidgetTree(
-            __import__("tests.fakes.fake_dev_session", fromlist=["FakeDebugSessionRepository"]).FakeDebugSessionRepository()
-        ),
-        dump_render_tree=__import__(
-            "mcp_phone_controll.domain.usecases.dev_session", fromlist=["DumpRenderTree"]
-        ).DumpRenderTree(
-            __import__("tests.fakes.fake_dev_session", fromlist=["FakeDebugSessionRepository"]).FakeDebugSessionRepository()
-        ),
-        toggle_inspector=__import__(
-            "mcp_phone_controll.domain.usecases.dev_session", fromlist=["ToggleInspector"]
-        ).ToggleInspector(
-            __import__("tests.fakes.fake_dev_session", fromlist=["FakeDebugSessionRepository"]).FakeDebugSessionRepository()
-        ),
-        # IDE
-        open_project_in_ide=__import__(
-            "mcp_phone_controll.domain.usecases.ide", fromlist=["OpenProjectInIde"]
-        ).OpenProjectInIde(
-            __import__("tests.fakes.fake_dev_session", fromlist=["FakeIdeRepository"]).FakeIdeRepository()
-        ),
-        list_ide_windows=__import__(
-            "mcp_phone_controll.domain.usecases.ide", fromlist=["ListIdeWindows"]
-        ).ListIdeWindows(
-            __import__("tests.fakes.fake_dev_session", fromlist=["FakeIdeRepository"]).FakeIdeRepository()
-        ),
-        close_ide_window=__import__(
-            "mcp_phone_controll.domain.usecases.ide", fromlist=["CloseIdeWindow"]
-        ).CloseIdeWindow(
-            __import__("tests.fakes.fake_dev_session", fromlist=["FakeIdeRepository"]).FakeIdeRepository()
-        ),
-        focus_ide_window=__import__(
-            "mcp_phone_controll.domain.usecases.ide", fromlist=["FocusIdeWindow"]
-        ).FocusIdeWindow(
-            __import__("tests.fakes.fake_dev_session", fromlist=["FakeIdeRepository"]).FakeIdeRepository()
-        ),
-        is_ide_available=__import__(
-            "mcp_phone_controll.domain.usecases.ide", fromlist=["IsIdeAvailable"]
-        ).IsIdeAvailable(
-            __import__("tests.fakes.fake_dev_session", fromlist=["FakeIdeRepository"]).FakeIdeRepository()
-        ),
+        # dev-session — shared fakes so list_debug_sessions reflects state
+        # from the same instance start_debug_session populated.
+        start_debug_session=StartDebugSession(debug_repo, state),
+        stop_debug_session=StopDebugSession(debug_repo),
+        restart_debug_session=RestartDebugSession(debug_repo),
+        list_debug_sessions=ListDebugSessions(debug_repo),
+        attach_debug_session=AttachDebugSession(debug_repo),
+        read_debug_log=ReadDebugLog(debug_repo),
+        tail_debug_log=TailDebugLog(debug_repo),
+        call_service_extension=CallServiceExtension(debug_repo),
+        dump_widget_tree=DumpWidgetTree(debug_repo),
+        dump_render_tree=DumpRenderTree(debug_repo),
+        toggle_inspector=ToggleInspector(debug_repo),
+        # IDE — same instance shared so close finds what open created
+        open_project_in_ide=OpenProjectInIde(ide_repo),
+        list_ide_windows=ListIdeWindows(ide_repo),
+        close_ide_window=CloseIdeWindow(ide_repo),
+        focus_ide_window=FocusIdeWindow(ide_repo),
+        is_ide_available=IsIdeAvailable(ide_repo),
+        write_vscode_launch_config=WriteVscodeLaunchConfig(),
         # WDA setup
-        setup_webdriveragent=__import__(
-            "mcp_phone_controll.domain.usecases.wda_setup", fromlist=["SetupWebDriverAgent"]
-        ).SetupWebDriverAgent(
-            __import__("tests.fakes.fake_dev_session", fromlist=["FakeWdaSetupCli"]).FakeWdaSetupCli()
+        setup_webdriveragent=SetupWebDriverAgent(FakeWdaSetupCli()),
+        # Code quality
+        dart_analyze=DartAnalyze(FakeCodeQualityRepository()),
+        dart_format=DartFormat(FakeCodeQualityRepository()),
+        dart_fix=DartFix(FakeCodeQualityRepository()),
+        flutter_pub_get=FlutterPubGet(FakeCodeQualityRepository()),
+        flutter_pub_outdated=FlutterPubOutdated(FakeCodeQualityRepository()),
+        quality_gate=QualityGate(FakeCodeQualityRepository(), tests),
+        patch_apply_safe=PatchApplySafe(),
+        narrate=Narrate(),
+        scaffold_feature=ScaffoldFeature(),
+        run_quick_check=RunQuickCheck(FakeCodeQualityRepository()),
+        grep_logs=GrepLogs(),
+        summarize_session=SummarizeSession(trace),
+        find_flutter_widget=FindFlutterWidget(),
+        # Advanced AR / Vision
+        calibrate_camera=CalibrateCamera(FakeVisionRepository()),
+        assert_pose_stable=AssertPoseStable(
+            FakeVisionRepository(), observation, artifacts, state
         ),
+        wait_for_ar_session_ready=WaitForArSessionReady(observation, state),
+        save_golden_image=SaveGoldenImage(observation, artifacts, state),
+        # DAP-lite — point at fake debug repo (no VM service connection in tests)
+        vm_list_isolates=VmListIsolates(debug_repo),
+        vm_evaluate=VmEvaluate(debug_repo),
         new_session=NewSession(artifacts),
         get_artifacts_dir=GetArtifactsDir(artifacts),
+        fetch_artifact=FetchArtifact(),
     )
     return ToolDispatcher(build_registry(use_cases))
 
@@ -322,6 +349,29 @@ async def test_full_smoke_loop(tmp_path: Path):
 
 
 @pytest.mark.asyncio
+async def test_dispatcher_coerces_string_bool_for_small_llms(tmp_path: Path):
+    """A 4B model passes 'force=\"true\"' instead of force=True; should still work."""
+    dispatcher = _build_fake_dispatcher(tmp_path)
+    res = await dispatcher.dispatch(
+        "select_device", {"serial": "EMU01", "force": "true"}
+    )
+    assert res["ok"] is True
+
+
+@pytest.mark.asyncio
+async def test_missing_arg_envelope_includes_corrected_example(tmp_path: Path):
+    dispatcher = _build_fake_dispatcher(tmp_path)
+    res = await dispatcher.dispatch("select_device", {})
+    assert res["ok"] is False
+    err = res["error"]
+    assert err["code"] == "InvalidArgumentFailure"
+    assert err["next_action"] == "fix_arguments"
+    assert "corrected_example" in err["details"]
+    # The example must contain the missing key with a valid placeholder value
+    assert "serial" in err["details"]["corrected_example"]
+
+
+@pytest.mark.asyncio
 async def test_unknown_tool_returns_error(tmp_path: Path):
     dispatcher = _build_fake_dispatcher(tmp_path)
     res = await dispatcher.dispatch("nonexistent", {})
@@ -352,7 +402,9 @@ async def test_registry_covers_all_use_case_fields(tmp_path: Path):
     expected = {
         "check_environment",
         "describe_capabilities",
+        "describe_tool",
         "session_summary",
+        "tool_usage_report",
         "inspect_project",
         "prepare_for_test",
         "run_test_plan",
@@ -379,6 +431,8 @@ async def test_registry_covers_all_use_case_fields(tmp_path: Path):
         "wait_for_element",
         "dump_ui",
         "assert_visible",
+        "tap_and_verify",
+        "assert_no_errors_since",
         "take_screenshot",
         "start_recording",
         "stop_recording",
@@ -414,8 +468,29 @@ async def test_registry_covers_all_use_case_fields(tmp_path: Path):
         "close_ide_window",
         "focus_ide_window",
         "is_ide_available",
+        "write_vscode_launch_config",
         "setup_webdriveragent",
+        "dart_analyze",
+        "dart_format",
+        "dart_fix",
+        "flutter_pub_get",
+        "flutter_pub_outdated",
+        "quality_gate",
+        "patch_apply_safe",
+        "narrate",
+        "scaffold_feature",
+        "run_quick_check",
+        "grep_logs",
+        "summarize_session",
+        "find_flutter_widget",
+        "calibrate_camera",
+        "assert_pose_stable",
+        "wait_for_ar_session_ready",
+        "save_golden_image",
+        "vm_list_isolates",
+        "vm_evaluate",
         "new_session",
         "get_artifacts_dir",
+        "fetch_artifact",
     }
     assert names == expected

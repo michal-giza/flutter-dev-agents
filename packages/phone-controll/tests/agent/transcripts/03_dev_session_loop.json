@@ -1,0 +1,51 @@
+[
+  {
+    "name": "Dev iteration loop",
+    "rationale": "Real-developer pattern: open IDE, start debug, hot reload, read log, stop. If lifecycle ordering changes, this transcript will catch it."
+  },
+  {
+    "tool": "list_devices",
+    "args": {},
+    "expect": {"ok": true}
+  },
+  {
+    "tool": "select_device",
+    "args": {"serial": "EMU01"},
+    "expect": {"ok": true}
+  },
+  {
+    "tool": "new_session",
+    "args": {"label": "dev-loop"},
+    "expect": {"ok": true}
+  },
+  {
+    "tool": "start_debug_session",
+    "args": {"project_path": "/tmp/fake-project"},
+    "expect": {"ok": true, "data_type": "dict"}
+  },
+  {
+    "tool": "list_debug_sessions",
+    "args": {},
+    "expect": {"ok": true, "data_type": "list", "data_min_len": 1}
+  },
+  {
+    "tool": "restart_debug_session",
+    "args": {"full_restart": false},
+    "expect": {"ok": true}
+  },
+  {
+    "tool": "read_debug_log",
+    "args": {"since_s": 5, "level": "all"},
+    "expect": {"ok": true, "data_type": "list"}
+  },
+  {
+    "tool": "stop_debug_session",
+    "args": {},
+    "expect": {"ok": true}
+  },
+  {
+    "tool": "release_device",
+    "args": {},
+    "expect": {"ok": true}
+  }
+]

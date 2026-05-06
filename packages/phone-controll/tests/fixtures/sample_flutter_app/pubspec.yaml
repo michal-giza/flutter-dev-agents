@@ -1,0 +1,22 @@
+name: sample_app
+description: Minimal fixture app for opt-in MCP integration tests.
+publish_to: 'none'
+version: 0.0.1+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+  flutter: ">=3.10.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  patrol: ^3.6.1
+
+flutter:
+  uses-material-design: true

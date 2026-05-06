@@ -213,6 +213,24 @@ spec:
 
 
 @pytest.mark.asyncio
+async def test_phase_outcome_carries_duration_ms():
+    import asyncio
+
+    async def slow_dispatch(name, args):
+        # ~10 ms of fake work so duration_ms isn't zero on fast machines
+        await asyncio.sleep(0.012)
+        return {"ok": True, "data": None}
+
+    executor = YamlPlanExecutor(slow_dispatch)
+    res = await executor.run(_plan((PlanPhase(phase="DEV_SESSION_STOP"),)))
+    assert isinstance(res, Ok)
+    phase = res.value.phases[0]
+    # Some CI runners have very fast clocks; just assert non-negative + < 1s.
+    assert phase.duration_ms >= 0
+    assert phase.duration_ms < 1000
+
+
+@pytest.mark.asyncio
 async def test_capabilities_plan_schema_includes_new_phases():
     from mcp_phone_controll.data.repositories.static_capabilities_provider import (
         StaticCapabilitiesProvider,

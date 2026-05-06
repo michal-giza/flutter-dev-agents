@@ -40,6 +40,7 @@ VALID_PHASES = (
     "<NAME>_GATE", "UNDER_TEST",
     "VERDICT_DECLINED", "VERDICT_BLOCKED",
     "OPEN_IDE", "DEV_SESSION_START", "HOT_RELOAD", "DEV_SESSION_STOP",
+    "AR_SCENE_READY",
 )
 _TERMINAL_PHASES = ("VERDICT_DECLINED", "VERDICT_BLOCKED", "REPORT")
 
@@ -60,6 +61,8 @@ class YamlPlanExecutor(PlanExecutor):
         outcomes: list[PhaseOutcome] = []
         terminal_reached = False
 
+        import asyncio as _asyncio
+
         for phase in plan.phases:
             if terminal_reached:
                 outcomes.append(
@@ -73,7 +76,15 @@ class YamlPlanExecutor(PlanExecutor):
                 )
                 continue
 
+            phase_started_at = _asyncio.get_event_loop().time()
             outcome = await self._run_phase(plan, phase)
+            phase_duration_ms = int(
+                (_asyncio.get_event_loop().time() - phase_started_at) * 1000
+            )
+            # PhaseOutcome is frozen — rebuild with duration_ms.
+            from dataclasses import replace
+
+            outcome = replace(outcome, duration_ms=phase_duration_ms)
             outcomes.append(outcome)
 
             if not outcome.ok:
@@ -98,15 +109,39 @@ class YamlPlanExecutor(PlanExecutor):
 
         finished = datetime.now()
         overall_ok = all(o.ok for o in outcomes if o.phase not in ("VERDICT_BLOCKED",))
-        return ok(
-            PlanRun(
-                plan_name=plan.name,
-                started_at=started,
-                finished_at=finished,
-                overall_ok=overall_ok,
-                phases=tuple(outcomes),
-            )
+        duration_ms = int((finished - started).total_seconds() * 1000)
+        plan_run = PlanRun(
+            plan_name=plan.name,
+            started_at=started,
+            finished_at=finished,
+            overall_ok=overall_ok,
+            phases=tuple(outcomes),
+            duration_ms=duration_ms,
         )
+
+        # Emit JUnit XML when the plan asks for it. Best-effort — never fail the
+        # run because of report I/O.
+        if plan.report_format == "junit":
+            try:
+                from pathlib import Path
+
+                from ...infrastructure.junit_writer import write_junit
+
+                # Write next to the plan's project, under build/test-results,
+                # falling back to ~/.mcp_phone_controll/reports if no project_path.
+                if plan.project_path is not None:
+                    out = Path(plan.project_path) / "build" / "test-results" / f"{plan.name}.junit.xml"
+                else:
+                    out = Path.home() / ".mcp_phone_controll" / "reports" / f"{plan.name}.junit.xml"
+                write_junit(plan_run, out)
+                # Replace the plan_run with one that knows where the report landed
+                from dataclasses import replace as _replace
+
+                plan_run = _replace(plan_run, junit_path=out)
+            except Exception:  # noqa: BLE001 — never fail the plan because of report I/O
+                pass
+
+        return ok(plan_run)
 
     # ---------- per-phase implementations ----------
 
@@ -127,6 +162,8 @@ class YamlPlanExecutor(PlanExecutor):
                 return await self._hot_reload(phase)
             if phase_name == "DEV_SESSION_STOP":
                 return await self._dev_session_stop(phase)
+            if phase_name == "AR_SCENE_READY":
+                return await self._ar_scene_ready(phase)
             if phase_name.endswith("_GATE") or phase_name == "UNDER_TEST":
                 return await self._driver_phase(plan, phase)
             if phase_name == "VERDICT_DECLINED" or phase_name == "VERDICT_BLOCKED":
@@ -376,6 +413,32 @@ class YamlPlanExecutor(PlanExecutor):
         return PhaseOutcome(
             phase=phase.phase, ok=True, planned_outcome=phase.planned_outcome,
             actual_outcome="dev_session_stopped",
+        )
+
+    async def _ar_scene_ready(self, phase: PlanPhase) -> PhaseOutcome:
+        # Wait for AR session, then optionally assert pose stability for a marker.
+        timeout_s = float(phase.extras.get("timeout_s", 30.0))
+        wait = await self._call(
+            "wait_for_ar_session_ready", {"timeout_s": timeout_s}
+        )
+        if not wait["ok"]:
+            return self._fail(phase, wait)
+        marker_id = phase.extras.get("marker_id")
+        if marker_id is not None:
+            stable = await self._call(
+                "assert_pose_stable",
+                {
+                    "marker_id": int(marker_id),
+                    "samples": int(phase.extras.get("samples", 8)),
+                    "marker_size_m": float(phase.extras.get("marker_size_m", 0.05)),
+                },
+            )
+            if not stable["ok"]:
+                return self._fail(phase, stable)
+        artifacts = await self._capture(phase)
+        return PhaseOutcome(
+            phase=phase.phase, ok=True, planned_outcome=phase.planned_outcome,
+            actual_outcome="ar_ready", artifacts=artifacts,
         )
 
     async def _capture(self, phase: PlanPhase) -> tuple[str, ...]:

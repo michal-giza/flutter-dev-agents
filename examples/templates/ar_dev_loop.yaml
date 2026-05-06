@@ -1,0 +1,56 @@
+apiVersion: phone-controll/v1
+kind: TestPlan
+metadata:
+  name: ar-dev-loop
+spec:
+  device:
+    platform: android        # AR/Vision tests should run on PHYSICAL devices,
+    pool: any                # never emulators/simulators (canned input).
+  project:
+    path: .
+  phases:
+    # Open project in its own VS Code window for the human reviewer.
+    - phase: OPEN_IDE
+      ide: vscode
+      new_window: true
+
+    - phase: PRE_FLIGHT
+
+    - phase: CLEAN
+      package_id: REPLACE_WITH_PACKAGE_ID
+
+    # Boot the long-lived debug session.
+    - phase: DEV_SESSION_START
+      mode: debug
+
+    # Hot reload after the agent edits code.
+    - phase: HOT_RELOAD
+      capture: [debug_log, screenshot]
+
+    # Drive UI to the AR screen via Patrol — locale-independent.
+    - phase: AR_PERMISSION_GATE
+      driver:
+        kind: patrol_test
+        target: integration_test/ar_camera_perm_test.dart
+      planned_outcome: accept
+
+    # Wait for ARKit/ARCore to stabilise tracking; optionally assert that the
+    # reference marker is being detected stably across N frames.
+    - phase: AR_SCENE_READY
+      timeout_s: 30
+      marker_id: 0           # ArUco DICT_4X4_50 marker id 0 = stand origin
+      samples: 8
+      marker_size_m: 0.05
+      capture: [screenshot]
+
+    # The AR overlay placement test.
+    - phase: UNDER_TEST
+      driver:
+        kind: patrol_test
+        target: integration_test/ar_anchor_placement_test.dart
+      capture: [screenshot, logs, debug_log]
+
+    - phase: DEV_SESSION_STOP
+
+  report:
+    format: junit

@@ -47,8 +47,11 @@ from tests.fakes.fake_repositories import (
 
 @pytest.mark.asyncio
 async def test_describe_capabilities_includes_core_surfaces():
+    from mcp_phone_controll.domain.usecases.discovery import (
+        DescribeCapabilitiesParams,
+    )
     uc = DescribeCapabilities(StaticCapabilitiesProvider())
-    res = await uc(NoParams())
+    res = await uc(DescribeCapabilitiesParams())
     assert isinstance(res, Ok)
     cap = res.value
     assert "android" in cap.platforms

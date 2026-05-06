@@ -31,6 +31,7 @@ class SetupWebDriverAgentParams:
     wda_dir: Path | None = None        # Existing checkout. If None, clone first.
     repo_url: str = "https://github.com/appium/WebDriverAgent.git"
     scheme: str = "WebDriverAgentRunner"
+    skip_if_built: bool = True         # Honor a previous successful build's marker file.
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,6 +41,12 @@ class WdaBuildResult:
     cloned: bool
     xcodebuild_stdout: str
     xcodebuild_stderr: str
+    skipped_existing: bool = False
+
+
+# Marker file written next to a successful build so we can short-circuit
+# subsequent calls. Includes the udid so multi-device setups don't collide.
+_BUILD_MARKER = ".mcp-phone-controll-built"
 
 
 class SetupWebDriverAgent(BaseUseCase[SetupWebDriverAgentParams, WdaBuildResult]):
@@ -84,6 +91,24 @@ class SetupWebDriverAgent(BaseUseCase[SetupWebDriverAgentParams, WdaBuildResult]
                 )
             )
 
+        # Short-circuit if a successful build for this UDID is already on disk.
+        marker = wda_dir / _BUILD_MARKER
+        if params.skip_if_built and marker.exists():
+            try:
+                if params.udid in marker.read_text(encoding="utf-8").splitlines():
+                    return ok(
+                        WdaBuildResult(
+                            udid=params.udid,
+                            wda_dir=wda_dir,
+                            cloned=cloned,
+                            xcodebuild_stdout="",
+                            xcodebuild_stderr="",
+                            skipped_existing=True,
+                        )
+                    )
+            except OSError:
+                pass
+
         build_res = await self._cli.build_for_testing(
             wda_dir=wda_dir, udid=params.udid, scheme=params.scheme
         )
@@ -100,6 +125,16 @@ class SetupWebDriverAgent(BaseUseCase[SetupWebDriverAgentParams, WdaBuildResult]
                     next_action="check_xcode_signing",
                 )
             )
+        # Record success so subsequent calls can short-circuit.
+        try:
+            existing = (
+                marker.read_text(encoding="utf-8") if marker.exists() else ""
+            )
+            udids = set(existing.splitlines()) | {params.udid}
+            marker.write_text("\n".join(sorted(u for u in udids if u)) + "\n", encoding="utf-8")
+        except OSError:
+            pass
+
         return ok(
             WdaBuildResult(
                 udid=params.udid,

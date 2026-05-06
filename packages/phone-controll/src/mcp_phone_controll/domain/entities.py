@@ -190,6 +190,10 @@ class CapabilityReport:
     # Self-describing schema for run_test_plan — agents can author plans
     # without trial-and-error against error messages.
     plan_schema: dict | None = None
+    # Tool ladder for small-LLM agents: which tools to expose at this level.
+    # Empty tuple = "all tools" (the default at level=expert / unspecified).
+    tool_subset: tuple[str, ...] = ()
+    level: str = "expert"
 
 
 @dataclass(frozen=True, slots=True)
@@ -259,6 +263,7 @@ class PhaseOutcome:
     error_code: str | None = None
     error_message: str | None = None
     notes: str | None = None
+    duration_ms: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -269,6 +274,7 @@ class PlanRun:
     overall_ok: bool
     phases: tuple[PhaseOutcome, ...]
     junit_path: Path | None = None
+    duration_ms: int = 0
 
 
 # --- Vision ---------------------------------------------------------------
@@ -295,6 +301,35 @@ class ImageDiff:
     passed: bool
     diff_image_path: Path | None = None
     masked_pixels: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class CameraIntrinsics:
+    """Camera matrix + distortion from a chessboard calibration."""
+
+    fx: float
+    fy: float
+    cx: float
+    cy: float
+    distortion: tuple[float, ...]   # k1, k2, p1, p2, k3
+    reprojection_error: float
+    sample_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class PoseStabilityReport:
+    marker_id: int
+    samples: int
+    translation_max_delta_m: float
+    rotation_max_delta_deg: float
+    passed: bool
+
+
+@dataclass(frozen=True, slots=True)
+class GoldenImage:
+    label: str
+    path: Path
+    image_size_bytes: int
 
 
 class ProjectType(str, Enum):
@@ -416,3 +451,70 @@ class IdeWindow:
     ide: IdeKind
     pid: int
     opened_at: datetime
+
+
+# --- Code quality --------------------------------------------------------
+
+
+class AnalyzerSeverity(str, Enum):
+    INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"
+
+
+@dataclass(frozen=True, slots=True)
+class AnalyzerIssue:
+    severity: AnalyzerSeverity
+    code: str
+    message: str
+    file: Path | None
+    line: int | None
+    column: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class AnalyzerReport:
+    project_path: Path
+    issues: tuple[AnalyzerIssue, ...]
+
+    @property
+    def errors(self) -> int:
+        return sum(1 for i in self.issues if i.severity is AnalyzerSeverity.ERROR)
+
+    @property
+    def warnings(self) -> int:
+        return sum(1 for i in self.issues if i.severity is AnalyzerSeverity.WARNING)
+
+
+@dataclass(frozen=True, slots=True)
+class FormatReport:
+    target_path: Path
+    files_changed: int
+    files_unchanged: int
+    diff: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class FixReport:
+    project_path: Path
+    fixes_applied: int
+    files_changed: int
+
+
+@dataclass(frozen=True, slots=True)
+class PubOutdatedEntry:
+    package: str
+    current: str | None
+    upgradable: str | None
+    latest: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class QualityGateReport:
+    project_path: Path
+    analyzer_errors: int
+    analyzer_warnings: int
+    format_clean: bool
+    unit_tests_passed: int
+    unit_tests_failed: int
+    overall_ok: bool

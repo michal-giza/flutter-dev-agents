@@ -179,8 +179,11 @@ async def test_unknown_driver_kind_lists_valid_kinds():
 
 @pytest.mark.asyncio
 async def test_describe_capabilities_includes_plan_schema():
+    from mcp_phone_controll.domain.usecases.discovery import (
+        DescribeCapabilitiesParams,
+    )
     uc = DescribeCapabilities(StaticCapabilitiesProvider())
-    res = await uc(NoParams())
+    res = await uc(DescribeCapabilitiesParams())
     assert isinstance(res, Ok)
     schema = res.value.plan_schema
     assert isinstance(schema, dict)
