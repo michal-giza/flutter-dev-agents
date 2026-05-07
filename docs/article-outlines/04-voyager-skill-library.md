@@ -63,14 +63,40 @@ for our MCP. It's 200 LOC.
 - **Skill composition.** Calling skill A inside skill B. Not yet.
   When you need it, the use case is one method.
 
-### Try it yourself (200 words)
+### Try it yourself — two scenarios (200 words + paste-able blocks)
+
+Reference: [`docs/test-runbook.md`](../test-runbook.md) Phase 4 for full
+stdout + troubleshooting.
+
+**Scenario A — Promote → list → replay roundtrip (test suite):**
 ```bash
-# Run a session that boots a debug loop.
-# Then:
-mcp> promote_sequence name="boot_debug_session" description="standard boot"
-mcp> list_skills
-mcp> replay_skill name="boot_debug_session" overrides={"proj": "/path/to/other/app"}
+cd ~/Desktop/flutter-dev-agents/packages/phone-controll
+.venv/bin/python -m pytest tests/unit/test_skill_library.py -v
 ```
+**Pass:** all 6 tests green. The roundtrip test exercises the full
+`promote_sequence → list_skills → replay_skill(overrides=...)` loop
+including `$proj`-style placeholder substitution.
+
+**Scenario A live, in Claude Code:**
+```
+> 1. select_device by my serial
+> 2. new_session(label="boot")
+> 3. start_debug_session(project_path="/path/to/my/app", mode="debug")
+> 4. promote_sequence(name="boot_debug_session",
+>      description="lock device, open session, start flutter run --machine")
+> 5. list_skills
+```
+**Pass:** `list_skills` shows `boot_debug_session` with `steps=3`,
+`use_count=0` (counters bump on **replay**, not creation).
+
+**Scenario B — Replay against a different project:**
+```
+> replay_skill(name="boot_debug_session", overrides={"proj": "/path/to/other/app"})
+> list_skills
+```
+**Pass:** the 3 underlying tool calls execute in order with the
+`$proj` placeholder substituted. `use_count` increments to 1,
+`success_rate: 1.0` if all steps succeeded.
 
 ### What's next (100 words)
 Article #5 covers benchmarking — once you have skills + retries +

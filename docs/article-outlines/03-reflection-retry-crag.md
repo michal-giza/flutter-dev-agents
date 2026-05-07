@@ -56,12 +56,44 @@ one sentence about why, try again." That's Reflexion. We shipped it.
 - Hallucinated tool calls — orthogonal; the strict-schema flag (H5)
   attacks that one.
 
-### Try it yourself (200 words)
+### Try it yourself — two scenarios (200 words + paste-able blocks)
+
+Reference: [`docs/test-runbook.md`](../test-runbook.md) Phase 3 for full
+stdout + troubleshooting.
+
+**Scenario A — Reflexion retry against the test suite:**
 ```bash
-MCP_REFLEXION_RETRIES=2 python -m mcp_phone_controll
-# In your prompt: ask the agent to run a flaky Patrol test against
-# your project. Observe REFLECTION phases in session_summary.
+cd ~/Desktop/flutter-dev-agents/packages/phone-controll
+MCP_REFLEXION_RETRIES=2 .venv/bin/python -m pytest \
+  tests/unit/test_reflexion_retry.py -v
 ```
+**Pass:** all 4 tests green. The "recover-and-continue" test is the
+headline — it proves a single flaky `UNDER_TEST` doesn't blow the run.
+
+**Scenario A live, against your project:** set
+`MCP_REFLEXION_RETRIES=2` in the Claude Code env, restart the session
+(`exit; claude`), then run a known-flaky Patrol test. In the resulting
+`session_summary`, look for a `REFLECTION` outcome whose `notes`
+contain the prior failure diagnosis, followed by a successful retry of
+the same phase, and `overall_ok: true`.
+
+**Scenario B — CRAG fallback:**
+```python
+import asyncio
+from mcp_phone_controll.container import build_runtime
+
+async def main():
+    _, d = build_runtime()
+    res = await d.dispatch('recall_corrective', {
+        'query': 'something very generic',
+        'scope': 'skill', 'confidence_threshold': 0.30, 'max_retries': 3,
+    })
+    print(res['data']['used_scope'], res['data']['diagnosis'])
+
+asyncio.run(main())
+```
+**Pass:** `used_scope` differs from the requested `skill` — proves the
+fallback ladder fired.
 
 ### What's next (100 words)
 Article #4 covers the Voyager skill library — when retries succeed,

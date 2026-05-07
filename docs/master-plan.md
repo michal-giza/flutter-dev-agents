@@ -338,6 +338,9 @@ solo founders ever ship.
 - `docs/article-outlines/05-benchmarking-your-stack.md` ← new.
 - `docs/composition.md` — the dependency boundary.
 - `docs/walkthrough-vscode-test.md` — what to run when validating.
+- `docs/test-runbook.md` — paste-ready test scenarios per article (Phase 0–5),
+  with expected stdout, pass criteria, and a troubleshooting table.
+  Linked from every article's "Try it yourself" section.
 - `docs/testing-procedures.md` — the four testing tiers.
 - `docs/course-outline.md` — paid course syllabus draft.
 - `docs/next-session-enhancements.md` — Tier H/I/J citations (most

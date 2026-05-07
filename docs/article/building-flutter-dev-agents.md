@@ -362,12 +362,63 @@ Same tool, three contexts, zero documentation drift.
 The repo is at `flutter-dev-agents`. The MCP package is `packages/phone-controll`. For Claude Code:
 
 ```bash
-git clone <repo> ~/Desktop/flutter-dev-agents
+git clone https://github.com/michal-giza/flutter-dev-agents ~/Desktop/flutter-dev-agents
 cd ~/Desktop/flutter-dev-agents/packages/phone-controll
 uv venv --python 3.11 && uv pip install -e ".[dev,ar,http]"
-pytest                    # 189 tests, ~half a second
+.venv/bin/python -m pytest tests/ -q   # expect: 301 passed, 2 skipped
 claude mcp add phone-controll -- $(pwd)/.venv/bin/python -m mcp_phone_controll
 ```
+
+## Try it yourself — three test scenarios
+
+Paste these into Claude Code (or your local-LLM REPL). Each scenario is
+copy-pasteable; the runbook at [`docs/test-runbook.md`](../test-runbook.md)
+has expected stdout, pass criteria, and a troubleshooting table per
+symptom.
+
+### Scenario A — 4-tool boot sequence (2 min, no device required)
+
+```
+> Use phone-controll. Run this 4-tool boot sequence and stop on the
+> first ok:false. Show me each envelope's `ok` and (if false)
+> `error.next_action`:
+>
+> 1. describe_capabilities(level="basic")
+> 2. check_environment
+> 3. list_devices
+> 4. inspect_project(project_path=".")
+```
+
+**Pass:** all four return `ok: true`. `describe_capabilities` returns
+exactly 18 tools in `tool_subset` and a 9-step `recommended_sequence`
+starting with `describe_capabilities`.
+
+### Scenario B — Declarative dev loop (5 min, device required)
+
+Edit `examples/templates/dev_iteration.yaml`, replace the two
+`REPLACE_*` placeholders, then:
+
+```
+> Validate then run examples/templates/dev_iteration.yaml against my
+> Flutter project. After it finishes, call summarize_session and
+> paste the 3-line headline.
+```
+
+**Pass:** A new VS Code window opens on your project. Session
+artifacts under `~/.mcp_phone_controll/sessions/<sid>/` include
+screenshots + debug logs. The headline reports ≥ 6 successful calls.
+
+### Scenario C — Multi-project parallelism (10 min, 2 devices required)
+
+Two terminals, two `claude` sessions, two different projects + serials.
+Both sessions run Scenario B. The second session must **not** acquire
+the first session's device.
+
+**Pass:** Each session locks its own serial in
+`~/.mcp_phone_controll/locks/`. `release_device` in session 1 doesn't
+touch session 2.
+
+
 
 For a local 4B model:
 

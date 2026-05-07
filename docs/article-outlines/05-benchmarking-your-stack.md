@@ -62,11 +62,42 @@ PR. Specific enough to catch real regressions.
   - The rate limiter probably catches more 4B model loops than
     expected.
 
-### How to add a task to the bench (200 words)
-- One JSON entry, one expected envelope shape.
-- Run locally: `python -m bench.run_bench --tasks T11`.
-- PR includes the task + a comment explaining "what regression would
-  this catch."
+### Try it yourself — two scenarios (200 words + paste-able blocks)
+
+Reference: [`docs/test-runbook.md`](../test-runbook.md) Phase 5 for full
+stdout + troubleshooting.
+
+**Scenario A — Run the bench (1 min):**
+```bash
+cd ~/Desktop/flutter-dev-agents/packages/phone-controll
+.venv/bin/python -m bench.run_bench
+```
+
+**Expected stdout (tail):**
+```
+bench done → /Users/<you>/.mcp_phone_controll/bench/<stamp>.json
+  junit → /Users/<you>/.mcp_phone_controll/bench/<stamp>.junit.xml
+  passed: 10/10
+```
+**Pass:** `10/10`, exit code 0. The JSON report includes per-task
+`duration_ms` and the `next_actions_seen` distribution.
+
+**Scenario B — Add a custom task:**
+Edit `bench/tasks.json`, append:
+```json
+{
+  "id": "T11-my-flow",
+  "description": "Validate my own canonical workflow.",
+  "calls": [
+    {"tool": "list_devices", "args": {}, "expect": {"ok": true}},
+    {"tool": "select_device", "args": {"serial": "EMU01"}, "expect": {"ok": true}},
+    {"tool": "tap_and_verify", "args": {"text": "Sign in", "expect_text": "Welcome"}, "expect": {"ok": true}}
+  ]
+}
+```
+Then `python -m bench.run_bench --tasks T11-my-flow`. **Pass:** task
+either succeeds or fails with a precise reason. Failure is fine —
+that's the bench doing its job.
 
 ### What's next (100 words)
 Articles #1–5 wrap a complete narrative: ship the MCP, bridge with

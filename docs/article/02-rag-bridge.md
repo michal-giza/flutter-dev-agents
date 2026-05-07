@@ -201,6 +201,69 @@ covers the same demand without paying for servers.
 The full backlog with citations is in
 [`docs/next-session-enhancements.md`](../next-session-enhancements.md).
 
+## Try it yourself — three test scenarios
+
+Pre-req: Qdrant running locally + the `[rag]` extra installed:
+
+```bash
+docker run -d --name qdrant -p 6333:6333 \
+  -v ~/qdrant_storage:/qdrant/storage qdrant/qdrant
+cd ~/Desktop/flutter-dev-agents/packages/phone-controll
+uv pip install -e '.[rag]'
+```
+
+Full expected stdout + pass criteria for each scenario lives at
+[`docs/test-runbook.md`](../test-runbook.md) Phase 2.
+
+### Scenario A — Index a project, recall a chunk (5 min)
+
+```python
+import asyncio
+from pathlib import Path
+from mcp_phone_controll.container import build_runtime
+
+async def main():
+    _, d = build_runtime()
+    res = await d.dispatch('index_project', {
+        'project_path': str(Path.home() / 'Desktop/flutter-dev-agents'),
+        'collection': 'fda-test',
+    })
+    print('index:', res['ok'], '— files:', res['data']['files_indexed'])
+
+    res = await d.dispatch('recall', {
+        'query': 'UMP_GATE preconditions decline path',
+        'k': 3, 'scope': 'all',
+    })
+    for c in res['data']:
+        print(f"  {c['score']:.3f}  {c['source']}")
+
+asyncio.run(main())
+```
+
+**Pass:** ≥ 20 files indexed, top-3 chunks each scoring above 0.3, with
+at least one literal-token match (proves hybrid lexical fusion fired).
+
+### Scenario B — Token-budget proof (3 min)
+
+```bash
+wc -c ~/Desktop/claude_skills/skills/mcp-phone-controll-testing/SKILL-FULL.md
+wc -c ~/Desktop/claude_skills/skills/mcp-phone-controll-testing/SKILL.md
+```
+
+**Pass:** new SKILL.md is roughly 1/5 of SKILL-FULL.md (~30 KB → ~4.5 KB).
+Multiply by tokens-per-byte for your encoder to get the per-session
+budget delta. On Qwen 2.5-7B that's the ~70% number from the article.
+
+### Scenario C — Shadow-run smoke (1 min)
+
+```bash
+.venv/bin/python -m scripts.shadow_run --suite tier_g --iterations 50
+```
+
+**Pass:** exit 0; every Tier-G tool reports
+`envelope_invariants_violated: 0` in the JSON report. This is the test
+that promotes new tools from "feels right" to "ships green under fuzz."
+
 ## What I'm asking from readers
 
 Clone it. Plug in your phone. Run the walkthrough at
