@@ -43,6 +43,13 @@ class TakeScreenshot(BaseUseCase[TakeScreenshotParams, Path]):
         shot_res = await self._observation.screenshot(serial_res.value, path_res.value)
         if isinstance(shot_res, Err):
             return shot_res
+        # Cap dimensions for vision-model compatibility (Claude 2000px hard
+        # limit on multi-image conversations; LLaVA/Qwen-VL prefer ≤1024px).
+        # Original is preserved at `<path>.orig.png` for visual-diff workflows.
+        # Fails open if cv2 isn't installed.
+        from ...data.image_capping import cap_image_in_place
+
+        cap_image_in_place(shot_res.value)
         await self._artifacts.register(
             Artifact(path=shot_res.value, kind=ArtifactKind.SCREENSHOT, label=params.label)
         )

@@ -109,6 +109,19 @@ a Qdrant server reachable at `MCP_QDRANT_URL` (default
 model. Both ship with the `rag-search` capstone too — that's the only
 point of overlap, and it's a static config, not an API.
 
+### Environment variables (all optional)
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `MCP_QDRANT_URL` | `http://localhost:6333` | Qdrant server for `recall` / `index_project`. |
+| `MCP_RAG_EMBED_MODEL` | `BAAI/bge-small-en-v1.5` | FastEmbed model name. |
+| `MCP_TRACE_DB` | (unset → in-memory ring) | Path to SQLite file for cross-session trace persistence. |
+| `MCP_SKILL_LIBRARY_DB` | (artifacts root) | Path to SQLite file backing the Voyager skill library. |
+| `MCP_AUTO_NARRATE_EVERY` | `0` (off) | Attach a one-line `narrate` field every Nth dispatcher call. Recommended `5` for 4B agents. |
+| `MCP_REFLEXION_RETRIES` | `0` (off) | Retry budget per failed retryable phase in the plan walker. |
+| `MCP_STRICT_TOOLS` | unset (off) | When truthy, the OpenAI function-call adapter advertises `strict: true` — sampler-side schema enforcement. |
+| `MCP_MAX_IMAGE_DIM` | `1920` | Long-edge cap for screenshots returned to the agent. Claude rejects multi-image conversations where any image exceeds 2000px; LLaVA / Qwen-VL prefer ≤1024px. Set `MCP_MAX_IMAGE_DIM=896` for tight local-vision-model context budgets, `0` to disable. Originals are preserved at `<path>.orig.png` so `compare_screenshot` and golden-image diffs stay full-resolution. |
+
 ## What lives where
 
 | Concern | Owner |

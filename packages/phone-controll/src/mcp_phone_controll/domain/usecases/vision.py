@@ -32,9 +32,14 @@ class CompareScreenshot(BaseUseCase[CompareScreenshotParams, ImageDiff]):
         self._vision = vision
 
     async def execute(self, params: CompareScreenshotParams) -> Result[ImageDiff]:
+        # Prefer the un-capped originals when present — capping is for the
+        # vision-model context budget, not for diff math (which wants the
+        # full sensor).
+        from ...data.image_capping import prefer_original
+
         return await self._vision.compare(
-            params.actual_path,
-            params.golden_path,
+            prefer_original(params.actual_path),
+            prefer_original(params.golden_path),
             params.tolerance,
             params.diff_output_path,
         )

@@ -351,6 +351,10 @@ class SaveGoldenImage(BaseUseCase[SaveGoldenImageParams, GoldenImage]):
             target_dir = session_res.value.root / "golden"
         target_dir.mkdir(parents=True, exist_ok=True)
         out = target_dir / f"{params.label}.png"
+        # Goldens are intentionally NOT dimension-capped — visual-diff math
+        # wants the full sensor. The cap in TakeScreenshot only applies to
+        # the agent-facing path; ObservationRepository.screenshot here
+        # writes the raw frame.
         shot_res = await self._observation.screenshot(serial_res.value, out)
         if isinstance(shot_res, Err):
             return shot_res
