@@ -101,8 +101,8 @@ def test_caps_oversized_png_referenced_in_envelope_data(tmp_path: Path):
     oversize = tmp_path / "shot.png"
     _write_png(oversize, width=3120, height=1440)
     envelope = {"ok": True, "data": str(oversize)}
-    capped = cap_pngs_in_envelope(envelope)
-    assert capped == 1
+    out = cap_pngs_in_envelope(envelope)
+    assert out.get("image_cap", {}).get("capped") == [str(oversize)]
     assert max(_read_dims(oversize)) <= 1920
 
 
@@ -116,8 +116,8 @@ def test_walks_nested_dict_and_caps(tmp_path: Path):
             "extras": {"snapshot": str(p2)},
         },
     }
-    capped = cap_pngs_in_envelope(envelope)
-    assert capped == 2
+    out = cap_pngs_in_envelope(envelope)
+    assert len(out["image_cap"]["capped"]) == 2
 
 
 def test_skips_exempt_paths(tmp_path: Path):
@@ -126,9 +126,8 @@ def test_skips_exempt_paths(tmp_path: Path):
     release = release_dir / "01-home.png"
     _write_png(release, width=3120, height=1440)
     envelope = {"ok": True, "data": {"full": str(release)}}
-    capped = cap_pngs_in_envelope(envelope)
-    assert capped == 0
-    # File untouched.
+    out = cap_pngs_in_envelope(envelope)
+    assert "image_cap" not in out
     assert max(_read_dims(release)) > 1920
 
 
@@ -136,11 +135,52 @@ def test_idempotent(tmp_path: Path):
     p = tmp_path / "x.png"
     _write_png(p, 3120, 1440)
     cap_pngs_in_envelope({"data": str(p)})
-    capped_second = cap_pngs_in_envelope({"data": str(p)})
-    assert capped_second == 0  # already under cap
+    # second call: file is already under cap, no rewrite.
+    out = cap_pngs_in_envelope({"data": str(p)})
+    assert "image_cap" not in out
 
 
 def test_handles_missing_file_gracefully():
     envelope = {"ok": True, "data": "/tmp/definitely-not-a-real-file.png"}
-    capped = cap_pngs_in_envelope(envelope)
-    assert capped == 0  # _looks_like_png_path filters non-existent paths
+    out = cap_pngs_in_envelope(envelope)
+    assert "image_cap" not in out
+
+
+def test_hard_refuses_when_cap_fails(tmp_path: Path, monkeypatch):
+    """Simulate cv2/PIL/sips all unavailable. The seatbelt must rewrite
+    the envelope, flip ok=false, and attach a structured diagnosis."""
+    oversize = tmp_path / "shot.png"
+    _write_png(oversize, width=3120, height=1440)
+
+    # Break every backend.
+    import mcp_phone_controll.data.image_capping as cap_mod
+
+    monkeypatch.setattr(cap_mod, "_resize_cv2", lambda *a, **k: False)
+    monkeypatch.setattr(cap_mod, "_resize_pil", lambda *a, **k: False)
+    monkeypatch.setattr(cap_mod, "_resize_sips", lambda *a, **k: False)
+
+    envelope = {"ok": True, "data": str(oversize)}
+    out = cap_pngs_in_envelope(envelope)
+
+    # The path must be removed from the agent-visible data field so
+    # Claude Code's auto-embed doesn't pick it up. The diagnostic
+    # `error.details.image_cap.refused[].path` deliberately keeps the
+    # path so the operator can find and fix the file.
+    assert out["data"] != str(oversize)
+    assert "<removed" in out["data"]
+    # ok=false; structured error.
+    assert out["ok"] is False
+    assert out["error"]["code"] == "ImageCapFailure"
+    assert out["error"]["next_action"] == "install_image_backend"
+    refused = out["error"]["details"]["image_cap"]["refused"]
+    assert len(refused) == 1
+    assert refused[0]["path"] == str(oversize)
+
+
+def test_capped_envelope_keeps_ok_true_when_all_caps_succeed(tmp_path: Path):
+    p = tmp_path / "shot.png"
+    _write_png(p, 3120, 1440)
+    out = cap_pngs_in_envelope({"ok": True, "data": str(p)})
+    # Successfully capped — ok stays True; diagnostic ride-along.
+    assert out["ok"] is True
+    assert "capped" in out["image_cap"]
