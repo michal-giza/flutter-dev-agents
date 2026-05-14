@@ -112,6 +112,9 @@ from mcp_phone_controll.domain.usecases.productivity import (
 )
 from mcp_phone_controll.domain.usecases.recall import IndexProject, Recall
 from mcp_phone_controll.domain.usecases.crag import CorrectiveRecall
+from mcp_phone_controll.domain.usecases.release_screenshot import (
+    CaptureReleaseScreenshot,
+)
 from mcp_phone_controll.domain.usecases.skill_library import (
     ListSkills,
     PromoteSequence,
@@ -310,6 +313,9 @@ def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:
         recall=Recall(_null_rag),
         recall_corrective=CorrectiveRecall(Recall(_null_rag)),
         index_project=IndexProject(_null_rag, _chunker),
+        capture_release_screenshot=CaptureReleaseScreenshot(
+            observation, artifacts, state
+        ),
         promote_sequence=PromoteSequence(trace, _skill_library),
         list_skills=ListSkills(_skill_library),
         replay_skill=ReplaySkill(_skill_library, _noop_dispatch),
@@ -514,6 +520,7 @@ async def test_registry_covers_all_use_case_fields(tmp_path: Path):
         "recall",
         "recall_corrective",
         "index_project",
+        "capture_release_screenshot",
         "promote_sequence",
         "list_skills",
         "replay_skill",

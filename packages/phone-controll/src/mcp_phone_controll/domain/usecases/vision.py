@@ -119,8 +119,15 @@ class WaitForMarker(BaseUseCase[WaitForMarkerParams, MarkerDetection]):
             shot_res = await self._observation.screenshot(serial, path_res.value)
             if isinstance(shot_res, Err):
                 return shot_res
+            # Cap each marker-poll frame so leftover artifacts don't blow
+            # Claude's per-image limit if the user later inspects them.
+            # Marker detection runs over the un-capped `.orig.png` via
+            # prefer_original — accuracy preserved.
+            from ...data.image_capping import cap_image_in_place, prefer_original
+
+            cap_image_in_place(shot_res.value)
             detect_res = await self._vision.detect_markers(
-                shot_res.value, params.dictionary
+                prefer_original(shot_res.value), params.dictionary
             )
             if isinstance(detect_res, Err):
                 return detect_res

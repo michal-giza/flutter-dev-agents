@@ -45,6 +45,10 @@ from ..domain.usecases.crag import (
     CorrectiveRecall,
     CorrectiveRecallParams,
 )
+from ..domain.usecases.release_screenshot import (
+    CaptureReleaseScreenshot,
+    CaptureReleaseScreenshotParams,
+)
 from ..domain.usecases.skill_library import (
     ListSkills,
     PromoteSequence,
@@ -548,6 +552,16 @@ def _params_recall(args: JsonDict) -> RecallParams:
     )
 
 
+def _params_capture_release_screenshot(
+    args: JsonDict,
+) -> CaptureReleaseScreenshotParams:
+    return CaptureReleaseScreenshotParams(
+        label=args["label"],
+        serial=args.get("serial"),
+        thumbnail_long_edge=int(args.get("thumbnail_long_edge", 256)),
+    )
+
+
 def _params_recall_corrective(args: JsonDict) -> CorrectiveRecallParams:
     return CorrectiveRecallParams(
         query=args["query"],
@@ -1039,6 +1053,7 @@ class UseCases:
     recall: Recall
     recall_corrective: CorrectiveRecall
     index_project: IndexProject
+    capture_release_screenshot: CaptureReleaseScreenshot
     promote_sequence: PromoteSequence
     list_skills: ListSkills
     replay_skill: ReplaySkill
@@ -1496,6 +1511,33 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             ),
             build_params=_params_screenshot,
             invoke=_bind(uc.take_screenshot, _params_screenshot),
+        ),
+        ToolDescriptor(
+            name="capture_release_screenshot",
+            description=(
+                "Capture a full-resolution PNG for app-store listings. "
+                "Returns metadata + thumbnail path only — full-res file "
+                "stays on disk and is NOT embedded inline (so it doesn't "
+                "blow Claude's 2000px multi-image cap). Open release_dir "
+                "in Finder to drag into Play Console / App Store Connect."
+            ),
+            input_schema=_schema(
+                {
+                    "label": _string(
+                        "Filename (no slashes). Conventionally '01-home', "
+                        "'02-feed', etc., one per store-listing slot."
+                    ),
+                    "thumbnail_long_edge": _int(
+                        "Thumbnail dimension cap (default 256, min 64)."
+                    ),
+                    **serial_prop,
+                },
+                ["label"],
+            ),
+            build_params=_params_capture_release_screenshot,
+            invoke=_bind(
+                uc.capture_release_screenshot, _params_capture_release_screenshot
+            ),
         ),
         ToolDescriptor(
             name="start_recording",

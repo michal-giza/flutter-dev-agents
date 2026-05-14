@@ -83,6 +83,13 @@ class PrepareForTest(BaseUseCase[PrepareForTestParams, PreparationResult]):
             shot_res = await self._observation.screenshot(serial, path_res.value)
             if isinstance(shot_res, Err):
                 return shot_res
+            # Cap dimensions before returning the path — Claude Code auto-
+            # embeds returned PNG paths inline, and uncapped Galaxy/iPhone
+            # screenshots blow the 2000px multi-image limit. Original
+            # preserved at `<path>.orig.png`.
+            from ...data.image_capping import cap_image_in_place
+
+            cap_image_in_place(shot_res.value)
             screenshot_path = str(shot_res.value)
             actions.append("take_screenshot")
 

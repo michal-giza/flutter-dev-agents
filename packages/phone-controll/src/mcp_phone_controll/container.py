@@ -80,6 +80,7 @@ from .domain.usecases.productivity import (
 )
 from .domain.usecases.recall import IndexProject, Recall
 from .domain.usecases.crag import CorrectiveRecall
+from .domain.usecases.release_screenshot import CaptureReleaseScreenshot
 from .domain.usecases.skill_library import (
     ListSkills,
     PromoteSequence,
@@ -553,6 +554,9 @@ def build_runtime(
         recall=Recall(rag_repo),
         recall_corrective=CorrectiveRecall(Recall(rag_repo)),
         index_project=IndexProject(rag_repo, _build_chunker()),
+        capture_release_screenshot=CaptureReleaseScreenshot(
+            observation_repo, artifacts_repo, state_repo
+        ),
         promote_sequence=PromoteSequence(trace_repo, skill_library_repo),
         list_skills=ListSkills(skill_library_repo),
         replay_skill=ReplaySkill(skill_library_repo, _dispatch),

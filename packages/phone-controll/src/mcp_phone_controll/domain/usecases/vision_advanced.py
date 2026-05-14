@@ -202,8 +202,16 @@ class AssertPoseStable(
             shot_res = await self._observation.screenshot(serial, path_res.value)
             if isinstance(shot_res, Err):
                 return shot_res
+            # Cap each pose-sample frame so Claude doesn't choke on a
+            # long-running pose check that emits 20+ uncapped PNGs.
+            # Pose math runs over the original via prefer_original.
+            from ...data.image_capping import cap_image_in_place, prefer_original
+
+            cap_image_in_place(shot_res.value)
             pose_res = await self._vision.infer_pose(
-                shot_res.value, params.marker_id, params.marker_size_m
+                prefer_original(shot_res.value),
+                params.marker_id,
+                params.marker_size_m,
             )
             if isinstance(pose_res, Err):
                 # Skip frames where the marker isn't seen rather than failing
