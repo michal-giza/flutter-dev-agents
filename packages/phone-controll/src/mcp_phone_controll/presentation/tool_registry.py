@@ -2639,6 +2639,13 @@ class ToolDispatcher:
             from .output_truncation import truncate_envelope
 
             envelope = truncate_envelope(envelope)
+        # Seatbelt: scan the response for any PNG path that's over the
+        # vision-model cap and resize in place. Use-case-level caps are
+        # the belt; this is the seatbelt. Goldens + release-mode files
+        # are exempt by path-segment match.
+        from .image_safety_net import cap_pngs_in_envelope
+
+        cap_pngs_in_envelope(envelope)
         if self._trace_repo is not None:
             await self._record(name, args, envelope)
         # Auto-narrate: attach a one-line summary every Nth call so a

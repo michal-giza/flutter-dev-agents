@@ -109,6 +109,12 @@ class OpenCvVisionRepository(VisionRepository):
             highlight = actual.copy()
             highlight[mask > 0] = (0, 0, 255)
             cv2.imwrite(str(diff_output_path), highlight)
+            # Diff image is returned to the agent as a path → Claude Code
+            # auto-embeds. Cap to keep it under the 2000px multi-image
+            # limit. Original highlighted diff preserved at `.orig.png`.
+            from ..image_capping import cap_image_in_place
+
+            cap_image_in_place(diff_output_path)
 
         return ok(
             ImageDiff(
