@@ -123,9 +123,15 @@ async def test_describe_tool_replay_size_zero_disables():
 @pytest.mark.asyncio
 async def test_auto_narrate_appends_summary_every_nth_call(tmp_path: Path):
     from tests.integration.test_tool_dispatcher import _build_fake_dispatcher
+    from mcp_phone_controll.presentation.middleware import AutoNarrateMiddleware
+
     d = _build_fake_dispatcher(tmp_path)
-    d._auto_narrate_every = 2  # type: ignore[attr-defined]
-    d._call_counter = 0  # type: ignore[attr-defined]
+    # Reach into the middleware chain rather than patching private dispatcher
+    # state — the refactor moved auto-narrate into its own middleware.
+    narrate_mw = next(mw for mw in d.middlewares if isinstance(mw, AutoNarrateMiddleware))
+    narrate_mw._every = 2
+    narrate_mw._counter = 0
+
     r1 = await d.dispatch("list_devices", {})
     assert "narrate" not in r1
     r2 = await d.dispatch("list_devices", {})

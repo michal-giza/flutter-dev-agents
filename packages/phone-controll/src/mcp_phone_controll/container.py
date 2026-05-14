@@ -102,6 +102,7 @@ from .domain.usecases.discovery import (
     ToolUsageReportUseCase,
 )
 from .domain.usecases.mcp_ping import McpPing
+from .domain.usecases.artifact_retention import DiskUsage, PruneOriginals
 from .domain.usecases.doctor import CheckEnvironment
 from .domain.usecases.lifecycle import (
     ClearAppData,
@@ -474,6 +475,8 @@ def build_runtime(
         session_summary=SessionSummary(trace_repo),
         tool_usage_report=ToolUsageReportUseCase(trace_repo, _all_tool_names),
         mcp_ping=McpPing(_all_tool_names_count),
+        disk_usage=DiskUsage(artifacts_repo),
+        prune_originals=PruneOriginals(artifacts_repo),
         inspect_project=InspectProject(inspector),
         prepare_for_test=PrepareForTest(
             lifecycle_repo, ui_repo, observation_repo, artifacts_repo, state_repo

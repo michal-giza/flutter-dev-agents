@@ -42,6 +42,11 @@ from ..domain.usecases.recall import (
     RecallParams,
 )
 from ..domain.usecases.mcp_ping import McpPing
+from ..domain.usecases.artifact_retention import (
+    DiskUsage,
+    PruneOriginals,
+    PruneOriginalsParams,
+)
 from ..domain.usecases.crag import (
     CorrectiveRecall,
     CorrectiveRecallParams,
@@ -654,6 +659,15 @@ def _params_session_summary(args: JsonDict) -> SessionSummaryParams:
     return SessionSummaryParams(session_id=args.get("session_id"))
 
 
+def _params_prune_originals(args: JsonDict) -> PruneOriginalsParams:
+    return PruneOriginalsParams(
+        older_than_days=(
+            int(args["older_than_days"]) if "older_than_days" in args else None
+        ),
+        dry_run=bool(args.get("dry_run", False)),
+    )
+
+
 def _params_tool_usage_report(args: JsonDict) -> ToolUsageReportParams:
     return ToolUsageReportParams(
         session_id=args.get("session_id"),
@@ -976,6 +990,8 @@ class UseCases:
     session_summary: SessionSummary
     tool_usage_report: ToolUsageReportUseCase
     mcp_ping: McpPing
+    disk_usage: DiskUsage
+    prune_originals: PruneOriginals
     inspect_project: InspectProject
     prepare_for_test: PrepareForTest
     run_test_plan: RunTestPlan
@@ -1136,6 +1152,38 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             input_schema=_schema({}),
             build_params=_params_no,
             invoke=_bind(uc.mcp_ping, _params_no),
+        ),
+        ToolDescriptor(
+            name="disk_usage",
+            description=(
+                "Report bytes used in the artifacts root, bucketed: "
+                "screenshots, originals (.orig.png companions), goldens, "
+                "release, logs, recordings, other. Useful before pruning."
+            ),
+            input_schema=_schema({}),
+            build_params=_params_no,
+            invoke=_bind(uc.disk_usage, _params_no),
+        ),
+        ToolDescriptor(
+            name="prune_originals",
+            description=(
+                "Delete `.orig.png` companions older than older_than_days "
+                "(defaults to MCP_ORIG_RETENTION_DAYS or 14). Conservative: "
+                "never touches capped screenshots, goldens, or release. "
+                "Run with dry_run=true first to see what would be removed."
+            ),
+            input_schema=_schema(
+                {
+                    "older_than_days": _int(
+                        "Retention window in days. Defaults to env or 14."
+                    ),
+                    "dry_run": _bool(
+                        "Report candidates without deleting (default false)."
+                    ),
+                }
+            ),
+            build_params=_params_prune_originals,
+            invoke=_bind(uc.prune_originals, _params_prune_originals),
         ),
         ToolDescriptor(
             name="session_summary",
@@ -2559,19 +2607,16 @@ def _missing_arg_envelope(descriptor: ToolDescriptor, missing_key: str) -> JsonD
 class ToolDispatcher:
     """Generic dispatcher: name → ToolDescriptor → uniform JSON envelope.
 
-    Records every call into an optional SessionTraceRepository for autonomy.
-    With `truncate_outputs=True` (default), long results are capped so 4B-class
-    models stay within context — the envelope picks up `data_truncated: true`
-    and `next_action: "fetch_full_artifact_if_needed"`.
-    """
+    Cross-cutting concerns (rate limit, image cap, trace recording,
+    auto-narrate, Patrol guard, output truncation) live in
+    `presentation/middleware.py` as a chain. The dispatcher itself is a
+    thin orchestrator: walk pre-dispatch hooks, invoke the use case,
+    walk post-dispatch hooks in reverse order. Each middleware is
+    independently unit-testable.
 
-    # Tools that put the device into a "Patrol-driven" mode. After any of these
-    # runs, raw tap_text on app UI is refused (system UI excepted via system=true)
-    # because Patrol selectors are locale-independent and survive layout changes.
-    _PATROL_ACTIVATING = frozenset(
-        {"prepare_for_test", "run_patrol_test", "run_patrol_suite", "run_test_plan"}
-    )
-    _PATROL_DEACTIVATING = frozenset({"release_device", "stop_app", "new_session"})
+    Pass `middlewares=` for full control; if omitted,
+    `build_default_chain` provides the canonical order.
+    """
 
     def __init__(
         self,
@@ -2580,98 +2625,58 @@ class ToolDispatcher:
         truncate_outputs: bool = True,
         rate_limiter=None,
         auto_narrate_every: int = 0,
+        middlewares: list | None = None,
     ) -> None:
         self._by_name = {d.name: d for d in descriptors}
         self._trace_repo = trace_repo
-        self._truncate_outputs = truncate_outputs
-        self._patrol_active = False
-        if rate_limiter is None:
-            from .rate_limiter import RateLimiter
 
-            rate_limiter = RateLimiter()
-        self._rate_limiter = rate_limiter
-        # Auto-narrate every Nth call. 0 disables (default). Inspired by
-        # Reflexion (Shinn et al., 2023, arXiv 2303.11366) — periodic
-        # self-summary improves long-horizon agent performance.
-        self._auto_narrate_every = max(0, int(auto_narrate_every))
-        self._call_counter = 0
+        if middlewares is None:
+            if rate_limiter is None:
+                from .rate_limiter import RateLimiter
+
+                rate_limiter = RateLimiter()
+            from .middleware import build_default_chain
+
+            middlewares = build_default_chain(
+                rate_limiter=rate_limiter,
+                trace_repo=trace_repo,
+                recorder=self._record,
+                truncate_outputs=truncate_outputs,
+                auto_narrate_every=auto_narrate_every,
+            )
+        self._middlewares = middlewares
 
     @property
     def descriptors(self) -> list[ToolDescriptor]:
         return list(self._by_name.values())
 
+    @property
+    def middlewares(self) -> list:
+        """Exposed read-only so tests + tooling can introspect / replace."""
+        return list(self._middlewares)
+
     def has(self, name: str) -> bool:
         return name in self._by_name
 
     async def dispatch(self, name: str, args: JsonDict | None) -> JsonDict:
-        # Refuse raw tap_text on app UI once Patrol owns the session — small
-        # models reach for it instinctively and break locale-dependent flows.
-        if (
-            name == "tap_text"
-            and self._patrol_active
-            and not bool((args or {}).get("system", False))
-        ):
-            return {
-                "ok": False,
-                "error": {
-                    "code": "TapTextRefused",
-                    "message": (
-                        "tap_text is refused while a Patrol-driven session is "
-                        "active. Use run_patrol_test for app UI; pass "
-                        "system=true only for OS-level dialogs."
-                    ),
-                    "next_action": "use_patrol",
-                    "details": {
-                        "reason": "patrol_session_active",
-                        "alternatives": [
-                            "run_patrol_test",
-                            "tap_and_verify (with Patrol-managed UI)",
-                        ],
-                    },
-                },
-            }
-        # Rate-limit / circuit-breaker guard. Discovery + introspection tools
-        # bypass it so an agent can always inspect its own state.
-        if name not in {
-            "describe_capabilities",
-            "describe_tool",
-            "session_summary",
-            "tool_usage_report",
-        }:
-            guard = self._rate_limiter.check(name)
+        # 1. Pre-dispatch hooks in order. Any may short-circuit.
+        for idx, mw in enumerate(self._middlewares):
+            guard = await mw.pre_dispatch(name, args)
             if guard is not None:
-                if self._trace_repo is not None:
-                    await self._record(name, args, guard)
-                return guard
+                envelope = guard
+                # Short-circuit still walks the post-dispatch hooks of
+                # the middlewares we already pre-traversed, in reverse,
+                # so trace + seatbelt see the rejection envelope too.
+                for prev in reversed(self._middlewares[: idx + 1]):
+                    envelope = await prev.post_dispatch(name, args, envelope)
+                return envelope
+
+        # 2. Invoke the use case.
         envelope = await self._dispatch_unrecorded(name, args)
-        ok_flag = bool(envelope.get("ok"))
-        self._rate_limiter.record(name, ok_flag)
-        if ok_flag and name in self._PATROL_ACTIVATING:
-            self._patrol_active = True
-        elif ok_flag and name in self._PATROL_DEACTIVATING:
-            self._patrol_active = False
-        if self._truncate_outputs:
-            from .output_truncation import truncate_envelope
 
-            envelope = truncate_envelope(envelope)
-        # Seatbelt: scan the response for any PNG path that's over the
-        # vision-model cap. Cap in place if possible; HARD-REFUSE to
-        # return paths the cap couldn't fix (would otherwise poison the
-        # conversation). Goldens + release-mode files exempt.
-        from .image_safety_net import cap_pngs_in_envelope
-
-        envelope = cap_pngs_in_envelope(envelope)
-        if self._trace_repo is not None:
-            await self._record(name, args, envelope)
-        # Auto-narrate: attach a one-line summary every Nth call so a
-        # forgetful agent sees a recap without having to ask. The narrate
-        # field rides alongside `data` / `error`, never replaces them.
-        if self._auto_narrate_every > 0:
-            self._call_counter += 1
-            if self._call_counter % self._auto_narrate_every == 0:
-                from ..domain.usecases.narrate import narrate_envelope
-
-                envelope["narrate"] = narrate_envelope(envelope, tool=name)
+        # 3. Post-dispatch in reverse order (LIFO so wrappers compose).
+        for mw in reversed(self._middlewares):
+            envelope = await mw.post_dispatch(name, args, envelope)
         return envelope
 
     async def _dispatch_unrecorded(
