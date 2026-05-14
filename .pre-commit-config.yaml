@@ -1,0 +1,44 @@
+# Pre-commit hooks — match what CI enforces, run them locally before pushing.
+#
+# Install:
+#   uv pip install pre-commit
+#   pre-commit install
+#
+# Run on every staged file:
+#   pre-commit run
+#
+# Run against the whole repo (parity with CI):
+#   pre-commit run --all-files
+#
+# The three gates below mirror `.github/workflows/ci.yml` exactly. If a
+# commit passes pre-commit it should pass CI. If you ever see drift,
+# update CI and this file in the same PR.
+
+repos:
+  # 1) Lint — fast, autoformatting where safe.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.7.4
+    hooks:
+      - id: ruff
+        name: ruff (lint)
+        args: [--fix, --exit-non-zero-on-fix]
+        files: ^packages/phone-controll/(src|tests|scripts)/.*\.py$
+
+  # 2) Tests + tool-catalogue staleness — local hooks; reuse the venv.
+  - repo: local
+    hooks:
+      - id: pytest-fast
+        name: pytest -q (phone-controll, fast suite)
+        entry: bash -c 'cd packages/phone-controll && .venv/bin/pytest -q --no-cov -x --ignore=tests/agent'
+        language: system
+        pass_filenames: false
+        files: ^packages/phone-controll/(src|tests)/.*\.py$
+        # Set SKIP=pytest-fast in env to bypass on huge cosmetic-only commits.
+
+      - id: tool-catalogue-fresh
+        name: docs/tools.md matches live registry
+        entry: bash -c 'cd packages/phone-controll && .venv/bin/python -m scripts.generate_tool_catalogue --check'
+        language: system
+        pass_filenames: false
+        # Triggers whenever a descriptor, use-case, or the catalogue itself moves.
+        files: ^(packages/phone-controll/src/mcp_phone_controll/(presentation/tool_registry|domain/usecases|domain/tool_levels)\.py|packages/phone-controll/src/mcp_phone_controll/presentation/descriptors/.*\.py|docs/tools.md)$

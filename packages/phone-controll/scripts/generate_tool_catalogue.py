@@ -73,7 +73,10 @@ def _generate(env_quiet: bool = True) -> str:
             req_marker = " *(required)*" if prop_name in required else ""
             ptype = (prop_schema or {}).get("type", "any")
             pdesc = (prop_schema or {}).get("description", "")
-            lines.append(f"- `{prop_name}: {ptype}`{req_marker} — {pdesc}".rstrip(" — "))
+            row = f"- `{prop_name}: {ptype}`{req_marker} — {pdesc}"
+            if row.endswith(" — "):
+                row = row[: -len(" — ")]
+            lines.append(row)
         lines.append("")
     return "\n".join(lines) + "\n"
 
@@ -96,8 +99,8 @@ def main() -> int:
         existing = args.output.read_text() if args.output.is_file() else ""
         if existing.strip() != content.strip():
             print(
-                f"docs/tools.md is stale. Re-run "
-                f"`python -m scripts.generate_tool_catalogue`.",
+                "docs/tools.md is stale. Re-run "
+                "`python -m scripts.generate_tool_catalogue`.",
                 file=sys.stderr,
             )
             return 1

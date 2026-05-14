@@ -23,7 +23,6 @@ import sys
 import time
 from pathlib import Path
 
-
 _DEFAULT_DEBOUNCE_S = 1.5
 _INDEXABLE_SUFFIXES = {".md", ".dart", ".py", ".yaml", ".yml"}
 

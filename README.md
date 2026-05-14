@@ -88,6 +88,18 @@ See [`examples/templates/dev_iteration.yaml`](examples/templates/dev_iteration.y
 
 See [`docs/adding_a_framework.md`](docs/adding_a_framework.md) and [`docs/adding_an_mcp.md`](docs/adding_an_mcp.md) for the extension recipes. Both stay small (a few new files each) thanks to the Clean Architecture boundaries.
 
+### Pre-commit hooks
+
+Mirrors CI exactly — install once, never push a red build again:
+
+```bash
+uv pip install pre-commit
+pre-commit install
+pre-commit run --all-files   # one-time baseline; CI parity check
+```
+
+Three gates: `ruff` (lint+autofix), `pytest -q` (fast suite, no `tests/agent`), `generate_tool_catalogue --check` (refuses if `docs/tools.md` drifts from the live registry). See [`.pre-commit-config.yaml`](.pre-commit-config.yaml).
+
 ## License
 
 TBD.

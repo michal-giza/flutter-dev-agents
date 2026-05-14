@@ -41,7 +41,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-
 # Strategies a 4B agent has been observed to attempt:
 #  1. "happy"  — args copied from corrected_example
 #  2. "fuzz"   — random permutations (wrong types, missing fields, extras)
@@ -115,9 +114,8 @@ def _fuzz_args(base: dict) -> dict:
         out[key] = [_rand_string()]
     elif op == "extra_garbage":
         out[_rand_string()] = _rand_string()
-    elif op == "stringify":
-        if isinstance(out[key], (int, float, bool)):
-            out[key] = str(out[key])
+    elif op == "stringify" and isinstance(out[key], (int, float, bool)):
+        out[key] = str(out[key])
     return out
 
 

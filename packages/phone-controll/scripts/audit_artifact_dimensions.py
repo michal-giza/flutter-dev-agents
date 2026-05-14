@@ -17,10 +17,8 @@ visual diff). Skips `.orig.png` companions (those should stay full-res).
 from __future__ import annotations
 
 import argparse
-import struct
 import sys
 from pathlib import Path
-
 
 _DEFAULT_ROOT = Path.home() / ".mcp_phone_controll" / "sessions"
 
@@ -95,7 +93,7 @@ def main() -> int:
             if cap_image_in_place(path, max_dim=args.max_dim):
                 capped += 1
         print(f"\ncapped {capped} of {len(oversized)} files.")
-        print(f"originals preserved at <path>.orig.png.")
+        print("originals preserved at <path>.orig.png.")
 
     if oversized and not args.cap:
         print("\nrun with --cap to resize them in place.")
