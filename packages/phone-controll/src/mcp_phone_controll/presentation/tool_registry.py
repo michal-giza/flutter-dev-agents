@@ -41,6 +41,7 @@ from ..domain.usecases.recall import (
     Recall,
     RecallParams,
 )
+from ..domain.usecases.mcp_ping import McpPing
 from ..domain.usecases.crag import (
     CorrectiveRecall,
     CorrectiveRecallParams,
@@ -974,6 +975,7 @@ class UseCases:
     describe_tool: DescribeTool
     session_summary: SessionSummary
     tool_usage_report: ToolUsageReportUseCase
+    mcp_ping: McpPing
     inspect_project: InspectProject
     prepare_for_test: PrepareForTest
     run_test_plan: RunTestPlan
@@ -1121,6 +1123,19 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             ),
             build_params=_params_describe_tool,
             invoke=_bind(uc.describe_tool, _params_describe_tool),
+        ),
+        ToolDescriptor(
+            name="mcp_ping",
+            description=(
+                "Identify the running MCP subprocess: version, git sha, "
+                "uptime, image backends, tool count. Call this FIRST when "
+                "a feature you expect is missing — a stale MCP subprocess "
+                "is the most common cause. If the sha doesn't match the "
+                "on-disk repo's HEAD, restart Claude Code."
+            ),
+            input_schema=_schema({}),
+            build_params=_params_no,
+            invoke=_bind(uc.mcp_ping, _params_no),
         ),
         ToolDescriptor(
             name="session_summary",

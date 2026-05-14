@@ -54,12 +54,19 @@ class DescribeCapabilities(
         if subset:
             permitted = set(subset)
             sequence = tuple(name for name in sequence if name in permitted)
+        # Surface version + git SHA so the agent can detect a stale MCP
+        # subprocess without a second tool call.
+        from ...version_info import version_info
+
+        info = version_info()
         return ok(
             replace(
                 report_res.value,
                 tool_subset=subset,
                 level=params.level,
                 recommended_sequence=sequence,
+                mcp_version=str(info["package_version"]),
+                mcp_git_sha=str(info["git_sha"]),
             )
         )
 

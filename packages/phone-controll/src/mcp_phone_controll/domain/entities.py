@@ -199,6 +199,12 @@ class CapabilityReport:
     # (Yao et al., 2022, arXiv 2210.03629): the model needs a strong prior on
     # *what* to call first, not just *which* tools exist.
     recommended_sequence: tuple[str, ...] = ()
+    # Version handshake — surfaced so an agent observing a missing
+    # feature can detect a stale MCP subprocess without a second tool call.
+    # Compare with the on-disk repo's `git rev-parse --short HEAD`; if
+    # they differ, the agent should ask the user to restart Claude Code.
+    mcp_version: str = "unknown"
+    mcp_git_sha: str = "unknown"
 
 
 @dataclass(frozen=True, slots=True)

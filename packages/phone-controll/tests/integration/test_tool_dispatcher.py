@@ -46,6 +46,7 @@ from mcp_phone_controll.domain.usecases.discovery import (
     SessionSummary,
     ToolUsageReportUseCase,
 )
+from mcp_phone_controll.domain.usecases.mcp_ping import McpPing
 from mcp_phone_controll.domain.usecases.doctor import CheckEnvironment
 from mcp_phone_controll.domain.usecases.patrol import (
     ListPatrolTests,
@@ -231,6 +232,7 @@ def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:
         describe_tool=DescribeTool(lambda name: None, traces=trace),
         session_summary=SessionSummary(trace),
         tool_usage_report=ToolUsageReportUseCase(trace, lambda: ()),
+        mcp_ping=McpPing(lambda: 0),
         inspect_project=InspectProject(inspector),
         prepare_for_test=_PrepFT(lifecycle, ui, observation, artifacts, state),
         run_test_plan=RunTestPlan(plan_executor, plan_loader),
@@ -439,6 +441,7 @@ async def test_registry_covers_all_use_case_fields(tmp_path: Path):
         "describe_tool",
         "session_summary",
         "tool_usage_report",
+        "mcp_ping",
         "inspect_project",
         "prepare_for_test",
         "run_test_plan",

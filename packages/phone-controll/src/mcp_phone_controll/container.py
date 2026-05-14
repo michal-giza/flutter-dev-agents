@@ -101,6 +101,7 @@ from .domain.usecases.discovery import (
     SessionSummary,
     ToolUsageReportUseCase,
 )
+from .domain.usecases.mcp_ping import McpPing
 from .domain.usecases.doctor import CheckEnvironment
 from .domain.usecases.lifecycle import (
     ClearAppData,
@@ -445,6 +446,10 @@ def build_runtime(
         assert placeholder_dispatcher is not None
         return [d.name for d in placeholder_dispatcher.descriptors]
 
+    def _all_tool_names_count() -> int:
+        assert placeholder_dispatcher is not None
+        return len(placeholder_dispatcher.descriptors)
+
     def _descriptor_lookup(name: str):
         assert placeholder_dispatcher is not None
         for d in placeholder_dispatcher.descriptors:
@@ -468,6 +473,7 @@ def build_runtime(
         describe_tool=DescribeTool(_descriptor_lookup, traces=trace_repo),
         session_summary=SessionSummary(trace_repo),
         tool_usage_report=ToolUsageReportUseCase(trace_repo, _all_tool_names),
+        mcp_ping=McpPing(_all_tool_names_count),
         inspect_project=InspectProject(inspector),
         prepare_for_test=PrepareForTest(
             lifecycle_repo, ui_repo, observation_repo, artifacts_repo, state_repo
@@ -587,6 +593,17 @@ def build_runtime(
         descriptors, trace_repo=trace_repo, auto_narrate_every=_auto_narrate
     )
     placeholder_dispatcher = dispatcher  # closes over the late-bound reference
+
+    # Boot-time self-check — one line to stderr so anyone tailing the
+    # MCP subprocess logs sees the running version, the git SHA, and
+    # which image-cap backends are available. Closes the diagnostic gap
+    # that caused the recurring stale-subprocess pain.
+    if os.environ.get("MCP_QUIET") != "1":
+        import sys
+        from .version_info import boot_self_check_log
+
+        print(boot_self_check_log(), file=sys.stderr)
+
     return use_cases, dispatcher
 
 
