@@ -30,9 +30,10 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
-import sys
 from importlib.util import find_spec
 from pathlib import Path
+
+from ..observability import warn
 
 DEFAULT_MAX_DIM = 1920
 
@@ -93,7 +94,7 @@ def _resize_cv2(path: Path, new_w: int, new_h: int) -> bool:
         resized = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
         return bool(cv2.imwrite(str(path), resized))
     except Exception as exc:
-        print(f"[image_capping] cv2 resize failed: {exc}", file=sys.stderr)
+        warn("image_cap_backend_failed", backend="cv2", error=str(exc))
         return False
 
 
@@ -108,7 +109,7 @@ def _resize_pil(path: Path, new_w: int, new_h: int) -> bool:
             resized.save(path, format="PNG")
         return True
     except Exception as exc:
-        print(f"[image_capping] PIL resize failed: {exc}", file=sys.stderr)
+        warn("image_cap_backend_failed", backend="PIL", error=str(exc))
         return False
 
 
@@ -128,7 +129,7 @@ def _resize_sips(path: Path, cap: int) -> bool:
         )
         return result.returncode == 0
     except (subprocess.TimeoutExpired, OSError) as exc:
-        print(f"[image_capping] sips resize failed: {exc}", file=sys.stderr)
+        warn("image_cap_backend_failed", backend="sips", error=str(exc))
         return False
 
 
@@ -163,10 +164,7 @@ def cap_image_in_place(path: Path, max_dim: int | None = None) -> bool:
         try:
             shutil.copy2(path, original)
         except OSError as exc:
-            print(
-                f"[image_capping] failed to preserve original {path}: {exc}",
-                file=sys.stderr,
-            )
+            warn("image_cap_original_save_failed", path=str(path), error=str(exc))
             # Continue anyway — losing the original is worse than failing
             # to cap, but capping is what protects the conversation.
 
@@ -184,13 +182,13 @@ def cap_image_in_place(path: Path, max_dim: int | None = None) -> bool:
             return True
 
     # All three failed.
-    print(
-        f"[image_capping] CAP FAILED for {path} ({w}x{h} → wanted ≤{cap}px). "
-        "Install one of: cv2 (`uv pip install -e '.[ar]'`), "
-        "Pillow (`uv pip install pillow`), or run on macOS where `sips` is "
-        "available by default. The dispatcher will refuse to return this "
-        "path until the cap succeeds.",
-        file=sys.stderr,
+    warn(
+        "image_cap_all_backends_failed",
+        path=str(path),
+        width=w,
+        height=h,
+        cap=cap,
+        fix="install cv2 (uv pip install -e '.[ar]') or Pillow, or run on macOS",
     )
     return False
 

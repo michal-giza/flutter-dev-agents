@@ -159,6 +159,7 @@ async def test_default_chain_contains_expected_middlewares():
     assert types == [
         "PatrolGuardMiddleware",
         "RateLimiterMiddleware",
+        "ProgressLogMiddleware",
         "OutputTruncationMiddleware",
         "ImageSafetyNetMiddleware",
         "TraceRecorderMiddleware",
@@ -174,7 +175,7 @@ async def test_dispatcher_walks_chain_in_correct_order(tmp_path: Path):
 
     d = _build_fake_dispatcher(tmp_path)
     # The fake dispatcher's middleware list is the default chain.
-    assert len(d.middlewares) == 6
+    assert len(d.middlewares) == 7
     # Dispatch goes through cleanly without raising.
     res = await d.dispatch("list_devices", {})
     assert res["ok"] is True

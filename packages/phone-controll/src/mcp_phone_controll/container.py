@@ -140,6 +140,7 @@ from .domain.usecases.observation import (
     TailLogs,
     TakeScreenshot,
 )
+from .domain.usecases.ocr import OcrScreenshot
 from .domain.usecases.patch_safe import PatchApplySafe
 from .domain.usecases.patrol import (
     ListPatrolTests,
@@ -158,12 +159,14 @@ from .domain.usecases.productivity import (
 from .domain.usecases.projects import InspectProject
 from .domain.usecases.recall import IndexProject, Recall
 from .domain.usecases.release_screenshot import CaptureReleaseScreenshot
+from .domain.usecases.set_agent_profile import SetAgentProfile
 from .domain.usecases.skill_library import (
     ListSkills,
     PromoteSequence,
     ReplaySkill,
 )
 from .domain.usecases.testing import RunIntegrationTests, RunUnitTests
+from .domain.usecases.ui_graph import ExtractUiGraph
 from .domain.usecases.ui_input import PressKey, Swipe, Tap, TapText, TypeText
 from .domain.usecases.ui_query import AssertVisible, DumpUi, FindElement, WaitForElement
 from .domain.usecases.ui_verify import AssertNoErrorsSince, TapAndVerify
@@ -475,6 +478,10 @@ def build_runtime(
         session_summary=SessionSummary(trace_repo),
         tool_usage_report=ToolUsageReportUseCase(trace_repo, _all_tool_names),
         mcp_ping=McpPing(_all_tool_names_count),
+        set_agent_profile=SetAgentProfile(
+            middleware_provider=lambda: placeholder_dispatcher.middlewares
+            if placeholder_dispatcher is not None else []
+        ),
         disk_usage=DiskUsage(artifacts_repo),
         prune_originals=PruneOriginals(artifacts_repo),
         inspect_project=InspectProject(inspector),
@@ -501,6 +508,8 @@ def build_runtime(
         assert_visible=AssertVisible(ui_repo, state_repo),
         tap_and_verify=TapAndVerify(ui_repo, state_repo),
         assert_no_errors_since=AssertNoErrorsSince(observation_repo, state_repo),
+        extract_ui_graph=ExtractUiGraph(ui_repo, state_repo),
+        ocr_screenshot=OcrScreenshot(),
         take_screenshot=TakeScreenshot(observation_repo, artifacts_repo, state_repo),
         start_recording=StartRecording(observation_repo, artifacts_repo, state_repo),
         stop_recording=StopRecording(observation_repo, artifacts_repo, state_repo),
@@ -597,16 +606,35 @@ def build_runtime(
     )
     placeholder_dispatcher = dispatcher  # closes over the late-bound reference
 
-    # Boot-time self-check — one line to stderr so anyone tailing the
-    # MCP subprocess logs sees the running version, the git SHA, and
-    # which image-cap backends are available. Closes the diagnostic gap
-    # that caused the recurring stale-subprocess pain.
-    if os.environ.get("MCP_QUIET") != "1":
-        import sys
+    # Boot-time self-check — single structured event so anyone tailing
+    # the MCP subprocess logs sees the running version, git SHA, image
+    # backends, and tool count. Closes the diagnostic gap that caused
+    # the recurring stale-subprocess pain. Format controlled by
+    # MCP_LOG_FORMAT (text/json); suppressed entirely by MCP_QUIET=1.
+    from .observability import info
+    from .version_info import version_info
 
-        from .version_info import boot_self_check_log
+    _info = version_info()
+    from importlib.util import find_spec as _find_spec
 
-        print(boot_self_check_log(), file=sys.stderr)
+    _backends = [
+        b for b, present in (
+            ("cv2", _find_spec("cv2") is not None),
+            ("PIL", _find_spec("PIL") is not None),
+            ("sips", bool(__import__("shutil").which("sips"))),
+        )
+        if present
+    ]
+    info(
+        "mcp_boot",
+        version=_info["package_version"],
+        git_sha=_info["git_sha"],
+        git_branch=_info["git_branch"],
+        git_dirty=_info["git_dirty"],
+        python=_info["python_version"],
+        image_backends=",".join(_backends) or "NONE",
+        n_tools=len(dispatcher.descriptors),
+    )
 
     return use_cases, dispatcher
 

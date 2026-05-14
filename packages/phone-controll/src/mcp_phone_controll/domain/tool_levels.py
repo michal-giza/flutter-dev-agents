@@ -13,6 +13,9 @@ expert.
 from __future__ import annotations
 
 BASIC_TOOLS: tuple[str, ...] = (
+    # Diagnostics — call FIRST whenever something feels off.
+    "mcp_ping",
+    "set_agent_profile",
     # Discover the world
     "describe_capabilities",
     "describe_tool",
@@ -27,12 +30,18 @@ BASIC_TOOLS: tuple[str, ...] = (
     "new_session",
     "get_artifacts_dir",
     "session_summary",
+    "summarize_session",
     # Lifecycle (the obvious ones)
     "prepare_for_test",
     "launch_app",
     "stop_app",
     "take_screenshot",
     "read_logs",
+    # Verify-after-action flow discipline (Tier A)
+    "tap_and_verify",
+    "assert_no_errors_since",
+    # Retrieval — query SKILL/docs/code without loading 8KB
+    "recall",
     # Tests via plans (preferred path for small LLMs)
     "validate_test_plan",
     "run_test_plan",
@@ -100,6 +109,8 @@ _BY_LEVEL = {
 # checklist in examples/agent_loop_small_llm.py and the ReAct prior.
 _RECOMMENDED_SEQUENCE: dict[str, tuple[str, ...]] = {
     "basic": (
+        "mcp_ping",
+        "set_agent_profile",
         "describe_capabilities",
         "check_environment",
         "inspect_project",
@@ -112,6 +123,8 @@ _RECOMMENDED_SEQUENCE: dict[str, tuple[str, ...]] = {
         "release_device",
     ),
     "intermediate": (
+        "mcp_ping",
+        "set_agent_profile",
         "describe_capabilities",
         "check_environment",
         "inspect_project",

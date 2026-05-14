@@ -25,9 +25,10 @@ skipped too — that workflow returns metadata, not a PNG path.
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 from typing import Any
+
+from ..observability import warn
 
 # Paths under these path-segment patterns are EXEMPT from auto-capping
 # because their full-resolution form is required for the user's workflow.
@@ -132,10 +133,10 @@ def cap_pngs_in_envelope(envelope: dict) -> dict:
                 }
             )
             replacements[value] = _REMOVED_MARKER
-            print(
-                f"[image_safety_net] REFUSED to return path {value} — "
-                f"cap failed; see stderr above for diagnosis.",
-                file=sys.stderr,
+            warn(
+                "image_safety_net_refused",
+                path=value,
+                reason="cap_failed_all_backends",
             )
 
     if not capped and not refused:

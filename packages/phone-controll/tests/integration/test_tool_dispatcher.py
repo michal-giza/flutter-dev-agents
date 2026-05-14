@@ -87,6 +87,7 @@ from mcp_phone_controll.domain.usecases.observation import (
     TailLogs,
     TakeScreenshot,
 )
+from mcp_phone_controll.domain.usecases.ocr import OcrScreenshot
 from mcp_phone_controll.domain.usecases.patch_safe import PatchApplySafe
 from mcp_phone_controll.domain.usecases.patrol import (
     ListPatrolTests,
@@ -106,6 +107,7 @@ from mcp_phone_controll.domain.usecases.recall import IndexProject, Recall
 from mcp_phone_controll.domain.usecases.release_screenshot import (
     CaptureReleaseScreenshot,
 )
+from mcp_phone_controll.domain.usecases.set_agent_profile import SetAgentProfile
 from mcp_phone_controll.domain.usecases.skill_library import (
     ListSkills,
     PromoteSequence,
@@ -115,6 +117,7 @@ from mcp_phone_controll.domain.usecases.testing import (
     RunIntegrationTests,
     RunUnitTests,
 )
+from mcp_phone_controll.domain.usecases.ui_graph import ExtractUiGraph
 from mcp_phone_controll.domain.usecases.ui_input import (
     PressKey,
     Swipe,
@@ -236,6 +239,7 @@ def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:
         session_summary=SessionSummary(trace),
         tool_usage_report=ToolUsageReportUseCase(trace, lambda: ()),
         mcp_ping=McpPing(lambda: 0),
+        set_agent_profile=SetAgentProfile(middleware_provider=lambda: []),
         disk_usage=DiskUsage(artifacts),
         prune_originals=PruneOriginals(artifacts),
         inspect_project=InspectProject(inspector),
@@ -260,6 +264,8 @@ def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:
         assert_visible=AssertVisible(ui, state),
         tap_and_verify=TapAndVerify(ui, state),
         assert_no_errors_since=AssertNoErrorsSince(observation, state),
+        extract_ui_graph=ExtractUiGraph(ui, state),
+        ocr_screenshot=OcrScreenshot(),
         take_screenshot=TakeScreenshot(observation, artifacts, state),
         start_recording=StartRecording(observation, artifacts, state),
         stop_recording=StopRecording(observation, artifacts, state),
@@ -447,6 +453,7 @@ async def test_registry_covers_all_use_case_fields(tmp_path: Path):
         "session_summary",
         "tool_usage_report",
         "mcp_ping",
+        "set_agent_profile",
         "disk_usage",
         "prune_originals",
         "inspect_project",
@@ -477,6 +484,8 @@ async def test_registry_covers_all_use_case_fields(tmp_path: Path):
         "assert_visible",
         "tap_and_verify",
         "assert_no_errors_since",
+        "extract_ui_graph",
+        "ocr_screenshot",
         "take_screenshot",
         "start_recording",
         "stop_recording",

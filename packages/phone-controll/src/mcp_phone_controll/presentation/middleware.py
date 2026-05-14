@@ -210,6 +210,55 @@ class AutoNarrateMiddleware(_BaseMiddleware):
         return envelope
 
 
+class ProgressLogMiddleware(_BaseMiddleware):
+    """Emit a structured log event per dispatch with duration_ms.
+
+    The cheapest possible step toward observability — pairs cleanly
+    with `MCP_LOG_FORMAT=json` to feed Datadog/Honeycomb. For tools
+    whose duration exceeds `slow_threshold_ms`, escalates the event
+    level to `warn` so a slow `index_project` or `build_app` is
+    visible without noise from fast calls.
+
+    Disable by setting `MCP_PROGRESS_LOG=off`.
+    """
+
+    def __init__(self, slow_threshold_ms: int = 2000) -> None:
+        import os
+
+        self._enabled = os.environ.get("MCP_PROGRESS_LOG", "on").lower() != "off"
+        self._slow_threshold_ms = max(0, int(slow_threshold_ms))
+        self._timers: dict[int, float] = {}
+
+    async def pre_dispatch(self, name, args):
+        if not self._enabled:
+            return None
+        import time
+
+        self._timers[id(args)] = time.monotonic()
+        return None
+
+    async def post_dispatch(self, name, args, envelope):
+        if not self._enabled:
+            return envelope
+        import time
+
+        started = self._timers.pop(id(args), None)
+        if started is None:
+            return envelope
+        duration_ms = int((time.monotonic() - started) * 1000)
+        from ..observability import emit
+
+        level = "warn" if duration_ms >= self._slow_threshold_ms else "info"
+        emit(
+            "tool_dispatch",
+            level=level,
+            tool=name,
+            ok=bool(envelope.get("ok")),
+            duration_ms=duration_ms,
+        )
+        return envelope
+
+
 # ----------------------------------------------------------------------
 # Default chain
 # ----------------------------------------------------------------------
@@ -235,6 +284,7 @@ def build_default_chain(
     return [
         patrol_guard,
         RateLimiterMiddleware(rate_limiter),
+        ProgressLogMiddleware(),
         OutputTruncationMiddleware(enabled=truncate_outputs),
         ImageSafetyNetMiddleware(),
         TraceRecorderMiddleware(trace_repo, recorder),

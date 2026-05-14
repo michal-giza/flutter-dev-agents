@@ -18,9 +18,13 @@ from mcp_phone_controll.domain.usecases.discovery import (
 # ---- G1: recommended_sequence -------------------------------------------
 
 
-def test_recommended_sequence_basic_starts_with_describe():
+def test_recommended_sequence_basic_starts_with_diagnostics():
+    """The first move for a 4B agent is mcp_ping (detect stale subprocess)
+    and set_agent_profile (apply small-model ergonomics)."""
     seq = recommended_sequence_for_level("basic")
-    assert seq[0] == "describe_capabilities"
+    assert seq[0] == "mcp_ping"
+    assert seq[1] == "set_agent_profile"
+    assert "describe_capabilities" in seq
     assert "release_device" in seq
 
 

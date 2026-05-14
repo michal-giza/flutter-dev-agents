@@ -140,6 +140,10 @@ from ..domain.usecases.observation import (
     TakeScreenshot,
     TakeScreenshotParams,
 )
+from ..domain.usecases.ocr import (
+    OcrScreenshot,
+    OcrScreenshotParams,
+)
 from ..domain.usecases.patch_safe import (
     PatchApplySafe,
     PatchApplySafeParams,
@@ -182,6 +186,13 @@ from ..domain.usecases.release_screenshot import (
     CaptureReleaseScreenshot,
     CaptureReleaseScreenshotParams,
 )
+from ..domain.usecases.set_agent_profile import (
+    PROFILES as _AGENT_PROFILES,
+)
+from ..domain.usecases.set_agent_profile import (
+    SetAgentProfile,
+    SetAgentProfileParams,
+)
 from ..domain.usecases.skill_library import (
     ListSkills,
     PromoteSequence,
@@ -194,6 +205,10 @@ from ..domain.usecases.testing import (
     RunIntegrationTestsParams,
     RunUnitTests,
     RunUnitTestsParams,
+)
+from ..domain.usecases.ui_graph import (
+    ExtractUiGraph,
+    ExtractUiGraphParams,
 )
 from ..domain.usecases.ui_input import (
     PressKey,
@@ -450,6 +465,21 @@ def _params_tap_and_verify(args: JsonDict) -> TapAndVerifyParams:
     )
 
 
+def _params_extract_ui_graph(args: JsonDict) -> ExtractUiGraphParams:
+    return ExtractUiGraphParams(
+        serial=args.get("serial"),
+        max_nodes=int(args.get("max_nodes", 200)),
+    )
+
+
+def _params_ocr_screenshot(args: JsonDict) -> OcrScreenshotParams:
+    return OcrScreenshotParams(
+        path=Path(args["path"]).expanduser(),
+        languages=tuple(args.get("languages") or ("eng",)),
+        min_confidence=float(args.get("min_confidence", 0.0)),
+    )
+
+
 def _params_assert_no_errors(args: JsonDict) -> AssertNoErrorsSinceParams:
     return AssertNoErrorsSinceParams(
         since_s=int(args.get("since_s", 30)),
@@ -658,6 +688,10 @@ def _params_describe_tool(args: JsonDict) -> DescribeToolParams:
 
 def _params_session_summary(args: JsonDict) -> SessionSummaryParams:
     return SessionSummaryParams(session_id=args.get("session_id"))
+
+
+def _params_set_agent_profile(args: JsonDict) -> SetAgentProfileParams:
+    return SetAgentProfileParams(name=args["name"])
 
 
 def _params_prune_originals(args: JsonDict) -> PruneOriginalsParams:
@@ -991,6 +1025,7 @@ class UseCases:
     session_summary: SessionSummary
     tool_usage_report: ToolUsageReportUseCase
     mcp_ping: McpPing
+    set_agent_profile: SetAgentProfile
     disk_usage: DiskUsage
     prune_originals: PruneOriginals
     inspect_project: InspectProject
@@ -1015,6 +1050,8 @@ class UseCases:
     assert_visible: AssertVisible
     tap_and_verify: TapAndVerify
     assert_no_errors_since: AssertNoErrorsSince
+    extract_ui_graph: ExtractUiGraph
+    ocr_screenshot: OcrScreenshot
     take_screenshot: TakeScreenshot
     start_recording: StartRecording
     stop_recording: StopRecording
@@ -1144,15 +1181,32 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
         ToolDescriptor(
             name="mcp_ping",
             description=(
-                "Identify the running MCP subprocess: version, git sha, "
-                "uptime, image backends, tool count. Call this FIRST when "
-                "a feature you expect is missing — a stale MCP subprocess "
-                "is the most common cause. If the sha doesn't match the "
-                "on-disk repo's HEAD, restart Claude Code."
+                "Identify the running MCP: version, git sha, uptime, "
+                "image backends, tool count. Call first if a feature "
+                "seems missing — a stale subprocess is usually the cause."
             ),
             input_schema=_schema({}),
             build_params=_params_no,
             invoke=_bind(uc.mcp_ping, _params_no),
+        ),
+        ToolDescriptor(
+            name="set_agent_profile",
+            description=(
+                "Apply a known agent profile (claude / haiku / qwen2.5-7b "
+                "/ qwen2.5-14b / llava / default). Flips image cap, "
+                "auto-narrate, strict schemas, Reflexion retries at once."
+            ),
+            input_schema=_schema(
+                {
+                    "name": _enum(
+                        sorted(_AGENT_PROFILES.keys()),
+                        "Profile name. Default for Claude is 'claude'.",
+                    ),
+                },
+                ["name"],
+            ),
+            build_params=_params_set_agent_profile,
+            invoke=_bind(uc.set_agent_profile, _params_set_agent_profile),
         ),
         ToolDescriptor(
             name="disk_usage",
@@ -1557,6 +1611,43 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             invoke=_bind(uc.assert_no_errors_since, _params_assert_no_errors),
         ),
         ToolDescriptor(
+            name="extract_ui_graph",
+            description=(
+                "Parse the device UI into a typed graph: clickables, "
+                "inputs, texts, images. Cheaper than vision-model calls. "
+                "Aligned with CogAgent / ShowUI / OS-Atlas pattern."
+            ),
+            input_schema=_schema(
+                {
+                    "max_nodes": _int("Cap on returned nodes (default 200)."),
+                    **serial_prop,
+                }
+            ),
+            build_params=_params_extract_ui_graph,
+            invoke=_bind(uc.extract_ui_graph, _params_extract_ui_graph),
+        ),
+        ToolDescriptor(
+            name="ocr_screenshot",
+            description=(
+                "Extract text from a PNG via Vision / Tesseract / easyocr "
+                "(tried in order). Use to 'read' a screen without a "
+                "vision model. Reads full-res original when present."
+            ),
+            input_schema=_schema(
+                {
+                    "path": _string("Path to a PNG."),
+                    "languages": {
+                        "type": "array", "items": {"type": "string"},
+                        "description": "Languages, e.g. ['eng','pol']. Default ['eng'].",
+                    },
+                    "min_confidence": _number("0..1; easyocr only."),
+                },
+                ["path"],
+            ),
+            build_params=_params_ocr_screenshot,
+            invoke=_bind(uc.ocr_screenshot, _params_ocr_screenshot),
+        ),
+        ToolDescriptor(
             name="take_screenshot",
             description=(
                 "Capture a PNG screenshot to the artifacts dir. Call only at "
@@ -1579,11 +1670,9 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
         ToolDescriptor(
             name="capture_release_screenshot",
             description=(
-                "Capture a full-resolution PNG for app-store listings. "
-                "Returns metadata + thumbnail path only — full-res file "
-                "stays on disk and is NOT embedded inline (so it doesn't "
-                "blow Claude's 2000px multi-image cap). Open release_dir "
-                "in Finder to drag into Play Console / App Store Connect."
+                "Full-res PNG for app-store listings. Returns metadata + "
+                "256px thumbnail; full-res file is NOT inlined. Open "
+                "release_dir in Finder to drag into Play/App Store."
             ),
             input_schema=_schema(
                 {
