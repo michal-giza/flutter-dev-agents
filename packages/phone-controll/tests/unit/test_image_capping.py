@@ -80,3 +80,69 @@ def test_env_var_drives_default_cap(tmp_path: Path, monkeypatch):
 
     out = cv2.imread(str(src))
     assert max(out.shape[:2]) == 1024
+
+
+# ---- performance regression guard --------------------------------------
+#
+# The image-cap path runs on every screenshot envelope. The dispatcher's
+# image-safety-net middleware walks every response payload and caps any
+# oversized PNG before it can reach the model. If that path ever regresses
+# to seconds-per-screenshot (e.g. someone swaps cv2 for a Python-only PIL
+# resize on a multi-MP image without thumbnail's in-place decimation),
+# agents grind to a halt.
+#
+# These tests pin a generous-but-meaningful budget. They're not benchmarks
+# — they catch the difference between "fast enough" and "broken."
+
+
+def test_cap_latency_under_budget_for_galaxy_s25_capture(tmp_path: Path):
+    """A real Galaxy S25 screenshot (1080×2340) caps under 250 ms.
+
+    Budget: 250 ms wall-clock for cv2-backed cap of a 1080×2340 PNG to
+    1920px on the long edge. Measured on a 2024 M-series laptop, the
+    cv2 path completes in <50 ms; we leave 5× headroom for CI variance.
+    A regression past 250 ms means the agent loop has stopped being
+    interactive — that's the signal to investigate.
+    """
+    import time
+
+    src = tmp_path / "screen_s25.png"
+    _write_png(src, width=1080, height=2340)
+
+    started = time.monotonic()
+    resized = cap_image_in_place(src, max_dim=1920)
+    elapsed_ms = (time.monotonic() - started) * 1000.0
+
+    assert resized is True
+    assert elapsed_ms < 250.0, (
+        f"image cap took {elapsed_ms:.0f} ms — budget is 250 ms. "
+        "Did someone swap the cv2 backend for a slower path?"
+    )
+
+
+def test_cap_no_op_is_effectively_free(tmp_path: Path):
+    """When the image is already within the cap, the helper short-circuits.
+
+    Budget: 30 ms/call averaged across 5 calls. The under-cap branch
+    should only stat the file and peek at PNG header bytes — no
+    decode, no resize. If we ever start decoding in this branch we'll
+    spend >100 ms per screenshot for no reason.
+    """
+    import time
+
+    src = tmp_path / "small.png"
+    _write_png(src, width=1080, height=1920)  # exactly at cap
+
+    # Warm up filesystem cache so the first stat doesn't pay disk latency.
+    cap_image_in_place(src, max_dim=1920)
+
+    started = time.monotonic()
+    for _ in range(5):
+        resized = cap_image_in_place(src, max_dim=1920)
+        assert resized is False
+    avg_ms = (time.monotonic() - started) * 1000.0 / 5
+
+    assert avg_ms < 30.0, (
+        f"under-cap short-circuit took {avg_ms:.1f} ms/call — "
+        "the helper is probably decoding when it shouldn't."
+    )
