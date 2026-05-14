@@ -8,7 +8,6 @@ sessions from grabbing the same device.
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 
 import pytest
@@ -38,7 +37,6 @@ from tests.fakes.fake_repositories import (
     FakeDeviceRepository,
     FakeSessionStateRepository,
 )
-
 
 # ----- filesystem repo: low-level lock semantics ---------------------------
 
@@ -144,7 +142,7 @@ async def test_filesystem_list_locks_omits_stale(tmp_path: Path):
     (tmp_path / "DEAD.lock").write_text(json.dumps(fake))
     res = await repo.list_locks()
     assert isinstance(res, Ok)
-    serials = {l.serial for l in res.value}
+    serials = {lock.serial for lock in res.value}
     assert "EMU01" in serials
     assert "DEAD" not in serials  # stale PID auto-cleaned
 
@@ -162,7 +160,7 @@ async def test_three_sessions_each_own_a_different_device(tmp_path: Path):
     assert all(isinstance(r, Ok) for r in (galaxy, emu, sim))
     listed = await repo.list_locks()
     assert isinstance(listed, Ok)
-    assert {l.serial for l in listed.value} == {
+    assert {lock.serial for lock in listed.value} == {
         "R3CYA05CHXB",
         "emulator-5554",
         "UDID-IPHONE-SIM",
@@ -267,7 +265,7 @@ async def test_list_locks_returns_all_sessions():
     list_uc = ListLocks(locks)
     res = await list_uc(NoParams())
     assert isinstance(res, Ok)
-    holders = {l.serial: l.session_id for l in res.value}
+    holders = {lock.serial: lock.session_id for lock in res.value}
     assert holders == {"A": "session-1", "B": "session-2"}
 
 
@@ -282,4 +280,4 @@ async def test_filesystem_handles_serials_with_special_chars(tmp_path: Path):
     assert isinstance(res, Ok)
     listed = await repo.list_locks()
     assert isinstance(listed, Ok)
-    assert weird in {l.serial for l in listed.value}
+    assert weird in {lock.serial for lock in listed.value}

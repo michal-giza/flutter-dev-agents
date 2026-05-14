@@ -84,7 +84,8 @@ def test_looks_like_png_only_for_real_files(tmp_path: Path):
     assert _looks_like_png_path(str(real))
     assert not _looks_like_png_path("/nope/x.png")
     assert not _looks_like_png_path("not a path")
-    assert not _looks_like_png_path("see <path>.orig.png for original")  # too short of a real check; exists() returns False
+    # exists() returns False, so the heuristic correctly rejects it.
+    assert not _looks_like_png_path("see <path>.orig.png for original")
 
 
 def test_looks_like_png_rejects_absurdly_long_strings():
@@ -107,8 +108,10 @@ def test_caps_oversized_png_referenced_in_envelope_data(tmp_path: Path):
 
 
 def test_walks_nested_dict_and_caps(tmp_path: Path):
-    p1 = tmp_path / "a.png"; _write_png(p1, 3120, 1440)
-    p2 = tmp_path / "b.png"; _write_png(p2, 2400, 1080)
+    p1 = tmp_path / "a.png"
+    _write_png(p1, 3120, 1440)
+    p2 = tmp_path / "b.png"
+    _write_png(p2, 2400, 1080)
     envelope = {
         "ok": True,
         "data": {

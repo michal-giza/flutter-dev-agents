@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from mcp_phone_controll.domain.entities import ImageDiff, MarkerDetection, Pose
 from mcp_phone_controll.domain.result import ok
 

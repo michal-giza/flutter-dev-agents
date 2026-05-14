@@ -29,8 +29,7 @@ from typing import Any
 
 from ...domain.entities import IndexStats, RecallChunk
 from ...domain.failures import RagIndexingFailure, RagUnavailableFailure
-from ...domain.result import Err, Result, err, ok
-
+from ...domain.result import Result, err, ok
 
 _DEFAULT_EMBED_MODEL = "BAAI/bge-small-en-v1.5"
 _DEFAULT_QDRANT_URL = "http://localhost:6333"
@@ -77,8 +76,8 @@ class QdrantRagRepository:
             if self._client is not None and self._embedder is not None:
                 return None
             try:
-                from qdrant_client import QdrantClient
                 from fastembed import TextEmbedding
+                from qdrant_client import QdrantClient
             except ImportError as exc:
                 self._init_error = RagUnavailableFailure(
                     message=f"missing optional dep: {exc}",
@@ -98,7 +97,7 @@ class QdrantRagRepository:
                 self._embedder = await asyncio.to_thread(
                     TextEmbedding, model_name=self._embed_model
                 )
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 self._init_error = RagUnavailableFailure(
                     message=f"failed to initialise RAG backend: {exc}",
                     next_action="start_qdrant",
@@ -116,7 +115,7 @@ class QdrantRagRepository:
             return err(fail)
         try:
             await asyncio.to_thread(self._client.get_collections)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return err(
                 RagUnavailableFailure(
                     message=f"qdrant unreachable: {exc}",
@@ -154,7 +153,7 @@ class QdrantRagRepository:
             )
             points = []
             sources_seen: set[str] = set()
-            for (text, source, metadata), vector in zip(items, vectors):
+            for (text, source, metadata), vector in zip(items, vectors, strict=True):
                 sources_seen.add(source)
                 point_id = _stable_point_id(collection, source, metadata, text)
                 payload = {
@@ -170,7 +169,7 @@ class QdrantRagRepository:
             await asyncio.to_thread(
                 self._client.upsert, collection_name=collection, points=points
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return err(
                 RagIndexingFailure(
                     message=f"indexing failed: {exc}",
@@ -200,6 +199,7 @@ class QdrantRagRepository:
         over_fetch = max(k * 4, 12)
         try:
             from qdrant_client.http import models as qm
+
             from ..hybrid_rerank import hybrid_rerank
 
             vector = (
@@ -249,7 +249,7 @@ class QdrantRagRepository:
                         },
                     )
                     all_hits.append((chunk_id, text, float(hit.score), chunk))
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return err(
                 RagUnavailableFailure(
                     message=f"recall failed: {exc}",

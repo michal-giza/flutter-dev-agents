@@ -5,62 +5,26 @@ Adding a new tool means adding one ToolDescriptor — the dispatcher and MCP ser
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Awaitable, Callable
+from typing import Any
 
+from ..domain.entities import AnalyzerSeverity as _AnalyzerSeverity
 from ..domain.entities import BuildMode, LogLevel, Platform
+from ..domain.entities import IdeKind as _IdeKind
 from ..domain.result import Err, Result
+from ..domain.usecases.artifact_retention import (
+    DiskUsage,
+    PruneOriginals,
+    PruneOriginalsParams,
+)
 from ..domain.usecases.artifacts import (
     FetchArtifact,
     FetchArtifactParams,
     GetArtifactsDir,
     NewSession,
     NewSessionParams,
-)
-from ..domain.usecases.patch_safe import (
-    PatchApplySafe,
-    PatchApplySafeParams,
-)
-from ..domain.usecases.narrate import Narrate, NarrateParams
-from ..domain.usecases.productivity import (
-    FindFlutterWidget,
-    FindFlutterWidgetParams,
-    GrepLogs,
-    GrepLogsParams,
-    RunQuickCheck,
-    RunQuickCheckParams,
-    ScaffoldFeature,
-    ScaffoldFeatureParams,
-    SummarizeSession,
-    SummarizeSessionParams,
-)
-from ..domain.usecases.recall import (
-    IndexProject,
-    IndexProjectParams,
-    Recall,
-    RecallParams,
-)
-from ..domain.usecases.mcp_ping import McpPing
-from ..domain.usecases.artifact_retention import (
-    DiskUsage,
-    PruneOriginals,
-    PruneOriginalsParams,
-)
-from ..domain.usecases.crag import (
-    CorrectiveRecall,
-    CorrectiveRecallParams,
-)
-from ..domain.usecases.release_screenshot import (
-    CaptureReleaseScreenshot,
-    CaptureReleaseScreenshotParams,
-)
-from ..domain.usecases.skill_library import (
-    ListSkills,
-    PromoteSequence,
-    PromoteSequenceParams,
-    ReplaySkill,
-    ReplaySkillParams,
 )
 from ..domain.usecases.base import NoParams
 from ..domain.usecases.build_install import (
@@ -70,110 +34,6 @@ from ..domain.usecases.build_install import (
     InstallAppParams,
     UninstallApp,
     UninstallAppParams,
-)
-from ..domain.usecases.devices import (
-    ForceReleaseLock,
-    ForceReleaseLockParams,
-    GetSelectedDevice,
-    ListDevices,
-    ListLocks,
-    ReleaseDevice,
-    ReleaseDeviceParams,
-    SelectDevice,
-    SelectDeviceParams,
-)
-from ..domain.usecases.lifecycle import (
-    ClearAppData,
-    ClearAppDataParams,
-    GrantPermission,
-    GrantPermissionParams,
-    LaunchApp,
-    LaunchAppParams,
-    StopApp,
-    StopAppParams,
-)
-from ..domain.usecases.observation import (
-    ReadLogs,
-    ReadLogsParams,
-    StartRecording,
-    StartRecordingParams,
-    StopRecording,
-    StopRecordingParams,
-    TailLogs,
-    TailLogsParams,
-    TakeScreenshot,
-    TakeScreenshotParams,
-)
-from ..domain.usecases.discovery import (
-    DescribeCapabilities,
-    DescribeCapabilitiesParams,
-    DescribeTool,
-    DescribeToolParams,
-    SessionSummary,
-    SessionSummaryParams,
-    ToolUsageReportParams,
-    ToolUsageReportUseCase,
-)
-from ..domain.usecases.doctor import CheckEnvironment
-from ..domain.usecases.patrol import (
-    ListPatrolTests,
-    ListPatrolTestsParams,
-    RunPatrolSuite,
-    RunPatrolSuiteParams,
-    RunPatrolTest,
-    RunPatrolTestParams,
-)
-from ..domain.usecases.plan import (
-    RunTestPlan,
-    RunTestPlanParams,
-    ValidateTestPlan,
-    ValidateTestPlanParams,
-)
-from ..domain.usecases.preparation import PrepareForTest, PrepareForTestParams
-from ..domain.usecases.projects import InspectProject, InspectProjectParams
-from ..domain.usecases.testing import (
-    RunIntegrationTests,
-    RunIntegrationTestsParams,
-    RunUnitTests,
-    RunUnitTestsParams,
-)
-from ..domain.usecases.ui_input import (
-    PressKey,
-    PressKeyParams,
-    Swipe,
-    SwipeParams,
-    Tap,
-    TapParams,
-    TapText,
-    TapTextParams,
-    TypeText,
-    TypeTextParams,
-)
-from ..domain.usecases.vision import (
-    CompareScreenshot,
-    CompareScreenshotParams,
-    DetectMarkers,
-    DetectMarkersParams,
-    InferCameraPose,
-    InferCameraPoseParams,
-    WaitForMarker,
-    WaitForMarkerParams,
-)
-from ..domain.usecases.debug_inspect import (
-    VmEvaluate,
-    VmEvaluateParams,
-    VmListIsolates,
-    VmListIsolatesParams,
-)
-from ..domain.usecases.vision_advanced import (
-    AssertPoseStable,
-    AssertPoseStableParams,
-    CalibrateCamera,
-    CalibrateCameraParams,
-    SaveGoldenImage,
-    SaveGoldenImageParams,
-    WaitForArSessionReady,
-    WaitForArSessionReadyParams,
 )
 from ..domain.usecases.code_quality import (
     DartAnalyze,
@@ -189,17 +49,15 @@ from ..domain.usecases.code_quality import (
     QualityGate,
     QualityGateParams,
 )
-from ..domain.entities import AnalyzerSeverity as _AnalyzerSeverity
-from ..domain.usecases.virtual_devices import (
-    BootSimulator,
-    BootSimulatorParams,
-    ListAvds,
-    ListSimulators,
-    ListSimulatorsParams,
-    StartEmulator,
-    StartEmulatorParams,
-    StopVirtualDevice,
-    StopVirtualDeviceParams,
+from ..domain.usecases.crag import (
+    CorrectiveRecall,
+    CorrectiveRecallParams,
+)
+from ..domain.usecases.debug_inspect import (
+    VmEvaluate,
+    VmEvaluateParams,
+    VmListIsolates,
+    VmListIsolatesParams,
 )
 from ..domain.usecases.dev_session import (
     AttachDebugSession,
@@ -223,6 +81,28 @@ from ..domain.usecases.dev_session import (
     ToggleInspector,
     ToggleInspectorParams,
 )
+from ..domain.usecases.devices import (
+    ForceReleaseLock,
+    ForceReleaseLockParams,
+    GetSelectedDevice,
+    ListDevices,
+    ListLocks,
+    ReleaseDevice,
+    ReleaseDeviceParams,
+    SelectDevice,
+    SelectDeviceParams,
+)
+from ..domain.usecases.discovery import (
+    DescribeCapabilities,
+    DescribeCapabilitiesParams,
+    DescribeTool,
+    DescribeToolParams,
+    SessionSummary,
+    SessionSummaryParams,
+    ToolUsageReportParams,
+    ToolUsageReportUseCase,
+)
+from ..domain.usecases.doctor import CheckEnvironment
 from ..domain.usecases.ide import (
     CloseIdeWindow,
     CloseIdeWindowParams,
@@ -236,11 +116,97 @@ from ..domain.usecases.ide import (
     WriteVscodeLaunchConfig,
     WriteVscodeLaunchConfigParams,
 )
-from ..domain.usecases.wda_setup import (
-    SetupWebDriverAgent,
-    SetupWebDriverAgentParams,
+from ..domain.usecases.lifecycle import (
+    ClearAppData,
+    ClearAppDataParams,
+    GrantPermission,
+    GrantPermissionParams,
+    LaunchApp,
+    LaunchAppParams,
+    StopApp,
+    StopAppParams,
 )
-from ..domain.entities import IdeKind as _IdeKind
+from ..domain.usecases.mcp_ping import McpPing
+from ..domain.usecases.narrate import Narrate, NarrateParams
+from ..domain.usecases.observation import (
+    ReadLogs,
+    ReadLogsParams,
+    StartRecording,
+    StartRecordingParams,
+    StopRecording,
+    StopRecordingParams,
+    TailLogs,
+    TailLogsParams,
+    TakeScreenshot,
+    TakeScreenshotParams,
+)
+from ..domain.usecases.patch_safe import (
+    PatchApplySafe,
+    PatchApplySafeParams,
+)
+from ..domain.usecases.patrol import (
+    ListPatrolTests,
+    ListPatrolTestsParams,
+    RunPatrolSuite,
+    RunPatrolSuiteParams,
+    RunPatrolTest,
+    RunPatrolTestParams,
+)
+from ..domain.usecases.plan import (
+    RunTestPlan,
+    RunTestPlanParams,
+    ValidateTestPlan,
+    ValidateTestPlanParams,
+)
+from ..domain.usecases.preparation import PrepareForTest, PrepareForTestParams
+from ..domain.usecases.productivity import (
+    FindFlutterWidget,
+    FindFlutterWidgetParams,
+    GrepLogs,
+    GrepLogsParams,
+    RunQuickCheck,
+    RunQuickCheckParams,
+    ScaffoldFeature,
+    ScaffoldFeatureParams,
+    SummarizeSession,
+    SummarizeSessionParams,
+)
+from ..domain.usecases.projects import InspectProject, InspectProjectParams
+from ..domain.usecases.recall import (
+    IndexProject,
+    IndexProjectParams,
+    Recall,
+    RecallParams,
+)
+from ..domain.usecases.release_screenshot import (
+    CaptureReleaseScreenshot,
+    CaptureReleaseScreenshotParams,
+)
+from ..domain.usecases.skill_library import (
+    ListSkills,
+    PromoteSequence,
+    PromoteSequenceParams,
+    ReplaySkill,
+    ReplaySkillParams,
+)
+from ..domain.usecases.testing import (
+    RunIntegrationTests,
+    RunIntegrationTestsParams,
+    RunUnitTests,
+    RunUnitTestsParams,
+)
+from ..domain.usecases.ui_input import (
+    PressKey,
+    PressKeyParams,
+    Swipe,
+    SwipeParams,
+    Tap,
+    TapParams,
+    TapText,
+    TapTextParams,
+    TypeText,
+    TypeTextParams,
+)
 from ..domain.usecases.ui_query import (
     AssertVisible,
     AssertVisibleParams,
@@ -256,6 +222,41 @@ from ..domain.usecases.ui_verify import (
     AssertNoErrorsSinceParams,
     TapAndVerify,
     TapAndVerifyParams,
+)
+from ..domain.usecases.virtual_devices import (
+    BootSimulator,
+    BootSimulatorParams,
+    ListAvds,
+    ListSimulators,
+    ListSimulatorsParams,
+    StartEmulator,
+    StartEmulatorParams,
+    StopVirtualDevice,
+    StopVirtualDeviceParams,
+)
+from ..domain.usecases.vision import (
+    CompareScreenshot,
+    CompareScreenshotParams,
+    DetectMarkers,
+    DetectMarkersParams,
+    InferCameraPose,
+    InferCameraPoseParams,
+    WaitForMarker,
+    WaitForMarkerParams,
+)
+from ..domain.usecases.vision_advanced import (
+    AssertPoseStable,
+    AssertPoseStableParams,
+    CalibrateCamera,
+    CalibrateCameraParams,
+    SaveGoldenImage,
+    SaveGoldenImageParams,
+    WaitForArSessionReady,
+    WaitForArSessionReadyParams,
+)
+from ..domain.usecases.wda_setup import (
+    SetupWebDriverAgent,
+    SetupWebDriverAgentParams,
 )
 from .serialization import to_jsonable
 

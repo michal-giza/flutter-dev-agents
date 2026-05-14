@@ -13,7 +13,7 @@ from ...domain.failures import (
     IdeWindowNotFoundFailure,
 )
 from ...domain.repositories import IdeRepository
-from ...domain.result import Err, Result, err, ok
+from ...domain.result import Result, err, ok
 from ...infrastructure.ide_cli import IdeCli
 
 
@@ -49,7 +49,7 @@ class VsCodeIdeRepository(IdeRepository):
                     },
                 )
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             return err(
                 IdeNotFoundFailure(
                     message=f"failed to spawn VS Code: {e}",
@@ -95,13 +95,13 @@ class VsCodeIdeRepository(IdeRepository):
                         next_action="list_ide_windows",
                     )
                 )
-            window = self._windows.pop(target_id)
+            self._windows.pop(target_id)
             proc = self._processes.pop(target_id, None)
         if proc is not None and proc.returncode is None:
-            try:
+            import contextlib
+
+            with contextlib.suppress(ProcessLookupError):
                 proc.terminate()
-            except ProcessLookupError:
-                pass
         return ok(None)
 
     async def focus_window(self, project_path: Path) -> Result[None]:
@@ -114,7 +114,7 @@ class VsCodeIdeRepository(IdeRepository):
                     next_action="ask_user",
                 )
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             return err(IdeNotFoundFailure(message=f"focus failed: {e}"))
         return ok(None)
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ...domain.entities import Device, DeviceClass, Platform
+from ...domain.entities import Device, Platform
 from ...domain.failures import AdbFailure, DeviceNotFoundFailure
 from ...domain.repositories import DeviceRepository
 from ...domain.result import Result, err, ok

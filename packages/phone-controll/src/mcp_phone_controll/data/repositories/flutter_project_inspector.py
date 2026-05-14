@@ -10,7 +10,6 @@ from ...domain.failures import InvalidArgumentFailure
 from ...domain.repositories import ProjectInspector
 from ...domain.result import Result, err, ok
 
-
 _PUBSPEC_NAME = re.compile(r"^name:\s*([\w_]+)\s*$", re.MULTILINE)
 _FLAVOR_LINE = re.compile(r"productFlavors\s*\{([^}]*)\}", re.DOTALL)
 _FLAVOR_NAME = re.compile(r"^\s*(\w+)\s*\{", re.MULTILINE)

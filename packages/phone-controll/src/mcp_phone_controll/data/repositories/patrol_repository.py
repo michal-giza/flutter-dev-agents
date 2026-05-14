@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from ...domain.entities import BuildMode, PatrolTestFile, TestRun
-from ...domain.failures import FlutterCliFailure, InvalidArgumentFailure, TestExecutionFailure
+from ...domain.failures import InvalidArgumentFailure, TestExecutionFailure
 from ...domain.repositories import PatrolRepository, TestRepository
 from ...domain.result import Result, err, ok
 from ...infrastructure.patrol_cli import PatrolCli

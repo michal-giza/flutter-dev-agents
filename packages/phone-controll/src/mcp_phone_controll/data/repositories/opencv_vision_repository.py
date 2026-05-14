@@ -183,7 +183,7 @@ class OpenCvVisionRepository(VisionRepository):
             return ok([])
 
         results: list[MarkerDetection] = []
-        for marker_id, corner_set in zip(ids.flatten().tolist(), corners):
+        for marker_id, corner_set in zip(ids.flatten().tolist(), corners, strict=False):
             pts = corner_set.reshape(4, 2).astype(int).tolist()
             cx = int(sum(p[0] for p in pts) / 4)
             cy = int(sum(p[1] for p in pts) / 4)

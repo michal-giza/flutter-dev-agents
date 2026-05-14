@@ -29,7 +29,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-
 # Paths under these path-segment patterns are EXEMPT from auto-capping
 # because their full-resolution form is required for the user's workflow.
 # Match by `/segment/` substring so a project rooted anywhere works.

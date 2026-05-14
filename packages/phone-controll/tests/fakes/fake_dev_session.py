@@ -17,7 +17,7 @@ from mcp_phone_controll.domain.entities import (
     ServiceExtensionResult,
 )
 from mcp_phone_controll.domain.failures import IdeWindowNotFoundFailure
-from mcp_phone_controll.domain.result import ok, err
+from mcp_phone_controll.domain.result import err, ok
 from mcp_phone_controll.infrastructure.process_runner import ProcessResult
 
 

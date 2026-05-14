@@ -21,7 +21,6 @@ from mcp_phone_controll.domain.entities import (
     TraceEntry,
 )
 from mcp_phone_controll.domain.result import Err, Ok
-from mcp_phone_controll.domain.usecases.base import NoParams
 from mcp_phone_controll.domain.usecases.discovery import (
     DescribeCapabilities,
     SessionSummary,
@@ -40,7 +39,6 @@ from tests.fakes.fake_repositories import (
     FakeSessionStateRepository,
     FakeUiRepository,
 )
-
 
 # -- capabilities ----------------------------------------------------------
 
@@ -215,7 +213,6 @@ async def test_plan_executor_walks_phases_and_stops_after_decline():
     res = await executor.run(plan)
     assert isinstance(res, Ok)
     run = res.value
-    phase_names = [o.phase for o in run.phases]
     # UNDER_TEST must NOT have been executed (skipped after decline)
     under = next(o for o in run.phases if o.phase == "UNDER_TEST")
     assert under.actual_outcome == "skipped_after_terminal"

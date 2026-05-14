@@ -20,7 +20,6 @@ from mcp_phone_controll.domain.result import Err, Ok
 from mcp_phone_controll.infrastructure.adb_client import AdbClient
 from mcp_phone_controll.infrastructure.process_runner import ProcessResult
 
-
 # Minimal real PNG: 8-byte signature + IHDR + IDAT + IEND. 1x1 transparent.
 _REAL_PNG = bytes.fromhex(
     "89504e470d0a1a0a"                          # signature

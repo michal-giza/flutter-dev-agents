@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-import os
-
 from mcp_phone_controll.adapters.schemas import (
     to_openai_function,
     to_openai_functions,
 )
 from mcp_phone_controll.presentation.tool_registry import ToolDescriptor
-
 
 _DESC = ToolDescriptor(
     name="example",

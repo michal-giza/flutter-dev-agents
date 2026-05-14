@@ -12,7 +12,6 @@ expert.
 
 from __future__ import annotations
 
-
 BASIC_TOOLS: tuple[str, ...] = (
     # Discover the world
     "describe_capabilities",

@@ -58,16 +58,6 @@ serialize_artifact = to_jsonable
 serialize_session = to_jsonable
 
 __all__ = [
-    "to_jsonable",
-    "serialize_device",
-    "serialize_bundle",
-    "serialize_bounds",
-    "serialize_ui_element",
-    "serialize_log_entry",
-    "serialize_test_run",
-    "serialize_test_case",
-    "serialize_artifact",
-    "serialize_session",
     "AppBundle",
     "Artifact",
     "Bounds",
@@ -77,4 +67,14 @@ __all__ = [
     "TestCase",
     "TestRun",
     "UiElement",
+    "serialize_artifact",
+    "serialize_bounds",
+    "serialize_bundle",
+    "serialize_device",
+    "serialize_log_entry",
+    "serialize_session",
+    "serialize_test_case",
+    "serialize_test_run",
+    "serialize_ui_element",
+    "to_jsonable",
 ]

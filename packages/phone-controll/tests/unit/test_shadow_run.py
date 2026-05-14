@@ -12,8 +12,8 @@ import pytest
 @pytest.mark.asyncio
 async def test_shadow_run_tier_g_zero_invariant_violations():
     # Import paths the script uses; mirror its logic without spawning a process.
-    import sys
     import importlib.util
+    import sys
 
     script_path = (
         Path(__file__).resolve().parents[2]

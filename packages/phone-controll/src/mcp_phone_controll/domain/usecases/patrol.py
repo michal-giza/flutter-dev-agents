@@ -8,8 +8,8 @@ from pathlib import Path
 from ..entities import BuildMode, PatrolTestFile, TestRun
 from ..repositories import PatrolRepository, SessionStateRepository
 from ..result import Err, Result
-from .base import BaseUseCase
 from ._helpers import resolve_serial
+from .base import BaseUseCase
 
 
 @dataclass(frozen=True, slots=True)

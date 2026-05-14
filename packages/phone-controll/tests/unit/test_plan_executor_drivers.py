@@ -24,14 +24,12 @@ from mcp_phone_controll.domain.entities import (
     TestPlan,
 )
 from mcp_phone_controll.domain.result import Err, Ok
-from mcp_phone_controll.domain.usecases.base import NoParams
 from mcp_phone_controll.domain.usecases.discovery import DescribeCapabilities
 from mcp_phone_controll.domain.usecases.plan import (
     ValidateTestPlan,
     ValidateTestPlanParams,
 )
 from mcp_phone_controll.infrastructure.yaml_plan_loader import YamlPlanLoader
-
 
 # ----- flutter_test driver -------------------------------------------------
 
@@ -241,8 +239,7 @@ async def test_validate_test_plan_requires_input():
 def test_valid_phases_and_drivers_match_implementation():
     """The constants exposed in the executor and the schema published in
     describe_capabilities must agree."""
-    schema = StaticCapabilitiesProvider()
-    # imported here so we use the same module reference
+    # Imported here so we use the same module reference.
     from mcp_phone_controll.data.repositories.static_capabilities_provider import (
         _PLAN_SCHEMA,
     )

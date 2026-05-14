@@ -17,7 +17,6 @@ from ...domain.repositories import ObservationRepository
 from ...domain.result import Result, err, ok
 from ...infrastructure.pymobiledevice3_cli import PyMobileDevice3Cli
 
-
 # Apple oslog severities mapped to our LogLevel.
 _OSLOG_LEVEL = {
     "default": LogLevel.INFO,
@@ -71,7 +70,7 @@ async def _terminate(proc: asyncio.subprocess.Process) -> None:
     proc.terminate()
     try:
         await asyncio.wait_for(proc.wait(), timeout=2.0)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         proc.kill()
         await proc.wait()
 
@@ -156,7 +155,7 @@ class IosObservationRepository(ObservationRepository):
                     break
                 try:
                     raw = await asyncio.wait_for(proc.stdout.readline(), timeout=remaining)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     break
                 if not raw:
                     break
@@ -206,7 +205,7 @@ class IosObservationRepository(ObservationRepository):
                     )
                 try:
                     raw = await asyncio.wait_for(proc.stdout.readline(), timeout=remaining)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     return err(TimeoutFailure(message="tail_logs_until timed out"))
                 if not raw:
                     break

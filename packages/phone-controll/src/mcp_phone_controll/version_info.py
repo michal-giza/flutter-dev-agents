@@ -34,7 +34,7 @@ def _package_version() -> str:
         from importlib.metadata import version
 
         return version("mcp_phone_controll")
-    except Exception:  # noqa: BLE001
+    except Exception:
         return "unknown"
 
 
@@ -97,8 +97,8 @@ def version_info() -> dict[str, Any]:
 
 def boot_self_check_log() -> str:
     """One-line stderr-friendly status line for the boot log."""
-    from importlib.util import find_spec
     import shutil
+    from importlib.util import find_spec
 
     cv2 = find_spec("cv2") is not None
     pil = find_spec("PIL") is not None

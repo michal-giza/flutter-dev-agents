@@ -9,7 +9,7 @@ from pathlib import Path
 from ..entities import IdeKind, IdeWindow
 from ..failures import FilesystemFailure
 from ..repositories import IdeRepository
-from ..result import Err, Result, err, ok
+from ..result import Result, err, ok
 from .base import BaseUseCase, NoParams
 
 

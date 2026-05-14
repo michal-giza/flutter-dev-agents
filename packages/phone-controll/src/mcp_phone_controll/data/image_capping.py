@@ -92,7 +92,7 @@ def _resize_cv2(path: Path, new_w: int, new_h: int) -> bool:
             return False
         resized = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
         return bool(cv2.imwrite(str(path), resized))
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         print(f"[image_capping] cv2 resize failed: {exc}", file=sys.stderr)
         return False
 
@@ -107,7 +107,7 @@ def _resize_pil(path: Path, new_w: int, new_h: int) -> bool:
             resized = img.resize((new_w, new_h), Image.LANCZOS)
             resized.save(path, format="PNG")
         return True
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         print(f"[image_capping] PIL resize failed: {exc}", file=sys.stderr)
         return False
 

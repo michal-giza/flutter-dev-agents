@@ -42,9 +42,8 @@ from ..repositories import (
     SessionStateRepository,
 )
 from ..result import Err, Result, err, ok
-from .base import BaseUseCase
 from ._helpers import resolve_serial
-
+from .base import BaseUseCase
 
 _DEFAULT_THUMB_LONG_EDGE = 256
 
@@ -137,7 +136,7 @@ class CaptureReleaseScreenshot(
                 target=release_dir / f"{params.label}.thumb.png",
                 long_edge=max(64, params.thumbnail_long_edge),
             )
-        except Exception:  # noqa: BLE001 — never fail the capture on thumbnail issues
+        except Exception:
             thumb_path = None
 
         return ok(

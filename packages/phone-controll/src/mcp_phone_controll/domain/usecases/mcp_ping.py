@@ -52,8 +52,8 @@ class McpPing(BaseUseCase[NoParams, McpPingResult]):
         self._n_tools_provider = n_tools_provider
 
     async def execute(self, _params: NoParams) -> Result[McpPingResult]:
-        from importlib.util import find_spec
         import shutil
+        from importlib.util import find_spec
 
         from ...version_info import version_info
 
@@ -68,7 +68,7 @@ class McpPing(BaseUseCase[NoParams, McpPingResult]):
         n_tools = 0
         try:
             n_tools = int(self._n_tools_provider())
-        except Exception:  # noqa: BLE001
+        except Exception:
             n_tools = 0
         return ok(
             McpPingResult(

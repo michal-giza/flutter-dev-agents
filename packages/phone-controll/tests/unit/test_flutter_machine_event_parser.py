@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import json
 
-import pytest
-
 from mcp_phone_controll.data.parsers.flutter_machine_event_parser import (
     app_id_from_started,
     event_to_log,

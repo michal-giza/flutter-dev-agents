@@ -13,7 +13,6 @@ from ...domain.repositories import LifecycleRepository
 from ...domain.result import Result, err, ok
 from ...infrastructure.simctl_client import SimctlClient
 
-
 # Map our generic Android-style permission names to simctl privacy services
 # where there's a sensible mapping; otherwise pass through verbatim.
 _PERMISSION_MAP = {
@@ -108,7 +107,10 @@ class SimctlSimulatorLifecycleRepository(LifecycleRepository):
                     details={
                         "stderr": result.stderr,
                         "service": service,
-                        "hint": "valid services: camera, microphone, location, photos, contacts, calendar, reminders, media-library, motion, all",
+                        "hint": (
+                            "valid services: camera, microphone, location, photos, "
+                            "contacts, calendar, reminders, media-library, motion, all"
+                        ),
                     },
                     next_action="fix_arguments",
                 )

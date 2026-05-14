@@ -14,9 +14,8 @@ from __future__ import annotations
 import asyncio
 import re
 import subprocess
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from ..entities import SessionTrace
 from ..failures import FilesystemFailure, InvalidArgumentFailure
@@ -26,7 +25,6 @@ from ..repositories import (
 )
 from ..result import Err, Result, err, ok
 from .base import BaseUseCase
-
 
 # ---------------- F1: scaffold_feature -----------------------------------
 

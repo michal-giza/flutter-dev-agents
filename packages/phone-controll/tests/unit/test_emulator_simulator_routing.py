@@ -13,8 +13,6 @@ import pytest
 
 from mcp_phone_controll.data.repositories.composite.composite_repositories import (
     CompositeDeviceRepository,
-    CompositeLifecycleRepository,
-    CompositeObservationRepository,
 )
 from mcp_phone_controll.data.repositories.composite.platform_resolver import (
     CachingPlatformResolver,
@@ -30,13 +28,12 @@ from mcp_phone_controll.domain.entities import (
     DeviceState,
     Platform,
 )
-from mcp_phone_controll.domain.result import Err, Ok
+from mcp_phone_controll.domain.result import Ok
 from tests.fakes.fake_repositories import (
     FakeDeviceRepository,
     FakeLifecycleRepository,
     FakeObservationRepository,
 )
-
 
 # ---- Android emulator: same code path as physical, just tagged differently --
 

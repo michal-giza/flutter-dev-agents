@@ -8,7 +8,6 @@ from ...domain.entities import Capability, CapabilityReport
 from ...domain.repositories import CapabilitiesProvider
 from ...domain.result import Result, ok
 
-
 _PLAN_SCHEMA = {
     "version": "phone-controll/v1",
     "kind": "TestPlan",
@@ -100,7 +99,10 @@ _PLAN_SCHEMA = {
     "notes": [
         "VERDICT_BLOCKED is auto-injected by the executor when a phase fails — do not declare it as a planned phase.",
         "VERDICT_DECLINED is a planned terminal — declare it after a *_GATE phase with planned_outcome: decline.",
-        "Phases ending in _GATE are user-defined gate names (UMP_GATE, ATT_GATE, PERM_CAMERA_GATE, ...) — they all require a driver.",
+        (
+            "Phases ending in _GATE are user-defined gate names (UMP_GATE, "
+            "ATT_GATE, PERM_CAMERA_GATE, ...) — they all require a driver."
+        ),
         "Single-phase plans (e.g. just PRE_FLIGHT) are valid — useful for setup-only flows.",
     ],
 }

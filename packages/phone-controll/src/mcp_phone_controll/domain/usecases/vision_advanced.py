@@ -29,9 +29,8 @@ from ..repositories import (
     VisionRepository,
 )
 from ..result import Err, Result, err, ok
-from .base import BaseUseCase
 from ._helpers import resolve_serial
-
+from .base import BaseUseCase
 
 # --- calibrate_camera ----------------------------------------------------
 

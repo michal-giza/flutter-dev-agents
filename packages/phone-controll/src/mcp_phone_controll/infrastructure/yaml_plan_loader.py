@@ -21,7 +21,6 @@ from ..domain.entities import PhaseDriver, PlanPhase, TestPlan
 from ..domain.failures import InvalidArgumentFailure
 from ..domain.result import Result, err, ok
 
-
 _API = "phone-controll/v1"
 _KIND = "TestPlan"
 

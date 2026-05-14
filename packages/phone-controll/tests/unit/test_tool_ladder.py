@@ -20,7 +20,6 @@ from mcp_phone_controll.domain.usecases.discovery import (
     DescribeToolParams,
 )
 
-
 # ----- tools_for_level -----------------------------------------------------
 
 

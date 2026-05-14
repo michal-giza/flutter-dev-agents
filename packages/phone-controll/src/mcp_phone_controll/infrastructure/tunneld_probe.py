@@ -17,7 +17,6 @@ import asyncio
 import socket
 from dataclasses import dataclass
 
-
 DEFAULT_TUNNELD_HOST = "127.0.0.1"
 DEFAULT_TUNNELD_PORT = 49151
 
@@ -47,7 +46,7 @@ async def probe_tunneld(
             timeout=timeout_s,
         )
         return TunneldStatus(running=True, host=host, port=port)
-    except (OSError, asyncio.TimeoutError) as e:
+    except (TimeoutError, OSError) as e:
         return TunneldStatus(
             running=False, host=host, port=port, detail=f"{type(e).__name__}: {e}"
         )

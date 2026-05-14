@@ -19,7 +19,6 @@ from pathlib import Path
 
 from ..domain.entities import PlanRun
 
-
 _FAILURE_CODES = frozenset(
     {
         "TestExecutionFailure",

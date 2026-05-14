@@ -12,7 +12,6 @@ from ..repositories import PlanExecutor
 from ..result import Err, Result, err, ok
 from .base import BaseUseCase
 
-
 # Phases that must always be preceded by a starter phase.
 _PHASE_PREREQS: dict[str, tuple[str, ...]] = {
     # device must be locked before any UNDER_TEST step

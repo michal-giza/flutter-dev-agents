@@ -35,7 +35,6 @@ from ..repositories import ArtifactRepository
 from ..result import Err, Result, err, ok
 from .base import BaseUseCase
 
-
 # Default retention window. Conservative — long enough to recover a
 # previous session's full-res image; short enough that a busy month
 # doesn't accumulate gigabytes.

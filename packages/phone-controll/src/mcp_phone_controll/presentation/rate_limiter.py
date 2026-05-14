@@ -64,11 +64,11 @@ class RateLimiter:
 
     def __init__(
         self,
-        default: RateLimitConfig = RateLimitConfig(),
+        default: RateLimitConfig | None = None,
         overrides: dict[str, RateLimitConfig] | None = None,
         now=time.monotonic,
     ) -> None:
-        self._default = default
+        self._default = default if default is not None else RateLimitConfig()
         self._overrides = dict(DEFAULT_OVERRIDES)
         if overrides:
             self._overrides.update(overrides)

@@ -17,7 +17,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 DEFAULT_MAX_STRING_BYTES = 8_000          # ~2-3K tokens
 DEFAULT_MAX_LIST_ITEMS = 200
 DEFAULT_MAX_DEPTH = 8

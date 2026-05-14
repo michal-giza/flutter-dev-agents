@@ -27,7 +27,6 @@ import math
 import re
 from dataclasses import dataclass
 
-
 _TOKEN_RE = re.compile(r"[A-Za-z][A-Za-z0-9_]*")
 
 

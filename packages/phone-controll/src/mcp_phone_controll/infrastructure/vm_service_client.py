@@ -119,5 +119,5 @@ class VmServiceClient:
                         pending.set_result(msg)
         except asyncio.CancelledError:
             return
-        except Exception:  # noqa: BLE001 — boundary
+        except Exception:
             return

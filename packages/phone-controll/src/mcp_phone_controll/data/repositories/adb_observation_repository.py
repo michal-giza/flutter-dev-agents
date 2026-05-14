@@ -13,7 +13,6 @@ from ...domain.result import Result, err, ok
 from ...infrastructure.adb_client import AdbClient
 from ..parsers.adb_devices_parser import parse_logcat_threadtime
 
-
 _LEVEL_ORDER = {
     LogLevel.VERBOSE: 0,
     LogLevel.DEBUG: 1,
@@ -63,7 +62,7 @@ class AdbObservationRepository(ObservationRepository):
         if serial in self._recordings:
             return err(AdbFailure(message=f"recording already in progress for {serial}"))
         remote = f"/sdcard/mcp_record_{abs(hash(output_path)) & 0xFFFFFFFF}.mp4"
-        proc = await self._adb._runner.stream(  # noqa: SLF001 — single intentional escape hatch
+        proc = await self._adb._runner.stream(
             ["adb", "-s", serial, "shell", "screenrecord", remote]
         )
         self._recordings[serial] = (proc, remote, output_path)
@@ -77,7 +76,7 @@ class AdbObservationRepository(ObservationRepository):
         proc.terminate()
         try:
             await asyncio.wait_for(proc.wait(), timeout=10.0)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             proc.kill()
             await proc.wait()
         # Pull the file. screenrecord finalizes on SIGTERM; give it a moment.
@@ -134,7 +133,7 @@ class AdbObservationRepository(ObservationRepository):
                     )
                 try:
                     raw = await asyncio.wait_for(proc.stdout.readline(), timeout=remaining)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     proc.terminate()
                     return err(TimeoutFailure(message="tail_logs_until timed out"))
                 if not raw:
@@ -155,6 +154,6 @@ class AdbObservationRepository(ObservationRepository):
                 proc.terminate()
                 try:
                     await asyncio.wait_for(proc.wait(), timeout=2.0)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     proc.kill()
         return ok(collected)

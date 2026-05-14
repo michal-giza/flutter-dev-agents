@@ -13,7 +13,6 @@ from mcp_phone_controll.adapters.openai_compat import create_app
 from mcp_phone_controll.adapters.schemas import to_openai_functions
 from mcp_phone_controll.presentation.tool_registry import ToolDispatcher
 
-
 # Reuse the integration dispatcher builder from the dispatcher test module
 from tests.integration.test_tool_dispatcher import _build_fake_dispatcher
 

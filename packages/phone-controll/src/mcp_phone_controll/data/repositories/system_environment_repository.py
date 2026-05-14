@@ -75,7 +75,7 @@ class SystemEnvironmentRepository(EnvironmentRepository):
                     fix=None if patrol_res.ok else "dart pub global activate patrol_cli",
                 )
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             checks.append(
                 EnvironmentCheck(
                     name="patrol", ok=False, detail=str(e),
@@ -93,7 +93,7 @@ class SystemEnvironmentRepository(EnvironmentRepository):
                     fix=None if pmd3_res.ok else "uv pip install -e \".[dev]\"  # reinstalls the venv",
                 )
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             checks.append(
                 EnvironmentCheck(name="pymobiledevice3", ok=False, detail=str(e)))
 

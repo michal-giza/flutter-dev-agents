@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from mcp_phone_controll.domain.entities import BuildMode, Bounds, Platform, UiElement
+from mcp_phone_controll.domain.entities import Bounds, BuildMode, Platform, UiElement
 from mcp_phone_controll.domain.failures import (
     DeviceNotFoundFailure,
     NoDeviceSelectedFailure,

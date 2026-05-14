@@ -126,7 +126,7 @@ class LanguageAwareChunker:
             return self._chunk_fixed(text, language)
         starts.append(len(text))
         chunks: list[Chunk] = []
-        for s, e in zip(starts, starts[1:]):
+        for s, e in zip(starts, starts[1:], strict=False):
             piece = text[s:e].strip()
             if len(piece) < _MIN_CHUNK_CHARS:
                 continue

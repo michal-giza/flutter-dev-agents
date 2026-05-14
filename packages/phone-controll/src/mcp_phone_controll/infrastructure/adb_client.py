@@ -7,7 +7,6 @@ from pathlib import Path
 
 from .process_runner import ProcessResult, ProcessRunner
 
-
 _ADB_FALLBACKS = (
     "/opt/homebrew/bin/adb",
     "/usr/local/bin/adb",

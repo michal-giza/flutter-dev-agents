@@ -59,7 +59,7 @@ class CompositeDeviceRepository(DeviceRepository):
         # missing python module, dead tunneld — Android always wins.
         try:
             i = await self._ios.list_devices()
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             self._last_ios_error = f"{type(e).__name__}: {e}"
             return ok(merged)
         if isinstance(i, Err):

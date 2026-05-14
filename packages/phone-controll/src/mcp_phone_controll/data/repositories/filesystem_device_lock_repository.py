@@ -27,7 +27,6 @@ from ...domain.failures import (
 from ...domain.repositories import DeviceLockRepository
 from ...domain.result import Result, err, ok
 
-
 # Filesystem-friendly serial: replace anything that isn't [A-Za-z0-9_.-] with _
 _SAFE = re.compile(r"[^A-Za-z0-9_.\-]")
 

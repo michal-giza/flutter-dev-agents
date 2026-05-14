@@ -6,6 +6,16 @@ from pathlib import Path
 
 import pytest
 
+from mcp_phone_controll.data.repositories.in_memory_device_lock_repository import (
+    InMemoryDeviceLockRepository,
+)
+from mcp_phone_controll.data.repositories.sqlite_skill_library_repository import (
+    SqliteSkillLibraryRepository,
+)
+from mcp_phone_controll.domain.usecases.artifact_retention import (
+    DiskUsage,
+    PruneOriginals,
+)
 from mcp_phone_controll.domain.usecases.artifacts import (
     FetchArtifact,
     GetArtifactsDir,
@@ -16,74 +26,16 @@ from mcp_phone_controll.domain.usecases.build_install import (
     InstallApp,
     UninstallApp,
 )
-from mcp_phone_controll.data.repositories.in_memory_device_lock_repository import (
-    InMemoryDeviceLockRepository,
+from mcp_phone_controll.domain.usecases.code_quality import (
+    DartAnalyze,
+    DartFix,
+    DartFormat,
+    FlutterPubGet,
+    FlutterPubOutdated,
+    QualityGate,
 )
-from mcp_phone_controll.domain.usecases.devices import (
-    ForceReleaseLock,
-    GetSelectedDevice,
-    ListDevices,
-    ListLocks,
-    ReleaseDevice,
-    SelectDevice,
-)
-from mcp_phone_controll.domain.usecases.lifecycle import (
-    ClearAppData,
-    GrantPermission,
-    LaunchApp,
-    StopApp,
-)
-from mcp_phone_controll.domain.usecases.observation import (
-    ReadLogs,
-    StartRecording,
-    StopRecording,
-    TailLogs,
-    TakeScreenshot,
-)
-from mcp_phone_controll.domain.usecases.discovery import (
-    DescribeCapabilities,
-    DescribeTool,
-    SessionSummary,
-    ToolUsageReportUseCase,
-)
-from mcp_phone_controll.domain.usecases.mcp_ping import McpPing
-from mcp_phone_controll.domain.usecases.artifact_retention import (
-    DiskUsage,
-    PruneOriginals,
-)
-from mcp_phone_controll.domain.usecases.doctor import CheckEnvironment
-from mcp_phone_controll.domain.usecases.patrol import (
-    ListPatrolTests,
-    RunPatrolSuite,
-    RunPatrolTest,
-)
-from mcp_phone_controll.domain.usecases.plan import RunTestPlan, ValidateTestPlan
-from mcp_phone_controll.domain.usecases.preparation import PrepareForTest
-from mcp_phone_controll.domain.usecases.projects import InspectProject
-from mcp_phone_controll.domain.usecases.vision import (
-    CompareScreenshot,
-    DetectMarkers,
-    InferCameraPose,
-    WaitForMarker,
-)
-from mcp_phone_controll.domain.usecases.virtual_devices import (
-    BootSimulator,
-    ListAvds,
-    ListSimulators,
-    StartEmulator,
-    StopVirtualDevice,
-)
-from mcp_phone_controll.domain.usecases.testing import (
-    RunIntegrationTests,
-    RunUnitTests,
-)
-from mcp_phone_controll.domain.usecases.ui_input import (
-    PressKey,
-    Swipe,
-    Tap,
-    TapText,
-    TypeText,
-)
+from mcp_phone_controll.domain.usecases.crag import CorrectiveRecall
+from mcp_phone_controll.domain.usecases.debug_inspect import VmEvaluate, VmListIsolates
 from mcp_phone_controll.domain.usecases.dev_session import (
     AttachDebugSession,
     CallServiceExtension,
@@ -97,6 +49,21 @@ from mcp_phone_controll.domain.usecases.dev_session import (
     TailDebugLog,
     ToggleInspector,
 )
+from mcp_phone_controll.domain.usecases.devices import (
+    ForceReleaseLock,
+    GetSelectedDevice,
+    ListDevices,
+    ListLocks,
+    ReleaseDevice,
+    SelectDevice,
+)
+from mcp_phone_controll.domain.usecases.discovery import (
+    DescribeCapabilities,
+    DescribeTool,
+    SessionSummary,
+    ToolUsageReportUseCase,
+)
+from mcp_phone_controll.domain.usecases.doctor import CheckEnvironment
 from mcp_phone_controll.domain.usecases.ide import (
     CloseIdeWindow,
     FocusIdeWindow,
@@ -105,9 +72,28 @@ from mcp_phone_controll.domain.usecases.ide import (
     OpenProjectInIde,
     WriteVscodeLaunchConfig,
 )
-from mcp_phone_controll.domain.usecases.wda_setup import SetupWebDriverAgent
-from mcp_phone_controll.domain.usecases.patch_safe import PatchApplySafe
+from mcp_phone_controll.domain.usecases.lifecycle import (
+    ClearAppData,
+    GrantPermission,
+    LaunchApp,
+    StopApp,
+)
+from mcp_phone_controll.domain.usecases.mcp_ping import McpPing
 from mcp_phone_controll.domain.usecases.narrate import Narrate
+from mcp_phone_controll.domain.usecases.observation import (
+    ReadLogs,
+    StartRecording,
+    StopRecording,
+    TailLogs,
+    TakeScreenshot,
+)
+from mcp_phone_controll.domain.usecases.patch_safe import PatchApplySafe
+from mcp_phone_controll.domain.usecases.patrol import (
+    ListPatrolTests,
+    RunPatrolSuite,
+    RunPatrolTest,
+)
+from mcp_phone_controll.domain.usecases.plan import RunTestPlan, ValidateTestPlan
 from mcp_phone_controll.domain.usecases.productivity import (
     FindFlutterWidget,
     GrepLogs,
@@ -115,8 +101,8 @@ from mcp_phone_controll.domain.usecases.productivity import (
     ScaffoldFeature,
     SummarizeSession,
 )
+from mcp_phone_controll.domain.usecases.projects import InspectProject
 from mcp_phone_controll.domain.usecases.recall import IndexProject, Recall
-from mcp_phone_controll.domain.usecases.crag import CorrectiveRecall
 from mcp_phone_controll.domain.usecases.release_screenshot import (
     CaptureReleaseScreenshot,
 )
@@ -125,29 +111,16 @@ from mcp_phone_controll.domain.usecases.skill_library import (
     PromoteSequence,
     ReplaySkill,
 )
-from mcp_phone_controll.data.repositories.sqlite_skill_library_repository import (
-    SqliteSkillLibraryRepository,
+from mcp_phone_controll.domain.usecases.testing import (
+    RunIntegrationTests,
+    RunUnitTests,
 )
-from mcp_phone_controll.domain.usecases.code_quality import (
-    DartAnalyze,
-    DartFix,
-    DartFormat,
-    FlutterPubGet,
-    FlutterPubOutdated,
-    QualityGate,
-)
-from mcp_phone_controll.domain.usecases.vision_advanced import (
-    AssertPoseStable,
-    CalibrateCamera,
-    SaveGoldenImage,
-    WaitForArSessionReady,
-)
-from mcp_phone_controll.domain.usecases.debug_inspect import VmEvaluate, VmListIsolates
-from tests.fakes.fake_dev_session import (
-    FakeCodeQualityRepository,
-    FakeDebugSessionRepository,
-    FakeIdeRepository,
-    FakeWdaSetupCli,
+from mcp_phone_controll.domain.usecases.ui_input import (
+    PressKey,
+    Swipe,
+    Tap,
+    TapText,
+    TypeText,
 )
 from mcp_phone_controll.domain.usecases.ui_query import (
     AssertVisible,
@@ -159,15 +132,39 @@ from mcp_phone_controll.domain.usecases.ui_verify import (
     AssertNoErrorsSince,
     TapAndVerify,
 )
+from mcp_phone_controll.domain.usecases.virtual_devices import (
+    BootSimulator,
+    ListAvds,
+    ListSimulators,
+    StartEmulator,
+    StopVirtualDevice,
+)
+from mcp_phone_controll.domain.usecases.vision import (
+    CompareScreenshot,
+    DetectMarkers,
+    InferCameraPose,
+    WaitForMarker,
+)
+from mcp_phone_controll.domain.usecases.vision_advanced import (
+    AssertPoseStable,
+    CalibrateCamera,
+    SaveGoldenImage,
+    WaitForArSessionReady,
+)
+from mcp_phone_controll.domain.usecases.wda_setup import SetupWebDriverAgent
 from mcp_phone_controll.presentation.tool_registry import (
     ToolDispatcher,
     UseCases,
     build_registry,
 )
-from tests.fakes.fake_vision import FakeVisionRepository
+from tests.fakes.fake_dev_session import (
+    FakeCodeQualityRepository,
+    FakeDebugSessionRepository,
+    FakeIdeRepository,
+    FakeWdaSetupCli,
+)
 from tests.fakes.fake_repositories import (
     FakeArtifactRepository,
-    FakeVirtualDeviceManager,
     FakeBuildRepository,
     FakeCapabilitiesProvider,
     FakeDeviceRepository,
@@ -182,7 +179,9 @@ from tests.fakes.fake_repositories import (
     FakeSessionTraceRepository,
     FakeTestRepository,
     FakeUiRepository,
+    FakeVirtualDeviceManager,
 )
+from tests.fakes.fake_vision import FakeVisionRepository
 
 
 def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:

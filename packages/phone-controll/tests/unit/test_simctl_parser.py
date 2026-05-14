@@ -7,7 +7,6 @@ import json
 from mcp_phone_controll.data.parsers.simctl_parser import parse_simctl_devices
 from mcp_phone_controll.domain.entities import DeviceClass, DeviceState, Platform
 
-
 _BASE_PAYLOAD = {
     "devices": {
         "com.apple.CoreSimulator.SimRuntime.iOS-17-4": [

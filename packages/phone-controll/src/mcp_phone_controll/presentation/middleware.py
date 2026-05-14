@@ -32,8 +32,8 @@ to a 20-line orchestrator.
 
 from __future__ import annotations
 
-from typing import Any, Awaitable, Callable, Protocol
-
+from collections.abc import Awaitable, Callable
+from typing import Any, Protocol
 
 JsonDict = dict[str, Any]
 

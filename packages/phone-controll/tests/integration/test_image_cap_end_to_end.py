@@ -26,7 +26,6 @@ import pytest
 
 from mcp_phone_controll.domain.result import ok
 
-
 _GALAXY_S25_W = 3120
 _GALAXY_S25_H = 1440
 _CLAUDE_API_LIMIT = 2000  # multi-image conversations
@@ -229,7 +228,7 @@ async def test_e2e_full_walk_through_no_leak(tmp_path: Path):
         if rejected:
             leaks.append((name, rejected))
     assert not leaks, (
-        f"end-to-end walk leaked over-cap PNGs from these tools:\n"
+        "end-to-end walk leaked over-cap PNGs from these tools:\n"
         + "\n".join(f"  {name}: {paths}" for name, paths in leaks)
     )
 
@@ -240,7 +239,9 @@ async def test_e2e_pre_existing_oversized_file_seatbelt_catches(tmp_path: Path):
     tool runs (e.g. left over from a previous session before the cap
     landed). The dispatcher's seatbelt must still catch it the moment
     a tool returns the path."""
-    dispatcher = _build_dispatcher_with_galaxy_observation(tmp_path)
+    # Build the dispatcher to ensure the runtime is wired correctly,
+    # even though we exercise the seatbelt directly below.
+    _build_dispatcher_with_galaxy_observation(tmp_path)
 
     # Pre-create an oversized file at a path a tool would later return.
     artifacts = tmp_path / "sessions"

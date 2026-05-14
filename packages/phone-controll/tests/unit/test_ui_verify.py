@@ -5,14 +5,13 @@ from __future__ import annotations
 import pytest
 
 from mcp_phone_controll.domain.entities import LogEntry, LogLevel, UiElement
+from mcp_phone_controll.domain.result import Err, ok
 from mcp_phone_controll.domain.usecases.ui_verify import (
     AssertNoErrorsSince,
     AssertNoErrorsSinceParams,
     TapAndVerify,
     TapAndVerifyParams,
 )
-from mcp_phone_controll.domain.result import Err, ok
-
 from tests.fakes.fake_repositories import (
     FakeObservationRepository,
     FakeSessionStateRepository,

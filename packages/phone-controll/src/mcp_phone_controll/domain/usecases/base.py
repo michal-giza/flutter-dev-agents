@@ -25,5 +25,5 @@ class BaseUseCase(ABC, Generic[P, T]):
     async def __call__(self, params: P) -> Result[T]:
         try:
             return await self.execute(params)
-        except Exception as e:  # noqa: BLE001 — boundary; convert to Failure
+        except Exception as e:
             return Err(UnexpectedFailure(message=f"{type(e).__name__}: {e}"))

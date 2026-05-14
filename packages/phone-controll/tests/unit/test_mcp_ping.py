@@ -48,6 +48,7 @@ async def test_describe_capabilities_includes_version_handshake():
     agent observing a missing feature can diagnose stale-subprocess
     without a second tool call."""
     from pathlib import Path
+
     from tests.integration.test_tool_dispatcher import _build_fake_dispatcher
 
     dispatcher = _build_fake_dispatcher(Path("/tmp"))

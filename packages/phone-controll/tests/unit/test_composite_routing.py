@@ -34,7 +34,7 @@ from mcp_phone_controll.domain.failures import (
     DeviceNotFoundFailure,
     InvalidArgumentFailure,
 )
-from mcp_phone_controll.domain.result import Err, Ok, err, ok
+from mcp_phone_controll.domain.result import Err, Ok, err
 from tests.fakes.fake_repositories import (
     FakeBuildRepository,
     FakeDeviceRepository,

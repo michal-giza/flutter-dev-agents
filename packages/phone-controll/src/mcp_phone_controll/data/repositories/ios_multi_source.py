@@ -78,7 +78,7 @@ class MultiSourceIosDeviceRepository(DeviceRepository):
         # Physical: best-effort (toolchain may be missing).
         try:
             phys = await self._physical.list_devices()
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             self._last_physical_error = f"{type(e).__name__}: {e}"
         else:
             if isinstance(phys, Err):
@@ -93,7 +93,7 @@ class MultiSourceIosDeviceRepository(DeviceRepository):
         # Simulator: best-effort (Xcode may be missing on non-mac CI).
         try:
             sim = await self._simulator.list_devices()
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             self._last_simulator_error = f"{type(e).__name__}: {e}"
         else:
             if isinstance(sim, Err):

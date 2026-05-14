@@ -25,7 +25,6 @@ from pathlib import Path
 
 from ...domain.result import Result, ok
 
-
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS skills (
     name TEXT PRIMARY KEY,

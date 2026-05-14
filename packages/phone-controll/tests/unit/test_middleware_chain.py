@@ -14,10 +14,8 @@ from mcp_phone_controll.presentation.middleware import (
     PatrolGuardMiddleware,
     RateLimiterMiddleware,
     TraceRecorderMiddleware,
-    _BaseMiddleware,
     build_default_chain,
 )
-
 
 # ---- per-middleware tests -----------------------------------------------
 

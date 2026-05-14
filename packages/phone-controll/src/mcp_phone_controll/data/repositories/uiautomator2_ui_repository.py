@@ -11,7 +11,6 @@ from ...domain.repositories import UiRepository
 from ...domain.result import Result, err, ok
 from ...infrastructure.uiautomator2_factory import UiAutomator2Factory
 
-
 _BOUNDS_RE = re.compile(r"\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]")
 
 

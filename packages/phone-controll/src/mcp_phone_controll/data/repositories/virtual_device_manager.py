@@ -109,7 +109,7 @@ class CompositeVirtualDeviceManager(VirtualDeviceManager):
             result = await self._adb.shell(serial, "reboot", "-p", timeout_s=10.0)
             # `adb -s emulator-X emu kill` is the canonical way; reboot -p is a
             # fallback. Use emu kill primarily.
-            kill_result = await self._adb._runner.run(  # noqa: SLF001 — single-purpose
+            kill_result = await self._adb._runner.run(
                 ["adb", "-s", serial, "emu", "kill"], timeout_s=10.0
             )
             if not kill_result.ok and not result.ok:

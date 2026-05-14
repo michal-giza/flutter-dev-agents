@@ -42,7 +42,7 @@ class ProcessRunner(Protocol):
         argv: list[str],
         cwd: Path | None = None,
         env: dict[str, str] | None = None,
-    ) -> "asyncio.subprocess.Process": ...
+    ) -> asyncio.subprocess.Process: ...
 
 
 class AsyncProcessRunner:
@@ -71,7 +71,7 @@ class AsyncProcessRunner:
             )
         try:
             stdout_b, stderr_b = await asyncio.wait_for(proc.communicate(), timeout=timeout_s)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             proc.kill()
             await proc.wait()
             raise
@@ -109,7 +109,7 @@ class AsyncProcessRunner:
                     _, stderr_b = await asyncio.wait_for(
                         proc.communicate(), timeout=timeout_s
                     )
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     proc.kill()
                     await proc.wait()
                     raise

@@ -239,7 +239,9 @@ class PhaseDriver:
 
 @dataclass(frozen=True, slots=True)
 class PlanPhase:
-    phase: str                      # PRE_FLIGHT | CLEAN | LAUNCHED | <GATE> | UNDER_TEST | VERDICT_* | OPEN_IDE | DEV_SESSION_*
+    # PRE_FLIGHT | CLEAN | LAUNCHED | <GATE> | UNDER_TEST | VERDICT_* |
+    # OPEN_IDE | DEV_SESSION_* | HOT_RELOAD | AR_SCENE_READY | REFLECTION
+    phase: str
     driver: PhaseDriver | None = None
     planned_outcome: str | None = None     # "accept" | "decline" | "pass" | "decided"
     package_id: str | None = None

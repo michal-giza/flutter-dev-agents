@@ -7,7 +7,6 @@ from pathlib import Path
 
 from .process_runner import ProcessResult, ProcessRunner
 
-
 _PATROL_FALLBACKS = (
     "/opt/homebrew/bin/patrol",
     "/usr/local/bin/patrol",

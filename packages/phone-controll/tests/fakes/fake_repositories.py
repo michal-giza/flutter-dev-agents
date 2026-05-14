@@ -8,7 +8,6 @@ from pathlib import Path
 from mcp_phone_controll.domain.entities import (
     AppBundle,
     Artifact,
-    BuildMode,
     Device,
     DeviceState,
     LogEntry,
@@ -373,7 +372,6 @@ class FakeVirtualDeviceManager:
 
     async def boot_simulator(self, name_or_udid):
         self.calls.append(("boot", name_or_udid))
-        from datetime import datetime as _dt2
 
         return ok(
             __import__(

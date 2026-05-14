@@ -12,7 +12,6 @@ from ...domain.repositories import ObservationRepository
 from ...domain.result import Result, err, ok
 from ...infrastructure.simctl_client import SimctlClient
 
-
 # Apple `log stream` levels → our LogLevel
 _LOG_LEVEL = {
     "Debug": LogLevel.DEBUG,
@@ -68,7 +67,7 @@ async def _terminate(proc: asyncio.subprocess.Process) -> None:
     proc.terminate()
     try:
         await asyncio.wait_for(proc.wait(), timeout=2.0)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         proc.kill()
         await proc.wait()
 
@@ -145,7 +144,7 @@ class SimctlSimulatorObservationRepository(ObservationRepository):
                     raw = await asyncio.wait_for(
                         proc.stdout.readline(), timeout=remaining
                     )
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     break
                 if not raw:
                     break
@@ -196,7 +195,7 @@ class SimctlSimulatorObservationRepository(ObservationRepository):
                     raw = await asyncio.wait_for(
                         proc.stdout.readline(), timeout=remaining
                     )
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     return err(TimeoutFailure(message="tail_logs_until timed out"))
                 if not raw:
                     break

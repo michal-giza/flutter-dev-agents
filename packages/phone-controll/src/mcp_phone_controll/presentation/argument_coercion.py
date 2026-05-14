@@ -16,7 +16,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 _TRUE_STRINGS = frozenset({"true", "yes", "1", "on"})
 _FALSE_STRINGS = frozenset({"false", "no", "0", "off", "null", "none", ""})
 
@@ -143,7 +142,7 @@ def corrected_example(schema: dict[str, Any]) -> dict[str, Any]:
 def _example_value(prop: dict[str, Any]) -> Any:
     if not isinstance(prop, dict):
         return None
-    if "enum" in prop and prop["enum"]:
+    if prop.get("enum"):
         return prop["enum"][0]
     target = prop.get("type")
     if isinstance(target, list):

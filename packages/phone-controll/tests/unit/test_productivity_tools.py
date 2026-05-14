@@ -20,7 +20,6 @@ from mcp_phone_controll.domain.usecases.productivity import (
     SummarizeSessionParams,
 )
 
-
 # ---- scaffold_feature ----------------------------------------------------
 
 

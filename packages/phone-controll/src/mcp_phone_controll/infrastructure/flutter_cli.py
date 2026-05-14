@@ -7,7 +7,6 @@ from pathlib import Path
 
 from .process_runner import ProcessResult, ProcessRunner
 
-
 _FLUTTER_FALLBACKS = (
     "/opt/homebrew/bin/flutter",
     "/usr/local/bin/flutter",

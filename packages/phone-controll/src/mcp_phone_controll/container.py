@@ -12,6 +12,7 @@ Layers wired here:
 from __future__ import annotations
 
 import atexit
+import contextlib
 import os
 import uuid
 from pathlib import Path
@@ -29,22 +30,35 @@ from .data.repositories.composite.composite_repositories import (
 )
 from .data.repositories.composite.platform_resolver import CachingPlatformResolver
 from .data.repositories.composite_project_inspector import CompositeProjectInspector
+from .data.repositories.dart_code_quality_repository import (
+    DartCodeQualityRepository,
+)
 from .data.repositories.filesystem_artifact_repository import FilesystemArtifactRepository
 from .data.repositories.filesystem_device_lock_repository import (
     FilesystemDeviceLockRepository,
 )
 from .data.repositories.flutter_build_repository import FlutterBuildRepository
+from .data.repositories.flutter_debug_session_repository import (
+    FlutterDebugSessionRepository,
+)
 from .data.repositories.flutter_project_inspector import FlutterProjectInspector
 from .data.repositories.flutter_test_repository import FlutterTestRepository
 from .data.repositories.in_memory_session_state_repository import (
     InMemorySessionStateRepository,
 )
+from .data.repositories.in_memory_session_trace_repository import (
+    InMemorySessionTraceRepository,
+)
+from .data.repositories.ios_device_repository import IosDeviceRepository
+from .data.repositories.ios_lifecycle_repository import IosLifecycleRepository
 from .data.repositories.ios_multi_source import (
     MultiSourceIosDeviceRepository,
     MultiSourceIosLifecycleRepository,
     MultiSourceIosObservationRepository,
 )
+from .data.repositories.ios_observation_repository import IosObservationRepository
 from .data.repositories.opencv_vision_repository import OpenCvVisionRepository
+from .data.repositories.patrol_repository import PatrolTestRepository
 from .data.repositories.simctl_simulator_device_repository import (
     SimctlSimulatorDeviceRepository,
 )
@@ -54,39 +68,40 @@ from .data.repositories.simctl_simulator_lifecycle_repository import (
 from .data.repositories.simctl_simulator_observation_repository import (
     SimctlSimulatorObservationRepository,
 )
-from .data.repositories.virtual_device_manager import CompositeVirtualDeviceManager
-from .data.repositories.in_memory_session_trace_repository import (
-    InMemorySessionTraceRepository,
-)
-from .data.repositories.ios_device_repository import IosDeviceRepository
-from .data.repositories.ios_lifecycle_repository import IosLifecycleRepository
-from .data.repositories.ios_observation_repository import IosObservationRepository
-from .data.repositories.patrol_repository import PatrolTestRepository
 from .data.repositories.static_capabilities_provider import StaticCapabilitiesProvider
 from .data.repositories.system_environment_repository import SystemEnvironmentRepository
 from .data.repositories.uiautomator2_ui_repository import UiAutomator2UiRepository
+from .data.repositories.virtual_device_manager import CompositeVirtualDeviceManager
+from .data.repositories.vscode_ide_repository import VsCodeIdeRepository
 from .data.repositories.wda_ui_repository import WdaUiRepository
 from .data.repositories.yaml_plan_executor import YamlPlanExecutor
 from .domain.entities import TestFramework
+from .domain.usecases.artifact_retention import DiskUsage, PruneOriginals
 from .domain.usecases.artifacts import FetchArtifact, GetArtifactsDir, NewSession
-from .domain.usecases.patch_safe import PatchApplySafe
-from .domain.usecases.narrate import Narrate
-from .domain.usecases.productivity import (
-    FindFlutterWidget,
-    GrepLogs,
-    RunQuickCheck,
-    ScaffoldFeature,
-    SummarizeSession,
-)
-from .domain.usecases.recall import IndexProject, Recall
-from .domain.usecases.crag import CorrectiveRecall
-from .domain.usecases.release_screenshot import CaptureReleaseScreenshot
-from .domain.usecases.skill_library import (
-    ListSkills,
-    PromoteSequence,
-    ReplaySkill,
-)
 from .domain.usecases.build_install import BuildApp, InstallApp, UninstallApp
+from .domain.usecases.code_quality import (
+    DartAnalyze,
+    DartFix,
+    DartFormat,
+    FlutterPubGet,
+    FlutterPubOutdated,
+    QualityGate,
+)
+from .domain.usecases.crag import CorrectiveRecall
+from .domain.usecases.debug_inspect import VmEvaluate, VmListIsolates
+from .domain.usecases.dev_session import (
+    AttachDebugSession,
+    CallServiceExtension,
+    DumpRenderTree,
+    DumpWidgetTree,
+    ListDebugSessions,
+    ReadDebugLog,
+    RestartDebugSession,
+    StartDebugSession,
+    StopDebugSession,
+    TailDebugLog,
+    ToggleInspector,
+)
 from .domain.usecases.devices import (
     ForceReleaseLock,
     GetSelectedDevice,
@@ -101,15 +116,23 @@ from .domain.usecases.discovery import (
     SessionSummary,
     ToolUsageReportUseCase,
 )
-from .domain.usecases.mcp_ping import McpPing
-from .domain.usecases.artifact_retention import DiskUsage, PruneOriginals
 from .domain.usecases.doctor import CheckEnvironment
+from .domain.usecases.ide import (
+    CloseIdeWindow,
+    FocusIdeWindow,
+    IsIdeAvailable,
+    ListIdeWindows,
+    OpenProjectInIde,
+    WriteVscodeLaunchConfig,
+)
 from .domain.usecases.lifecycle import (
     ClearAppData,
     GrantPermission,
     LaunchApp,
     StopApp,
 )
+from .domain.usecases.mcp_ping import McpPing
+from .domain.usecases.narrate import Narrate
 from .domain.usecases.observation import (
     ReadLogs,
     StartRecording,
@@ -117,6 +140,7 @@ from .domain.usecases.observation import (
     TailLogs,
     TakeScreenshot,
 )
+from .domain.usecases.patch_safe import PatchApplySafe
 from .domain.usecases.patrol import (
     ListPatrolTests,
     RunPatrolSuite,
@@ -124,7 +148,21 @@ from .domain.usecases.patrol import (
 )
 from .domain.usecases.plan import RunTestPlan, ValidateTestPlan
 from .domain.usecases.preparation import PrepareForTest
+from .domain.usecases.productivity import (
+    FindFlutterWidget,
+    GrepLogs,
+    RunQuickCheck,
+    ScaffoldFeature,
+    SummarizeSession,
+)
 from .domain.usecases.projects import InspectProject
+from .domain.usecases.recall import IndexProject, Recall
+from .domain.usecases.release_screenshot import CaptureReleaseScreenshot
+from .domain.usecases.skill_library import (
+    ListSkills,
+    PromoteSequence,
+    ReplaySkill,
+)
 from .domain.usecases.testing import RunIntegrationTests, RunUnitTests
 from .domain.usecases.ui_input import PressKey, Swipe, Tap, TapText, TypeText
 from .domain.usecases.ui_query import AssertVisible, DumpUi, FindElement, WaitForElement
@@ -142,63 +180,26 @@ from .domain.usecases.vision import (
     InferCameraPose,
     WaitForMarker,
 )
-from .infrastructure.android_emulator_cli import AndroidEmulatorCli
-from .infrastructure.simctl_client import SimctlClient
-from .infrastructure.adb_client import AdbClient
-from .infrastructure.flutter_cli import FlutterCli
-from .infrastructure.patrol_cli import PatrolCli
-from .infrastructure.process_runner import AsyncProcessRunner
-from .infrastructure.pymobiledevice3_cli import PyMobileDevice3Cli
-from .infrastructure.uiautomator2_factory import CachingUiAutomator2Factory
-from .infrastructure.wda_factory import CachingWdaFactory
-from .infrastructure.yaml_plan_loader import YamlPlanLoader
-from .infrastructure.ide_cli import IdeCli
-from .infrastructure.wda_setup_cli import WdaSetupCli
-from .data.repositories.flutter_debug_session_repository import (
-    FlutterDebugSessionRepository,
-)
-from .data.repositories.vscode_ide_repository import VsCodeIdeRepository
-from .domain.usecases.dev_session import (
-    AttachDebugSession,
-    CallServiceExtension,
-    DumpRenderTree,
-    DumpWidgetTree,
-    ListDebugSessions,
-    ReadDebugLog,
-    RestartDebugSession,
-    StartDebugSession,
-    StopDebugSession,
-    TailDebugLog,
-    ToggleInspector,
-)
-from .domain.usecases.ide import (
-    CloseIdeWindow,
-    FocusIdeWindow,
-    IsIdeAvailable,
-    ListIdeWindows,
-    OpenProjectInIde,
-    WriteVscodeLaunchConfig,
-)
-from .domain.usecases.wda_setup import SetupWebDriverAgent
-from .domain.usecases.code_quality import (
-    DartAnalyze,
-    DartFix,
-    DartFormat,
-    FlutterPubGet,
-    FlutterPubOutdated,
-    QualityGate,
-)
 from .domain.usecases.vision_advanced import (
     AssertPoseStable,
     CalibrateCamera,
     SaveGoldenImage,
     WaitForArSessionReady,
 )
-from .domain.usecases.debug_inspect import VmEvaluate, VmListIsolates
-from .data.repositories.dart_code_quality_repository import (
-    DartCodeQualityRepository,
-)
+from .domain.usecases.wda_setup import SetupWebDriverAgent
+from .infrastructure.adb_client import AdbClient
+from .infrastructure.android_emulator_cli import AndroidEmulatorCli
 from .infrastructure.dart_cli import DartCli, FlutterPubCli
+from .infrastructure.flutter_cli import FlutterCli
+from .infrastructure.ide_cli import IdeCli
+from .infrastructure.patrol_cli import PatrolCli
+from .infrastructure.process_runner import AsyncProcessRunner
+from .infrastructure.pymobiledevice3_cli import PyMobileDevice3Cli
+from .infrastructure.simctl_client import SimctlClient
+from .infrastructure.uiautomator2_factory import CachingUiAutomator2Factory
+from .infrastructure.wda_factory import CachingWdaFactory
+from .infrastructure.wda_setup_cli import WdaSetupCli
+from .infrastructure.yaml_plan_loader import YamlPlanLoader
 from .presentation.tool_registry import ToolDispatcher, UseCases, build_registry
 
 
@@ -217,7 +218,7 @@ def _stop_debug_sessions_atexit(debug_repo) -> None:
             loop.run_until_complete(debug_repo.stop_all())
         finally:
             loop.close()
-    except Exception:  # noqa: BLE001 — atexit must never raise
+    except Exception:
         return
 
 
@@ -239,14 +240,12 @@ def _release_session_locks_atexit(lock_repo, session_id: str) -> None:
                 import json
 
                 data = json.loads(path.read_text(encoding="utf-8"))
-            except Exception:  # noqa: BLE001
+            except Exception:
                 continue
             if data.get("session_id") == session_id:
-                try:
+                with contextlib.suppress(OSError):
                     path.unlink()
-                except OSError:
-                    pass
-    except Exception:  # noqa: BLE001 — atexit must never raise
+    except Exception:
         return
 
 
@@ -256,14 +255,15 @@ def _build_chunker():
     return LanguageAwareChunker()
 
 
-def _make_gate_runner(gate: "QualityGate"):
+def _make_gate_runner(gate: QualityGate):
     """Adapter: PatchApplySafe expects `(project_path) -> Awaitable[Result[dict]]`.
 
     QualityGate returns a dataclass; we map it into a small dict the patch
     use case can read.
     """
+    from .domain.result import Err as _Err
+    from .domain.result import ok as _ok
     from .domain.usecases.code_quality import QualityGateParams
-    from .domain.result import ok as _ok, Err as _Err
 
     async def _run(project_path):
         res = await gate.execute(QualityGateParams(project_path=project_path))
@@ -392,11 +392,11 @@ def build_runtime(
 
     # RAG: optional. Use Qdrant if `[rag]` extras importable; else a Null
     # repo that returns informative `next_action: "install_rag_extra"`.
+    from .data.repositories.null_rag_repository import NullRagRepository
     from .data.repositories.qdrant_rag_repository import (
         QdrantRagRepository,
         rag_extras_available,
     )
-    from .data.repositories.null_rag_repository import NullRagRepository
 
     rag_repo = (
         QdrantRagRepository()
@@ -603,6 +603,7 @@ def build_runtime(
     # that caused the recurring stale-subprocess pain.
     if os.environ.get("MCP_QUIET") != "1":
         import sys
+
         from .version_info import boot_self_check_log
 
         print(boot_self_check_log(), file=sys.stderr)

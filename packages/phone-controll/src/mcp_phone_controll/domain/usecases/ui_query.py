@@ -8,8 +8,8 @@ from ..entities import UiElement
 from ..failures import UiElementNotFoundFailure
 from ..repositories import SessionStateRepository, UiRepository
 from ..result import Err, Result, err, ok
-from .base import BaseUseCase
 from ._helpers import resolve_serial
+from .base import BaseUseCase
 
 
 @dataclass(frozen=True, slots=True)

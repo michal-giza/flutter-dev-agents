@@ -14,7 +14,6 @@ from pathlib import Path
 
 from .process_runner import ProcessResult, ProcessRunner
 
-
 _VSCODE_FALLBACKS = (
     "/usr/local/bin/code",
     "/opt/homebrew/bin/code",

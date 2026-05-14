@@ -39,7 +39,6 @@ from tests.fakes.fake_repositories import (
     FakeSessionStateRepository,
 )
 
-
 # --- doctor ----------------------------------------------------------------
 
 

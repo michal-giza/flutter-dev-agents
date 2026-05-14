@@ -13,8 +13,8 @@ from ..entities import (
 )
 from ..repositories import DebugSessionRepository, SessionStateRepository
 from ..result import Err, Result
-from .base import BaseUseCase, NoParams
 from ._helpers import resolve_serial
+from .base import BaseUseCase, NoParams
 
 
 @dataclass(frozen=True, slots=True)

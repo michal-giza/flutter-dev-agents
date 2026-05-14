@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ..entities import ImageDiff, MarkerDetection, Pose
-from ..failures import TimeoutFailure, VisionFailure
+from ..failures import TimeoutFailure
 from ..repositories import (
     ArtifactRepository,
     ObservationRepository,
@@ -15,8 +15,8 @@ from ..repositories import (
     VisionRepository,
 )
 from ..result import Err, Result, err, ok
-from .base import BaseUseCase
 from ._helpers import resolve_serial
+from .base import BaseUseCase
 
 
 @dataclass(frozen=True, slots=True)

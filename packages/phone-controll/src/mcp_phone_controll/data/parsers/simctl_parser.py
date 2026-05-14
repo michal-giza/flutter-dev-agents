@@ -23,7 +23,6 @@ import re
 
 from ...domain.entities import Device, DeviceClass, DeviceState, Platform
 
-
 _RUNTIME_RE = re.compile(r"iOS-(\d+)-(\d+)")
 
 

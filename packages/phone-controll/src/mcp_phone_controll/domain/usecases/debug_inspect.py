@@ -122,7 +122,7 @@ async def _with_vm(uri: str, op, **kwargs) -> Result[dict]:
                 details={"hint": "uv pip install -e \".[debug]\""},
             )
         )
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         return err(
             DebugSessionFailure(
                 message=f"failed to connect to VM service: {e}",

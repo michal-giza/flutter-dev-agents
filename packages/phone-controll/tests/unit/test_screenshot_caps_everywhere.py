@@ -24,7 +24,6 @@ pytestmark = pytest.mark.skipif(not _have_cv2(), reason="cv2 not installed")
 
 
 def _read_png_dims(path: Path) -> tuple[int, int]:
-    import struct
 
     with path.open("rb") as fh:
         header = fh.read(24)

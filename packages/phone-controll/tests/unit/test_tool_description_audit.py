@@ -7,9 +7,8 @@ small-LLM context window.
 
 from __future__ import annotations
 
-from mcp_phone_controll.domain.tool_levels import BASIC_TOOLS
 from mcp_phone_controll.container import build_runtime
-
+from mcp_phone_controll.domain.tool_levels import BASIC_TOOLS
 
 _BASIC_WORD_LIMIT = 35
 _HARD_WORD_LIMIT = 70

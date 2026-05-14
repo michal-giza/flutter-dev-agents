@@ -84,7 +84,7 @@ class FlutterMachineClient:
     ) -> None:
         """Spawn the subprocess and wait for app.started to fire."""
         argv = [
-            self._flutter._flutter,  # noqa: SLF001 — single-purpose
+            self._flutter._flutter,
             "run",
             "--machine",
             f"--{mode}",
@@ -106,7 +106,7 @@ class FlutterMachineClient:
         self._reader_task = asyncio.create_task(self._read_loop())
         try:
             await asyncio.wait_for(self._started_event.wait(), timeout=startup_timeout_s)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             await self.stop()
             raise
 
@@ -117,13 +117,13 @@ class FlutterMachineClient:
         try:
             if self._app_id:
                 await self.send("app.stop", {"appId": self._app_id}, response_timeout_s=10.0)
-        except Exception:  # noqa: BLE001
+        except Exception:
             pass
         if self._proc.returncode is None:
             self._proc.terminate()
             try:
                 await asyncio.wait_for(self._proc.wait(), timeout=5.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 self._proc.kill()
                 await self._proc.wait()
         if self._reader_task is not None:
@@ -180,7 +180,7 @@ class FlutterMachineClient:
                     self._dispatch(obj)
         except asyncio.CancelledError:
             return
-        except Exception:  # noqa: BLE001
+        except Exception:
             return
 
     def _dispatch(self, obj: dict[str, Any]) -> None:

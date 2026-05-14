@@ -63,11 +63,34 @@ python_classes = "Test"
 filterwarnings = ["ignore::pytest.PytestCollectionWarning"]
 
 [tool.ruff]
-line-length = 100
+line-length = 120
 target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+# Deliberate-style ignores — these flag patterns we use on purpose, not bugs.
+ignore = [
+    # We use `class Foo(str, Enum)` deliberately for JSON-serialisation
+    # compatibility across providers that don't read StrEnum reliably.
+    "UP042",
+    # Em-dashes, en-dashes and similar Unicode punctuation in docstrings
+    # are intentional prose style; ruff flags them as "ambiguous" but
+    # they're readable and consistent across the codebase.
+    "RUF001",  # ambiguous-unicode-character-string
+    "RUF002",  # ambiguous-unicode-character-docstring
+    # Pure-style preferences we don't enforce:
+    "SIM108",  # if/else → ternary; sometimes the explicit form is clearer
+    "SIM103",  # `return bool(x)` is sometimes more readable than `return x`
+    "RUF005",  # `[*lst, x]` vs `lst + [x]` is a taste preference
+    "RUF007",  # `zip(a, a[1:])` is fine; `itertools.pairwise` is sometimes overkill
+    "RUF046",  # int(round(x)) — explicit cast can be clearer than relying on Python 3.x semantics
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests legitimately do deferred imports for skip-conditions and lazy paths.
+"tests/**/*.py" = ["E402"]
+# Container wires deferred imports inside build_runtime() for optional extras.
+"src/mcp_phone_controll/container.py" = ["E402"]
 
 [tool.mypy]
 python_version = "3.11"

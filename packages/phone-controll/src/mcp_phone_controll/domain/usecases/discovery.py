@@ -9,7 +9,7 @@ from ..failures import InvalidArgumentFailure
 from ..repositories import CapabilitiesProvider, SessionTraceRepository
 from ..result import Err, Result, err, ok
 from ..tool_levels import recommended_sequence_for_level, tools_for_level
-from .base import BaseUseCase, NoParams
+from .base import BaseUseCase
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,7 +45,7 @@ class DescribeCapabilities(
         if self._all_tool_names_provider is not None:
             try:
                 all_names = tuple(self._all_tool_names_provider())
-            except Exception:  # noqa: BLE001
+            except Exception:
                 all_names = ()
         subset = tools_for_level(params.level, all_names)
         sequence = recommended_sequence_for_level(params.level)
@@ -171,7 +171,7 @@ class ToolUsageReportUseCase(BaseUseCase[ToolUsageReportParams, ToolUsageReport]
         if self._all_tool_names_provider is not None:
             try:
                 all_names = set(self._all_tool_names_provider())
-            except Exception:  # noqa: BLE001
+            except Exception:
                 all_names = set()
             seen = set(counts.keys())
             dead = tuple(sorted(all_names - seen))

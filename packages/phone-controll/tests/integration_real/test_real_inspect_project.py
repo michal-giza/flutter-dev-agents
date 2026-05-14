@@ -16,7 +16,7 @@ import pytest
 async def test_inspect_project_parses_fixture(sample_flutter_app: Path):
     from mcp_phone_controll.container import build_runtime
 
-    use_cases, dispatcher = build_runtime()
+    _, dispatcher = build_runtime()
     res = await dispatcher.dispatch(
         "inspect_project", {"project_path": str(sample_flutter_app)}
     )
@@ -30,7 +30,7 @@ async def test_inspect_project_parses_fixture(sample_flutter_app: Path):
 async def test_list_patrol_tests_finds_smoke(sample_flutter_app: Path):
     from mcp_phone_controll.container import build_runtime
 
-    use_cases, dispatcher = build_runtime()
+    _, dispatcher = build_runtime()
     res = await dispatcher.dispatch(
         "list_patrol_tests", {"project_path": str(sample_flutter_app)}
     )

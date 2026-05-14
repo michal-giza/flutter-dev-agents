@@ -96,14 +96,14 @@ class FlutterDebugSessionRepository(DebugSessionRepository):
                     next_action="install_flutter",
                 )
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return err(
                 DebugSessionFailure(
                     message="`flutter run --machine` did not emit app.started within timeout",
                     next_action="check_environment",
                 )
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             return err(
                 DebugSessionFailure(
                     message=f"failed to start debug session: {e}",
@@ -140,7 +140,7 @@ class FlutterDebugSessionRepository(DebugSessionRepository):
             return ok(None)
         try:
             await active.client.stop()
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             return err(
                 DebugSessionFailure(
                     message=f"failed to stop debug session: {e}",
@@ -162,7 +162,7 @@ class FlutterDebugSessionRepository(DebugSessionRepository):
         active.state = DebugSessionState.RELOADING
         try:
             response = await active.client.restart(full_restart=full_restart)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             active.state = DebugSessionState.ERRORED
             return err(HotReloadFailure(message=f"hot reload failed: {e}"))
         if "error" in response:
@@ -271,7 +271,7 @@ class FlutterDebugSessionRepository(DebugSessionRepository):
         started = asyncio.get_event_loop().time()
         try:
             response = await active.client.send("app.callServiceExtension", params)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             return err(ServiceExtensionFailure(message=f"call failed: {e}"))
         elapsed_ms = int((asyncio.get_event_loop().time() - started) * 1000)
         if "error" in response:
@@ -291,7 +291,7 @@ class FlutterDebugSessionRepository(DebugSessionRepository):
 
     # ----- helpers --------------------------------------------------
 
-    async def _resolve(self, session_id: str | None) -> "_Active | None":
+    async def _resolve(self, session_id: str | None) -> _Active | None:
         target_id = session_id or self._most_recent
         if target_id is None:
             return None
@@ -307,7 +307,7 @@ class FlutterDebugSessionRepository(DebugSessionRepository):
         for active in sessions:
             try:
                 await active.client.stop()
-            except Exception:  # noqa: BLE001
+            except Exception:
                 continue
 
 
@@ -315,8 +315,15 @@ class _Active:
     """Internal record bundling DebugSession entity with its live client."""
 
     __slots__ = (
-        "session_id", "client", "project_path", "device_serial",
-        "mode", "flavor", "target", "started_at", "state",
+        "client",
+        "device_serial",
+        "flavor",
+        "mode",
+        "project_path",
+        "session_id",
+        "started_at",
+        "state",
+        "target",
     )
 
     def __init__(

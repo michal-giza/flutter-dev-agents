@@ -17,7 +17,6 @@ from ...domain.result import Result, err, ok
 from ...infrastructure.dart_cli import DartCli, FlutterPubCli
 from ..parsers.dart_analyze_parser import parse_analyze_json
 
-
 _FORMAT_CHANGED_RE = re.compile(r"Changed (\d+) file\(s\)")
 _FORMAT_UNCHANGED_RE = re.compile(r"(\d+) unchanged")
 _FIX_APPLIED_RE = re.compile(r"(\d+) fix(?:es)? made in (\d+) file")

@@ -148,7 +148,9 @@ def _wire_agent_proxy(app, dispatcher) -> None:
         try:
             import httpx
         except ImportError as e:
-            raise HTTPException(status_code=500, detail=f"httpx not installed: {e}")
+            raise HTTPException(
+                status_code=500, detail=f"httpx not installed: {e}"
+            ) from e
 
         messages: list[dict[str, Any]] = list(payload.get("messages") or [])
         max_turns = int(payload.get("max_turns", 8))

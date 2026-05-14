@@ -25,11 +25,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ..entities import IndexStats, RecallChunk
-from ..failures import RagIndexingFailure, RagUnavailableFailure
+from ..failures import RagIndexingFailure
 from ..repositories import RagRepository
 from ..result import Err, Result, err, ok
 from .base import BaseUseCase
-
 
 _VALID_SCOPES = frozenset({"skill", "docs", "trace", "code", "all"})
 

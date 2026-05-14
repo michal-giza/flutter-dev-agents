@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from mcp_phone_controll.presentation.rate_limiter import (
     RateLimitConfig,
     RateLimiter,

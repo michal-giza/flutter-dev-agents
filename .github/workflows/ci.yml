@@ -20,8 +20,12 @@ jobs:
           export PATH="$HOME/.local/bin:$PATH"
           cd packages/${{ matrix.package }}
           uv venv --python 3.11
-          uv pip install -e ".[dev]"
+          # `[ar]` brings cv2 — needed by the image-cap test backends.
+          # `[dev]` brings ruff + pytest. Skip `[rag,debug,http]` for speed.
+          uv pip install -e ".[dev,ar]"
       - name: Run tests
+        env:
+          MCP_QUIET: "1"
         run: |
           export PATH="$HOME/.local/bin:$PATH"
           cd packages/${{ matrix.package }}

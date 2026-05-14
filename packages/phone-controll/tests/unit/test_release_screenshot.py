@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from datetime import datetime
 from pathlib import Path
 
@@ -124,7 +123,7 @@ async def test_response_does_not_leak_full_path(tmp_path: Path):
     from mcp_phone_controll.presentation.serialization import to_jsonable
 
     payload = to_jsonable(res.value)
-    full = str((res.value.release_dir / res.value.full_resolution_filename))
+    full = str(res.value.release_dir / res.value.full_resolution_filename)
     leaked = [
         (k, v) for k, v in payload.items()
         if isinstance(v, str) and v == full

@@ -24,7 +24,6 @@ from ..entities import RecallChunk
 from ..failures import RagIndexingFailure
 from ..result import Err, Result, err, ok
 
-
 _FALLBACK_ORDER = ("skill", "docs", "code", "trace", "all")
 
 

@@ -25,7 +25,6 @@ from ...domain.entities import SessionTrace, TraceEntry
 from ...domain.repositories import SessionTraceRepository
 from ...domain.result import Result, ok
 
-
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS trace_entries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

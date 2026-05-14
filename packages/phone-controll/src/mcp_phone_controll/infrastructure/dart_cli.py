@@ -12,7 +12,6 @@ from pathlib import Path
 
 from .process_runner import ProcessResult, ProcessRunner
 
-
 _DART_FALLBACKS = (
     "/opt/homebrew/bin/dart",
     "/usr/local/bin/dart",

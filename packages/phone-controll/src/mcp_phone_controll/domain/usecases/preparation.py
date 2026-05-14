@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from pathlib import Path
+from dataclasses import dataclass
 
 from ..repositories import (
     ArtifactRepository,
@@ -13,8 +12,8 @@ from ..repositories import (
     UiRepository,
 )
 from ..result import Err, Result, ok
-from .base import BaseUseCase
 from ._helpers import resolve_serial
+from .base import BaseUseCase
 
 
 @dataclass(frozen=True, slots=True)

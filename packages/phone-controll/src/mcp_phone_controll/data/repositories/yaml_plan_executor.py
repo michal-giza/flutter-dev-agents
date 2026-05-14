@@ -17,7 +17,6 @@ the executor refuses to advance past such a phase.
 from __future__ import annotations
 
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
 from ...domain.entities import (
@@ -26,10 +25,8 @@ from ...domain.entities import (
     PlanRun,
     TestPlan,
 )
-from ...domain.failures import InvalidArgumentFailure, PlanExecutionFailure
 from ...domain.repositories import PlanExecutor
-from ...domain.result import Err, Result, err, ok
-
+from ...domain.result import Result, ok
 
 VALID_DRIVER_KINDS = (
     "patrol_test", "flutter_test", "tap_text", "noop",
@@ -159,7 +156,6 @@ class YamlPlanExecutor(PlanExecutor):
                 if retried_ok:
                     # Mark the original failure as recovered so overall_ok
                     # treats the run as a pass while preserving the audit trail.
-                    original_idx = -(2 * self._reflexion_retries) - 1
                     # Find the original failed outcome we recorded right
                     # before the retries began. It's the most-recent ok=False
                     # entry whose phase matches the retried one.
@@ -232,7 +228,7 @@ class YamlPlanExecutor(PlanExecutor):
                 from dataclasses import replace as _replace
 
                 plan_run = _replace(plan_run, junit_path=out)
-            except Exception:  # noqa: BLE001 — never fail the plan because of report I/O
+            except Exception:
                 pass
 
         return ok(plan_run)
@@ -276,7 +272,7 @@ class YamlPlanExecutor(PlanExecutor):
                 error_code="InvalidArgumentFailure",
                 error_message=f"unknown phase {phase_name!r} — {hint}",
             )
-        except Exception as e:  # noqa: BLE001 — boundary
+        except Exception as e:
             return PhaseOutcome(
                 phase=phase_name,
                 ok=False,
@@ -381,7 +377,10 @@ class YamlPlanExecutor(PlanExecutor):
                     planned_outcome=phase.planned_outcome,
                     actual_outcome="missing_project_path",
                     error_code="InvalidArgumentFailure",
-                    error_message="flutter_test driver needs project_path (set on phase or top-level spec.project.path)",
+                    error_message=(
+                        "flutter_test driver needs project_path (set on phase "
+                        "or top-level spec.project.path)"
+                    ),
                 )
             target = str(phase.driver.target) if phase.driver.target else "integration_test/"
             args = {"project_path": project, "test_path": target}
