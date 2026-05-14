@@ -1,0 +1,87 @@
+{
+  "name": "phone-controll nightly smoke",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "triggerAtHour": 2
+            }
+          ]
+        }
+      },
+      "id": "1",
+      "name": "Daily @ 02:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8765/tools/run_test_plan",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"plan_path\": \"examples/templates/smoke.yaml\"}",
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "id": "2",
+      "name": "Run smoke plan",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.ok }}",
+              "value2": false
+            }
+          ]
+        }
+      },
+      "id": "3",
+      "name": "Failed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8765/tools/notify_webhook",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"url\":\"https://hooks.slack.com/services/REPLACE_ME\",\"event\":\"nightly_smoke_failed\",\"payload\":{\"plan_run\":$json}}"
+      },
+      "id": "4",
+      "name": "Notify Slack",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [880, 200]
+    }
+  ],
+  "connections": {
+    "Daily @ 02:00": {
+      "main": [[{ "node": "Run smoke plan", "type": "main", "index": 0 }]]
+    },
+    "Run smoke plan": {
+      "main": [[{ "node": "Failed?", "type": "main", "index": 0 }]]
+    },
+    "Failed?": {
+      "main": [
+        [{ "node": "Notify Slack", "type": "main", "index": 0 }],
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "version": 1
+}

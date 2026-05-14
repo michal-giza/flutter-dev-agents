@@ -397,3 +397,26 @@ class RagRepository(Protocol):
     ) -> Result[IndexStats]: ...
 
     async def is_available(self) -> Result[str]: ...
+
+
+@runtime_checkable
+class SkillLibraryRepository(Protocol):
+    """Persistent named-macro library — see ADR-0004 (Voyager-style).
+
+    Skills are JSON-encodeable sequences keyed by name. `promote`
+    stores or replaces; `fetch` reads back; `record_use` updates
+    success/use counters. Implementations: SQLite-backed (default),
+    in-memory (tests).
+    """
+
+    async def promote(
+        self, name: str, description: str, sequence: list[dict]
+    ) -> Result[None]: ...
+
+    async def list_skills(self) -> Result[list[dict]]: ...
+
+    async def fetch(self, name: str) -> Result[dict | None]: ...
+
+    async def record_use(self, name: str, success: bool) -> Result[None]: ...
+
+    async def delete(self, name: str) -> Result[None]: ...

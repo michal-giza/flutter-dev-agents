@@ -83,12 +83,32 @@ class IndexProjectParams:
     project_path: Path
     collection: str = "phone-controll-default"
     include_globs: tuple[str, ...] = ("**/*.md", "**/*.dart", "**/*.py")
+    # Default exclusions cover obvious credential files + heavy build dirs.
+    # A `.mcpignore` at the project root extends this list (one pattern
+    # per line, fnmatch syntax). Closes review §6 risk #5 — keeps
+    # secrets out of the RAG index even when an agent enthusiastically
+    # calls index_project on a real Flutter app.
     exclude_globs: tuple[str, ...] = (
         "**/.git/**",
         "**/build/**",
         "**/.dart_tool/**",
         "**/node_modules/**",
         "**/.venv/**",
+        # Credential + env files — never index by default.
+        "**/.env",
+        "**/.env.*",
+        "**/*.pem",
+        "**/*.key",
+        "**/*.p12",
+        "**/*.keystore",
+        "**/*.jks",
+        "**/service-account*.json",
+        "**/firebase-adminsdk*.json",
+        "**/credentials*.json",
+        "**/secret*.json",
+        "**/secrets*.json",
+        "**/google-services.json",
+        "**/GoogleService-Info.plist",
     )
 
 
@@ -115,9 +135,12 @@ class IndexProject(BaseUseCase[IndexProjectParams, IndexStats]):
         avail = await self._rag.is_available()
         if isinstance(avail, Err):
             return avail
+        # Merge in patterns from `.mcpignore` if present — same syntax as
+        # `.gitignore` (fnmatch glob, one per line, # for comments).
+        effective_excludes = tuple(params.exclude_globs) + _read_mcpignore(project)
         items: list[tuple[str, str, dict]] = []
         skipped: list[str] = []
-        for path in _walk(project, params.include_globs, params.exclude_globs):
+        for path in _walk(project, params.include_globs, effective_excludes):
             try:
                 text = path.read_text(errors="replace")
             except OSError:
@@ -163,6 +186,32 @@ class IndexProject(BaseUseCase[IndexProjectParams, IndexStats]):
 
 
 # --- helpers --------------------------------------------------------------
+
+
+def _read_mcpignore(project: Path) -> tuple[str, ...]:
+    """Read project_root/.mcpignore — extra exclude patterns, one per line.
+
+    Same syntax as `.gitignore`: fnmatch glob, lines starting with `#`
+    are comments, blanks ignored. Lines without a `**/` prefix get one
+    added so they match anywhere in the tree.
+    """
+    path = project / ".mcpignore"
+    if not path.is_file():
+        return ()
+    try:
+        lines = path.read_text(errors="replace").splitlines()
+    except OSError:
+        return ()
+    patterns: list[str] = []
+    for raw in lines:
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        # Normalise: prepend `**/` if not already a rooted pattern.
+        if not line.startswith("/") and not line.startswith("**/"):
+            line = "**/" + line
+        patterns.append(line.lstrip("/"))
+    return tuple(patterns)
 
 
 def _walk(

@@ -1,0 +1,66 @@
+{
+  "name": "phone-controll green-build → Slack",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "release-ready",
+        "options": {}
+      },
+      "id": "1",
+      "name": "Webhook (release_ready)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "channel": "#releases",
+        "text": "=Release {{$json.payload.version}} ready. APK: {{$json.payload.apk}}",
+        "otherOptions": {}
+      },
+      "id": "2",
+      "name": "Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [500, 300],
+      "credentials": {
+        "slackApi": { "name": "Slack credentials" }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": "REPLACE_GOOGLE_SHEET_ID",
+        "sheetName": "Releases",
+        "columns": {
+          "values": {
+            "version": "={{$json.payload.version}}",
+            "apk": "={{$json.payload.apk}}",
+            "ts": "={{$now}}"
+          }
+        }
+      },
+      "id": "3",
+      "name": "Append to Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [500, 480],
+      "credentials": {
+        "googleSheetsOAuth2Api": { "name": "Google Sheets" }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook (release_ready)": {
+      "main": [
+        [
+          { "node": "Slack", "type": "main", "index": 0 },
+          { "node": "Append to Sheet", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "version": 1
+}

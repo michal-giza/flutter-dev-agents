@@ -20,19 +20,9 @@ from dataclasses import dataclass
 from typing import Any
 
 from ..failures import InvalidArgumentFailure
-from ..repositories import SessionTraceRepository
+from ..repositories import SessionTraceRepository, SkillLibraryRepository
 from ..result import Err, Result, err, ok
 from .base import BaseUseCase, NoParams
-
-
-# A skill library repository protocol — defined inline because the
-# library is owned by data/, not a domain concept across multiple repos.
-class _SkillRepo:
-    async def promote(self, name: str, description: str, sequence: list[dict]) -> Result[None]: ...
-    async def list_skills(self) -> Result[list[dict]]: ...
-    async def fetch(self, name: str) -> Result[dict | None]: ...
-    async def record_use(self, name: str, success: bool) -> Result[None]: ...
-    async def delete(self, name: str) -> Result[None]: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,7 +47,7 @@ class PromoteSequence(BaseUseCase[PromoteSequenceParams, PromotedSkill]):
     def __init__(
         self,
         traces: SessionTraceRepository,
-        library: _SkillRepo,
+        library: SkillLibraryRepository,
     ) -> None:
         self._traces = traces
         self._library = library
@@ -136,7 +126,7 @@ class PromoteSequence(BaseUseCase[PromoteSequenceParams, PromotedSkill]):
 
 
 class ListSkills(BaseUseCase[NoParams, list[dict]]):
-    def __init__(self, library: _SkillRepo) -> None:
+    def __init__(self, library: SkillLibraryRepository) -> None:
         self._library = library
 
     async def execute(self, _params: NoParams) -> Result[list[dict]]:
@@ -168,7 +158,7 @@ class ReplaySkill(BaseUseCase[ReplaySkillParams, ReplayResult]):
     success-rate skills next time (Voyager's "skill library curation").
     """
 
-    def __init__(self, library: _SkillRepo, dispatcher_call) -> None:
+    def __init__(self, library: SkillLibraryRepository, dispatcher_call) -> None:
         self._library = library
         self._call = dispatcher_call
 

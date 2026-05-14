@@ -19,9 +19,17 @@ from typing import Any
 from .schemas import to_openai_functions
 
 
+def _strip_bearer(value: str) -> str:
+    """Extract `<key>` from an `Authorization: Bearer <key>` header value."""
+    value = value.strip()
+    if value.lower().startswith("bearer "):
+        return value[7:].strip()
+    return value
+
+
 def create_app(dispatcher=None, *, allow_agent_proxy: bool = True):
     """Build the FastAPI app. Lazy imports so the core MCP runs without [http]."""
-    from fastapi import FastAPI, HTTPException
+    from fastapi import Depends, FastAPI, Header, HTTPException
     from fastapi.middleware.cors import CORSMiddleware
 
     if dispatcher is None:
@@ -48,14 +56,40 @@ def create_app(dispatcher=None, *, allow_agent_proxy: bool = True):
         allow_headers=["*"],
     )
 
+    # Optional auth: when MCP_HTTP_API_KEY is set, every request must
+    # carry `X-Api-Key: <key>` (or `Authorization: Bearer <key>`).
+    # Closes review §6 risk #4 — open localhost ports become hostile
+    # the moment they're forwarded to a LAN.
+    import os
+
+    _expected_key = os.environ.get("MCP_HTTP_API_KEY", "").strip() or None
+
+    async def _require_auth(
+        x_api_key: str | None = Header(default=None),
+        authorization: str | None = Header(default=None),
+    ) -> None:
+        """Auth dependency. No-op when MCP_HTTP_API_KEY is unset; otherwise
+        requires `X-Api-Key: <key>` or `Authorization: Bearer <key>`."""
+        if _expected_key is None:
+            return
+        provided = x_api_key or _strip_bearer(authorization or "")
+        if provided != _expected_key:
+            raise HTTPException(status_code=401, detail="invalid or missing API key")
+
     @app.get("/tools")
-    async def list_tools(strict: bool | None = None) -> list[dict[str, Any]]:
+    async def list_tools(
+        strict: bool | None = None, _auth: None = Depends(_require_auth)
+    ) -> list[dict[str, Any]]:
         # `?strict=true` opts into structured-output mode at the OpenAI
         # function level — see adapters/schemas.py docstring.
         return to_openai_functions(dispatcher.descriptors, strict=strict)
 
     @app.post("/tools/{name}")
-    async def call_tool(name: str, args: dict[str, Any] | None = None):
+    async def call_tool(
+        name: str,
+        args: dict[str, Any] | None = None,
+        _auth: None = Depends(_require_auth),
+    ):
         if not dispatcher.has(name):
             raise HTTPException(status_code=404, detail=f"unknown tool: {name}")
         return await dispatcher.dispatch(name, args or {})

@@ -27,7 +27,7 @@ If you're building agents for your own dev workflow, a lot of this is copy-paste
 ```
 flutter-dev-agents/
 ├── packages/
-│   └── phone-controll/        ← the MCP, 74 tools, ~190 tests
+│   └── phone-controll/        ← the MCP, 105 tools, 366 tests
 └── examples/                   ← shared YAML plan templates + agent loop
 ```
 

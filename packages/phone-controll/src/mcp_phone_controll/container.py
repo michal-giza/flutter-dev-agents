@@ -133,6 +133,7 @@ from .domain.usecases.lifecycle import (
 )
 from .domain.usecases.mcp_ping import McpPing
 from .domain.usecases.narrate import Narrate
+from .domain.usecases.notify_webhook import NotifyWebhook
 from .domain.usecases.observation import (
     ReadLogs,
     StartRecording,
@@ -482,6 +483,7 @@ def build_runtime(
             middleware_provider=lambda: placeholder_dispatcher.middlewares
             if placeholder_dispatcher is not None else []
         ),
+        notify_webhook=NotifyWebhook(),
         disk_usage=DiskUsage(artifacts_repo),
         prune_originals=PruneOriginals(artifacts_repo),
         inspect_project=InspectProject(inspector),

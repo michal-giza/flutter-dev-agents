@@ -1,0 +1,72 @@
+{
+  "name": "phone-controll release-screenshots → Drive",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "release-screenshots",
+        "options": {}
+      },
+      "id": "1",
+      "name": "Webhook (release_screenshots)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "payload.paths",
+        "include": "allOtherFields",
+        "options": {}
+      },
+      "id": "2",
+      "name": "Split paths",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "filePath": "={{$json.path}}",
+        "options": {}
+      },
+      "id": "3",
+      "name": "Read file (binary)",
+      "type": "n8n-nodes-base.readBinaryFile",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "name": "={{$json.path.split('/').pop()}}",
+        "parents": "REPLACE_DRIVE_FOLDER_ID",
+        "binaryData": true,
+        "binaryPropertyName": "data"
+      },
+      "id": "4",
+      "name": "Upload to Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [900, 300],
+      "credentials": {
+        "googleDriveOAuth2Api": { "name": "Google Drive" }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook (release_screenshots)": {
+      "main": [[{ "node": "Split paths", "type": "main", "index": 0 }]]
+    },
+    "Split paths": {
+      "main": [[{ "node": "Read file (binary)", "type": "main", "index": 0 }]]
+    },
+    "Read file (binary)": {
+      "main": [[{ "node": "Upload to Drive", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "version": 1
+}

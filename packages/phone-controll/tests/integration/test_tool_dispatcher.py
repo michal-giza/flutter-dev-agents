@@ -80,6 +80,7 @@ from mcp_phone_controll.domain.usecases.lifecycle import (
 )
 from mcp_phone_controll.domain.usecases.mcp_ping import McpPing
 from mcp_phone_controll.domain.usecases.narrate import Narrate
+from mcp_phone_controll.domain.usecases.notify_webhook import NotifyWebhook
 from mcp_phone_controll.domain.usecases.observation import (
     ReadLogs,
     StartRecording,
@@ -240,6 +241,7 @@ def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:
         tool_usage_report=ToolUsageReportUseCase(trace, lambda: ()),
         mcp_ping=McpPing(lambda: 0),
         set_agent_profile=SetAgentProfile(middleware_provider=lambda: []),
+        notify_webhook=NotifyWebhook(),
         disk_usage=DiskUsage(artifacts),
         prune_originals=PruneOriginals(artifacts),
         inspect_project=InspectProject(inspector),
@@ -454,6 +456,7 @@ async def test_registry_covers_all_use_case_fields(tmp_path: Path):
         "tool_usage_report",
         "mcp_ping",
         "set_agent_profile",
+        "notify_webhook",
         "disk_usage",
         "prune_originals",
         "inspect_project",

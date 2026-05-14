@@ -128,6 +128,10 @@ from ..domain.usecases.lifecycle import (
 )
 from ..domain.usecases.mcp_ping import McpPing
 from ..domain.usecases.narrate import Narrate, NarrateParams
+from ..domain.usecases.notify_webhook import (
+    NotifyWebhook,
+    NotifyWebhookParams,
+)
 from ..domain.usecases.observation import (
     ReadLogs,
     ReadLogsParams,
@@ -694,6 +698,18 @@ def _params_set_agent_profile(args: JsonDict) -> SetAgentProfileParams:
     return SetAgentProfileParams(name=args["name"])
 
 
+def _params_notify_webhook(args: JsonDict) -> NotifyWebhookParams:
+    return NotifyWebhookParams(
+        url=args["url"],
+        event=args["event"],
+        payload=dict(args.get("payload") or {}),
+        auth_bearer=args.get("auth_bearer"),
+        auth_header_name=args.get("auth_header_name"),
+        auth_header_value=args.get("auth_header_value"),
+        timeout_s=float(args.get("timeout_s", 10.0)),
+    )
+
+
 def _params_prune_originals(args: JsonDict) -> PruneOriginalsParams:
     return PruneOriginalsParams(
         older_than_days=(
@@ -1026,6 +1042,7 @@ class UseCases:
     tool_usage_report: ToolUsageReportUseCase
     mcp_ping: McpPing
     set_agent_profile: SetAgentProfile
+    notify_webhook: NotifyWebhook
     disk_usage: DiskUsage
     prune_originals: PruneOriginals
     inspect_project: InspectProject
@@ -1207,6 +1224,31 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             ),
             build_params=_params_set_agent_profile,
             invoke=_bind(uc.set_agent_profile, _params_set_agent_profile),
+        ),
+        ToolDescriptor(
+            name="notify_webhook",
+            description=(
+                "POST a structured event to an n8n / Slack / generic "
+                "webhook. Use for outbound notifications (build green, "
+                "release ready). Lock down hosts via MCP_WEBHOOK_ALLOWLIST."
+            ),
+            input_schema=_schema(
+                {
+                    "url": _string("Webhook URL (https, or http on localhost)."),
+                    "event": _string("Snake_case event identifier."),
+                    "payload": {
+                        "type": "object",
+                        "description": "JSON payload sent under `payload`.",
+                    },
+                    "auth_bearer": _string("Optional Bearer token."),
+                    "auth_header_name": _string("Optional custom auth header."),
+                    "auth_header_value": _string(""),
+                    "timeout_s": _number("HTTP timeout (default 10)."),
+                },
+                ["url", "event"],
+            ),
+            build_params=_params_notify_webhook,
+            invoke=_bind(uc.notify_webhook, _params_notify_webhook),
         ),
         ToolDescriptor(
             name="disk_usage",
