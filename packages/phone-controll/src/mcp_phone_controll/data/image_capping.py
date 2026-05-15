@@ -2,7 +2,12 @@
 
 Claude rejects multi-image conversations where any image exceeds 2000px
 on the long edge. Local vision models (LLaVA, Qwen-VL) work best at
-≤1024px. Default cap of 1920 is safe across all current providers.
+≤1024px. **Default cap is 1600** — that's 400px of headroom under the
+2000 API ceiling, deliberately wider than necessary. We tried 1920 first
+and still saw intermittent rejections in production (the 80px margin was
+swamped by rounding, accumulation across many images per turn, and one
+stale-subprocess incident). 1600 is the new safe default; override with
+`MCP_MAX_IMAGE_DIM` if you genuinely need higher resolution.
 
 Three backends, tried in order — first one that works wins:
 
@@ -35,7 +40,7 @@ from pathlib import Path
 
 from ..observability import warn
 
-DEFAULT_MAX_DIM = 1920
+DEFAULT_MAX_DIM = 1600
 
 
 def _max_dim() -> int:
@@ -191,6 +196,24 @@ def cap_image_in_place(path: Path, max_dim: int | None = None) -> bool:
         fix="install cv2 (uv pip install -e '.[ar]') or Pillow, or run on macOS",
     )
     return False
+
+
+def available_backends() -> tuple[str, ...]:
+    """Which cap backends are usable in this process, in priority order.
+
+    Surfaced by `mcp_ping` and the boot self-check log so a stale
+    subprocess (or a Linux box missing cv2/PIL) is visible in one call
+    instead of failing silently. If this returns `()`, capping is
+    non-functional and the safety net will refuse oversized PNGs.
+    """
+    found: list[str] = []
+    if find_spec("cv2") is not None:
+        found.append("cv2")
+    if find_spec("PIL") is not None:
+        found.append("PIL")
+    if shutil.which("sips"):
+        found.append("sips")
+    return tuple(found)
 
 
 def is_within_cap(path: Path, max_dim: int | None = None) -> bool:

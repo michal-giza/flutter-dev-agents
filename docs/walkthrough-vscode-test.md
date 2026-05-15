@@ -243,6 +243,31 @@ screenshots, logs, JUnit XML if your plan asked for it. Use
    tap_text(text="Allow", system=true)
    ```
 
+4. **"An image in the conversation exceeds the dimension limit
+   (2000px)"** — the conversation contains a PNG that's > 2000px on its
+   long edge. The MCP caps every screenshot it produces at 1600px (400px
+   of headroom under the API ceiling). If you see this error anyway,
+   diagnose in this order:
+   1. **Verify the MCP is running the current code.** Call `mcp_ping`
+      and check `image_cap_px` in the response. If it's `1920` (old
+      default) or higher, your MCP subprocess is stale — fully quit and
+      relaunch Claude Code so the editable install reloads.
+   2. **Check `image_backends`** in the same `mcp_ping` envelope. At
+      least one of `cv2`, `PIL`, `sips` must be present. If the tuple
+      is empty, the cap path has no backend and is silently a no-op;
+      install Pillow (`uv pip install pillow`) or run on macOS for
+      the `sips` fallback.
+   3. **Audit historical artifacts.** Old sessions on disk from before
+      the cap was lowered may still be > 1600px. Re-cap them once:
+      ```
+      python -m scripts.audit_artifact_dimensions \
+        --root ~/.mcp_phone_controll/sessions --cap --max-dim 1600
+      ```
+   4. **You uploaded the offending image yourself.** Screenshots of
+      your IDE attached directly to the chat aren't routed through the
+      MCP — Claude Code sees them at native resolution. Crop or resize
+      before attaching.
+
 ---
 
 ## See also

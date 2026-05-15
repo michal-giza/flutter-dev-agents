@@ -2,7 +2,7 @@
 a known model.
 
 Why: a 4B local model needs different ergonomics than Claude Sonnet —
-tighter image cap (896 vs 1920), auto-narrate on, strict tool schemas,
+tighter image cap (896 vs 1600), auto-narrate on, strict tool schemas,
 Reflexion retries on. Today the user wires this through six env vars
 (`MCP_MAX_IMAGE_DIM`, `MCP_AUTO_NARRATE_EVERY`, `MCP_STRICT_TOOLS`,
 `MCP_REFLEXION_RETRIES`, …). Easy to forget one; impossible to flip
@@ -15,7 +15,7 @@ the live middleware chain.
 Profiles are deliberately conservative defaults that have been
 validated in actual usage:
 
-  - **claude** — Sonnet/Opus / large-context. Image cap 1920, no
+  - **claude** — Sonnet/Opus / large-context. Image cap 1600, no
     auto-narrate, no strict tools, no Reflexion. Minimal interference.
   - **qwen2.5-7b** — local MLX. Image cap 896, narrate every 5 calls,
     strict tool schemas, 2 Reflexion retries on retryable phases.
@@ -42,13 +42,13 @@ from .base import BaseUseCase
 # When you add a profile, add a row to the README so users can discover it.
 PROFILES: dict[str, dict] = {
     "claude": {
-        "image_cap": 1920,
+        "image_cap": 1600,
         "auto_narrate_every": 0,
         "strict_tools": False,
         "reflexion_retries": 0,
     },
     "haiku": {
-        "image_cap": 1920,
+        "image_cap": 1600,
         "auto_narrate_every": 8,
         "strict_tools": False,
         "reflexion_retries": 1,
@@ -73,7 +73,7 @@ PROFILES: dict[str, dict] = {
     },
     # Reset to defaults; useful for tests.
     "default": {
-        "image_cap": 1920,
+        "image_cap": 1600,
         "auto_narrate_every": 0,
         "strict_tools": False,
         "reflexion_retries": 0,

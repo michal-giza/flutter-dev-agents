@@ -96,24 +96,21 @@ def version_info() -> dict[str, Any]:
 
 
 def boot_self_check_log() -> str:
-    """One-line stderr-friendly status line for the boot log."""
-    import shutil
-    from importlib.util import find_spec
+    """One-line stderr-friendly status line for the boot log.
 
-    cv2 = find_spec("cv2") is not None
-    pil = find_spec("PIL") is not None
-    sips = bool(shutil.which("sips"))
+    Includes the active image cap (`image_cap_px=`) so a stale subprocess
+    running an old default (1920) is visible as soon as the daemon starts
+    — without comparing the value the agent never knows it's stuck on
+    last week's code.
+    """
+    from .data.image_capping import _max_dim, available_backends
+
     info = version_info()
-    backends = []
-    if cv2:
-        backends.append("cv2")
-    if pil:
-        backends.append("PIL")
-    if sips:
-        backends.append("sips")
+    backends = available_backends()
     return (
         f"[phone-controll] startup: version={info['package_version']} "
         f"sha={info['git_sha']}{'*' if info['git_dirty'] else ''} "
         f"branch={info['git_branch']} python={info['python_version']} "
+        f"image_cap_px={_max_dim()} "
         f"image_backends={','.join(backends) or 'NONE'} pid={info['pid']}"
     )

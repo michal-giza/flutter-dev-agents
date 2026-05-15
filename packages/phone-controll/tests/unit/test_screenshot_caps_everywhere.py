@@ -59,14 +59,14 @@ async def test_prepare_for_test_caps_evidence_screenshot(tmp_path: Path):
     assert path.exists()
     w, h = _read_png_dims(path)
     long_edge = max(w, h)
-    assert long_edge <= 1920, (
+    assert long_edge <= 1600, (
         f"prepare_for_test left evidence screenshot at {w}×{h} — "
         f"this is the exact regression that broke Claude conversations."
     )
 
 
 @pytest.mark.asyncio
-async def test_take_screenshot_caps_under_1920(tmp_path: Path):
+async def test_take_screenshot_caps_under_default(tmp_path: Path):
     from tests.integration.test_tool_dispatcher import _build_fake_dispatcher
 
     dispatcher = _build_fake_dispatcher(tmp_path)
@@ -76,4 +76,5 @@ async def test_take_screenshot_caps_under_1920(tmp_path: Path):
     path = Path(res["data"])
     assert path.exists()
     w, h = _read_png_dims(path)
-    assert max(w, h) <= 1920
+    # Default cap is 1600 (was 1920 — see image_capping.py docstring).
+    assert max(w, h) <= 1600

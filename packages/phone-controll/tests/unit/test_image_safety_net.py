@@ -104,7 +104,8 @@ def test_caps_oversized_png_referenced_in_envelope_data(tmp_path: Path):
     envelope = {"ok": True, "data": str(oversize)}
     out = cap_pngs_in_envelope(envelope)
     assert out.get("image_cap", {}).get("capped") == [str(oversize)]
-    assert max(_read_dims(oversize)) <= 1920
+    # Default cap is 1600 (lowered from 1920 — see image_capping.py docstring).
+    assert max(_read_dims(oversize)) <= 1600
 
 
 def test_walks_nested_dict_and_caps(tmp_path: Path):
@@ -131,7 +132,8 @@ def test_skips_exempt_paths(tmp_path: Path):
     envelope = {"ok": True, "data": {"full": str(release)}}
     out = cap_pngs_in_envelope(envelope)
     assert "image_cap" not in out
-    assert max(_read_dims(release)) > 1920
+    # Exempt paths keep their native dimensions (> default 1600 cap).
+    assert max(_read_dims(release)) > 1600
 
 
 def test_idempotent(tmp_path: Path):

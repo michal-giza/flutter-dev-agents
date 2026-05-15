@@ -38,6 +38,7 @@ class McpPingResult:
     python_version: str
     pid: int
     image_backends: tuple[str, ...]
+    image_cap_px: int
     n_tools: int
 
 
@@ -52,19 +53,10 @@ class McpPing(BaseUseCase[NoParams, McpPingResult]):
         self._n_tools_provider = n_tools_provider
 
     async def execute(self, _params: NoParams) -> Result[McpPingResult]:
-        import shutil
-        from importlib.util import find_spec
-
+        from ...data.image_capping import _max_dim, available_backends
         from ...version_info import version_info
 
         info = version_info()
-        backends: list[str] = []
-        if find_spec("cv2") is not None:
-            backends.append("cv2")
-        if find_spec("PIL") is not None:
-            backends.append("PIL")
-        if shutil.which("sips"):
-            backends.append("sips")
         n_tools = 0
         try:
             n_tools = int(self._n_tools_provider())
@@ -80,7 +72,8 @@ class McpPing(BaseUseCase[NoParams, McpPingResult]):
                 uptime_s=float(info["uptime_s"]),
                 python_version=info["python_version"],
                 pid=int(info["pid"]),
-                image_backends=tuple(backends),
+                image_backends=available_backends(),
+                image_cap_px=_max_dim(),
                 n_tools=n_tools,
             )
         )

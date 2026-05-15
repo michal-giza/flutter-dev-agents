@@ -13,6 +13,11 @@ dependencies = [
     "anyio>=4.4.0",
     "pydantic>=2.7.0",
     "pyyaml>=6.0.0",
+    # Pillow is also pulled transitively (adbutils, facebook-wda) but we
+    # depend on it explicitly because it's our PIL image-cap fallback. If
+    # an upstream ever drops it we MUST notice — the cap path silently
+    # losing a backend is the exact regression we've been firefighting.
+    "pillow>=10.0.0",
 ]
 
 [project.optional-dependencies]
