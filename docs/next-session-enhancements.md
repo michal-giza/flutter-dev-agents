@@ -164,3 +164,101 @@ current:
 Citation-graph crawl from any new paper you read; track what cites
 Toolformer, ReAct, Voyager. Most production-relevant work now sits at
 the intersection of those three threads.
+
+---
+
+## Tier K — iOS reliability (real-user bug reports, May 2026)
+
+These two issues were caught during hands-on testing against the
+iPhone 17 simulator and a physical iPhone 15. Capture them here so
+the fix is grounded in real failure modes, not theoretical worry.
+
+### K1. iPhone 17 sim (iOS 26.5): `tap`/`swipe` crash with `'NoneType' object has no attribute 'make_http_connection'`
+
+**Symptom.** Every UI control tool against the iPhone 17 simulator on
+iOS 26.5 fails immediately. Trace ends in
+`'NoneType' object has no attribute 'make_http_connection'`. UI control
+is fully blocked — affects `tap`, `swipe`, `type_text`, `press_key`,
+anything that routes through the WDA factory.
+
+**Root cause (likely).**
+`packages/phone-controll/src/mcp_phone_controll/infrastructure/wda_factory.py`
+always constructs `wda.USBClient(udid)` regardless of whether the
+target is a physical device or a simulator. `USBClient` connects over
+**usbmux**, which doesn't exist for simulators. For simulators you
+need `wda.Client("http://localhost:<wda-port>")` (the WDA server is
+listening on a TCP port that `xcrun simctl launch …
+WebDriverAgentRunner` exposes, not over usbmux). The `None` is the
+result of the usbmux lookup silently failing; the next
+`.make_http_connection()` call attribute-errors on it.
+
+**Shape of fix.**
+1. Teach the WDA factory to distinguish physical iPhone from simulator
+   UDIDs. Cheapest check: ask `xcrun simctl list devices -j` and see
+   if the UDID is in the booted-simulator set.
+2. Branch: physical → `wda.USBClient(udid)`; simulator →
+   `wda.Client(f"http://localhost:{port}")` where `port` is captured
+   from the WDA server's startup log when we launch
+   `com.facebook.WebDriverAgentRunner.xctrunner` via `simctl` (default
+   8100, but Xcode auto-picks if 8100 is taken).
+3. Add an integration test using a fake `simctl` runner + a fake
+   `wda` module that asserts the right constructor is picked per
+   target type.
+4. Update `docs/ios_setup.md` with a one-paragraph "WDA on simulators
+   vs. devices" section.
+
+**Why now.** This is a *complete* block on iOS-simulator workflows —
+the recommended dev loop for users without a physical iPhone.
+Severity: critical for iOS adoption. Estimated effort: ½ day.
+
+**Citations / source.** Real user bug report, May 2026. Cross-check
+against Appium's
+[WebDriverAgent docs](https://github.com/appium/WebDriverAgent#usage)
+which document the same physical-vs-sim split.
+
+---
+
+### K2. Physical iPhone 15 (iOS 26.2.1): `take_screenshot` hint for missing tunneld is misleading
+
+**Symptom.** `take_screenshot` against a real iPhone fails with the
+`start_tunneld` next_action. The user follows our hint
+(`sudo pymobiledevice3 remote tunneld`) and it fails immediately
+because `pymobiledevice3` isn't installed — the system Python at
+`/Applications/Xcode.app/Contents/Developer/usr/bin/python3` has no
+such module.
+
+**Root cause.** Our hint assumed `pymobiledevice3` is on PATH. On a
+freshly-cloned dev machine it isn't — Xcode's bundled Python doesn't
+ship it, and the MCP's venv is a separate world. We were documenting
+the daemon-start step but skipping the install step.
+
+**Shape of fix (partially landed — full fix outstanding).**
+1. ✅ **Done in this commit.** The hint in `IOSObservationRepository`
+   now lists the install command FIRST (`pipx install pymobiledevice3`
+   or `pip3 install --user pymobiledevice3`), then the daemon start
+   using `sudo $(which pymobiledevice3) remote tunneld`.
+2. ⏳ **Still TODO.** `check_environment` (the doctor) should probe
+   for `pymobiledevice3` explicitly and emit a red item with the same
+   two-step fix when missing. Right now the doctor doesn't catch this
+   — the install gap is only surfaced at first use, not at startup.
+3. ⏳ **Still TODO.** `scripts/install.sh` should `pipx install
+   pymobiledevice3` as part of fresh-laptop bootstrap so new devs
+   never hit this.
+4. ⏳ **Still TODO.** Update `docs/ios_setup.md#tunneld` with the
+   install-first instructions verbatim.
+
+**Why now.** This blocks the second-most-common iOS flow (physical
+device screenshotting) until the user works out — through
+trial-and-error — that they need a separate install step. Severity:
+medium. Estimated effort: 2 hours for items 2–4 above.
+
+**Open question.** Should `pymobiledevice3` be an explicit dependency
+in `pyproject.toml`'s `[ios]` extra, so `uv pip install -e ".[ios]"`
+during install just works? Argument *for*: zero-friction onboarding.
+Argument *against*: tunneld still needs root (`sudo`), so installing
+the library doesn't fully solve the UX — a privilege-escalation step
+remains regardless. Probably still worth doing.
+
+**Citations / source.** Real user bug report, May 2026. Confirmed by
+inspecting Xcode's bundled Python on macOS — `import pymobiledevice3`
+raises `ModuleNotFoundError`.

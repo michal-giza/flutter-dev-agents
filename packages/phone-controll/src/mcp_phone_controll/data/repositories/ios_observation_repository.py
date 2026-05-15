@@ -94,16 +94,25 @@ class IosObservationRepository(ObservationRepository):
             details: dict = {"stderr": stderr}
             next_action = None
             if tunneld_hint:
+                # Two-step hint: the install step FIRST (because the system
+                # Python at /Applications/Xcode.app/.../python3 does NOT have
+                # pymobiledevice3 — running the sudo command bare fails out
+                # of the box), then the daemon start. Reported by real users
+                # on a fresh iOS 26 setup, May 2026.
                 details["fix_command"] = (
-                    "sudo pymobiledevice3 remote tunneld   "
-                    "(leave running in a separate terminal)"
+                    "# one-time install (skip if `which pymobiledevice3` works):\n"
+                    "pipx install pymobiledevice3   "
+                    "# OR: pip3 install --user pymobiledevice3\n"
+                    "# then, leave running in a separate terminal:\n"
+                    "sudo $(which pymobiledevice3) remote tunneld"
                 )
                 details["docs_url"] = "docs/ios_setup.md#tunneld"
                 next_action = "start_tunneld"
             else:
                 details["hint"] = (
-                    "Run `sudo pymobiledevice3 remote tunneld` once; "
-                    "see docs/ios_setup.md."
+                    "Install pymobiledevice3 (`pipx install pymobiledevice3`), "
+                    "then run `sudo $(which pymobiledevice3) remote tunneld` "
+                    "in a separate terminal. See docs/ios_setup.md."
                 )
             return err(
                 FlutterCliFailure(
