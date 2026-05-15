@@ -8,7 +8,7 @@ from ...domain.entities import Bounds, UiElement
 from ...domain.failures import TimeoutFailure, UiElementNotFoundFailure, UiFailure
 from ...domain.repositories import UiRepository
 from ...domain.result import Result, err, ok
-from ...infrastructure.wda_factory import WdaFactory
+from ...infrastructure.wda_factory import WdaFactory, WdaUnreachable
 
 
 def _bounds_from_rect(rect: dict | None) -> Bounds:
@@ -35,6 +35,31 @@ def _element_from_wda(elem) -> UiElement:
     )
 
 
+class _WdaUnreachableSentinel(Exception):
+    """Wraps `WdaUnreachable` so the action wrappers below can recognise it
+    distinctly from a generic exception. Carries the original for structured
+    error reporting."""
+
+    def __init__(self, original: WdaUnreachable) -> None:
+        super().__init__(str(original))
+        self.original = original
+
+
+def _wda_unreachable_err(e: _WdaUnreachableSentinel, action: str) -> Result[None]:
+    """Build a structured Err for the `WdaUnreachable` case so every action
+    surfaces the same `next_action` + `fix_command` to the agent. Replaces
+    the historical NoneType-attribute crash with something an autonomous
+    agent can actually switch on."""
+    orig = e.original
+    return err(
+        UiFailure(
+            message=f"{action} failed: {orig}",
+            next_action=orig.next_action,
+            details={"fix_command": orig.fix_command},
+        )
+    )
+
+
 class WdaUiRepository(UiRepository):
     """iOS UI driver. Requires WebDriverAgent built and installed on the device."""
 
@@ -42,13 +67,22 @@ class WdaUiRepository(UiRepository):
         self._factory = factory
 
     async def _session(self, serial: str):
-        return await self._factory.get(serial)
+        try:
+            return await self._factory.get(serial)
+        except WdaUnreachable as e:
+            # Translate the typed transport error to a structured failure
+            # so agents see `next_action: "start_wda_on_simulator"` instead
+            # of the historical NoneType crash. Raised back as a sentinel
+            # exception so every action wrapper below catches uniformly.
+            raise _WdaUnreachableSentinel(e) from e
 
     async def tap(self, serial: str, x: int, y: int) -> Result[None]:
         try:
             s = await self._session(serial)
             await asyncio.to_thread(s.tap, x, y)
             return ok(None)
+        except _WdaUnreachableSentinel as e:
+            return _wda_unreachable_err(e, "tap")
         except Exception as e:
             return err(UiFailure(message=f"tap failed: {e}"))
 
@@ -61,6 +95,8 @@ class WdaUiRepository(UiRepository):
                 return err(UiElementNotFoundFailure(message=f"label not found: {text!r}"))
             await asyncio.to_thread(elem.tap)
             return ok(None)
+        except _WdaUnreachableSentinel as e:
+            return _wda_unreachable_err(e, "tap_text")
         except Exception as e:
             return err(UiFailure(message=f"tap_text failed: {e}"))
 
@@ -71,6 +107,8 @@ class WdaUiRepository(UiRepository):
             s = await self._session(serial)
             await asyncio.to_thread(s.swipe, x1, y1, x2, y2, duration_ms / 1000.0)
             return ok(None)
+        except _WdaUnreachableSentinel as e:
+            return _wda_unreachable_err(e, "swipe")
         except Exception as e:
             return err(UiFailure(message=f"swipe failed: {e}"))
 
@@ -79,6 +117,8 @@ class WdaUiRepository(UiRepository):
             s = await self._session(serial)
             await asyncio.to_thread(s.send_keys, text)
             return ok(None)
+        except _WdaUnreachableSentinel as e:
+            return _wda_unreachable_err(e, "type_text")
         except Exception as e:
             return err(UiFailure(message=f"type_text failed: {e}"))
 
@@ -89,6 +129,8 @@ class WdaUiRepository(UiRepository):
             key = mapping.get(keycode.lower(), keycode.lower())
             await asyncio.to_thread(s.press, key)
             return ok(None)
+        except _WdaUnreachableSentinel as e:
+            return _wda_unreachable_err(e, "press_key")
         except Exception as e:
             return err(UiFailure(message=f"press_key failed: {e}"))
 
@@ -116,6 +158,8 @@ class WdaUiRepository(UiRepository):
             if not exists:
                 return ok(None)
             return ok(_element_from_wda(elem))
+        except _WdaUnreachableSentinel as e:
+            return _wda_unreachable_err(e, "find")
         except Exception as e:
             return err(UiFailure(message=f"find failed: {e}"))
 
@@ -145,5 +189,7 @@ class WdaUiRepository(UiRepository):
             s = await self._session(serial)
             xml = await asyncio.to_thread(lambda: s.source(format="xml"))
             return ok(str(xml))
+        except _WdaUnreachableSentinel as e:
+            return _wda_unreachable_err(e, "dump_ui")
         except Exception as e:
             return err(UiFailure(message=f"dump_ui failed: {e}"))

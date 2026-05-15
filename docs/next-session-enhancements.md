@@ -167,11 +167,12 @@ the intersection of those three threads.
 
 ---
 
-## Tier K — iOS reliability (real-user bug reports, May 2026)
+## Tier K — iOS reliability (real-user bug reports, May 2026) — ✅ FULLY LANDED
 
-These two issues were caught during hands-on testing against the
-iPhone 17 simulator and a physical iPhone 15. Capture them here so
-the fix is grounded in real failure modes, not theoretical worry.
+Both issues caught during hands-on testing against the iPhone 17
+simulator and a physical iPhone 15. The full fix shipped May 15, 2026.
+Kept below for historical context and as a worked example of how this
+backlog file is consumed.
 
 ### K1. iPhone 17 sim (iOS 26.5): `tap`/`swipe` crash with `'NoneType' object has no attribute 'make_http_connection'`
 
@@ -211,6 +212,12 @@ result of the usbmux lookup silently failing; the next
 the recommended dev loop for users without a physical iPhone.
 Severity: critical for iOS adoption. Estimated effort: ½ day.
 
+**Status: ✅ landed.** Dual-mode factory + reachability probe +
+structured `WdaUnreachable` exception + repository-layer translation
+to `next_action="start_wda_on_simulator"` + 6 hermetic tests
+(`tests/unit/test_wda_factory.py`). `MCP_IOS_SIM_WDA_PORT` env var for
+non-default ports.
+
 **Citations / source.** Real user bug report, May 2026. Cross-check
 against Appium's
 [WebDriverAgent docs](https://github.com/appium/WebDriverAgent#usage)
@@ -232,25 +239,33 @@ freshly-cloned dev machine it isn't — Xcode's bundled Python doesn't
 ship it, and the MCP's venv is a separate world. We were documenting
 the daemon-start step but skipping the install step.
 
-**Shape of fix (partially landed — full fix outstanding).**
-1. ✅ **Done in this commit.** The hint in `IOSObservationRepository`
-   now lists the install command FIRST (`pipx install pymobiledevice3`
-   or `pip3 install --user pymobiledevice3`), then the daemon start
-   using `sudo $(which pymobiledevice3) remote tunneld`.
-2. ⏳ **Still TODO.** `check_environment` (the doctor) should probe
-   for `pymobiledevice3` explicitly and emit a red item with the same
-   two-step fix when missing. Right now the doctor doesn't catch this
-   — the install gap is only surfaced at first use, not at startup.
-3. ⏳ **Still TODO.** `scripts/install.sh` should `pipx install
-   pymobiledevice3` as part of fresh-laptop bootstrap so new devs
-   never hit this.
-4. ⏳ **Still TODO.** Update `docs/ios_setup.md#tunneld` with the
-   install-first instructions verbatim.
+**Shape of fix — ALL FOUR items landed.**
+1. ✅ The hint in `IOSObservationRepository` lists the install
+   command first.
+2. ✅ `SystemEnvironmentRepository` adds a `pymobiledevice3_cli`
+   check that runs `shutil.which("pymobiledevice3")` and emits a
+   red item with the `pipx install` fix when missing. The existing
+   `pymobiledevice3` (runtime) and `ios_tunneld` checks also got
+   updated `fix=` strings that lead with the install step.
+3. ✅ `scripts/install.sh` step 5b: detects missing `pymobiledevice3`
+   on PATH, installs `pipx` via Homebrew if needed, then
+   `pipx install pymobiledevice3` (falls back to `pip3 install --user`).
+4. ✅ `docs/ios_setup.md` §3a (Install pymobiledevice3 system-wide)
+   rewritten with verbatim install commands; §3 (Start the daemon)
+   uses `sudo $(which pymobiledevice3) remote tunneld` so the path
+   resolves correctly regardless of how the user installed.
+5. ✅ Bonus: new `[ios]` extra in `pyproject.toml` documenting the
+   dep explicitly. Note: the library install via `[ios]` ≠ the
+   system-wide binary needed by `sudo tunneld`. The extra is
+   commented to call out the difference.
 
 **Why now.** This blocks the second-most-common iOS flow (physical
 device screenshotting) until the user works out — through
 trial-and-error — that they need a separate install step. Severity:
 medium. Estimated effort: 2 hours for items 2–4 above.
+
+**Status: ✅ landed.** See "Shape of fix" — all five items
+shipped May 15, 2026.
 
 **Open question.** Should `pymobiledevice3` be an explicit dependency
 in `pyproject.toml`'s `[ios]` extra, so `uv pip install -e ".[ios]"`

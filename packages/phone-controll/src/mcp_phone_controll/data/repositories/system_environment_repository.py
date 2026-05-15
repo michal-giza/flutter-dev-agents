@@ -83,19 +83,55 @@ class SystemEnvironmentRepository(EnvironmentRepository):
                 )
             )
 
-        # pymobiledevice3
+        # pymobiledevice3 — TWO checks, intentionally separate so users see
+        # the install-vs-runnable distinction (backlog item K2). Historically
+        # we only checked the runtime call; when the binary was missing the
+        # failure looked like "transient runtime error" rather than "you
+        # haven't installed it."
+        pmd3_cli_path = shutil.which("pymobiledevice3")
+        if pmd3_cli_path is None:
+            checks.append(
+                EnvironmentCheck(
+                    name="pymobiledevice3_cli",
+                    ok=False,
+                    detail="not found on PATH",
+                    fix=(
+                        "pipx install pymobiledevice3  "
+                        "# OR: pip3 install --user pymobiledevice3   "
+                        "# (the project venv's pymobiledevice3 is fine for "
+                        "library use but tunneld needs a system-wide binary "
+                        "you can sudo)"
+                    ),
+                )
+            )
+        else:
+            checks.append(
+                EnvironmentCheck(
+                    name="pymobiledevice3_cli",
+                    ok=True,
+                    detail=pmd3_cli_path,
+                )
+            )
+
         try:
             pmd3_res = await self._pmd3.usbmux_list(timeout_s=5.0)
             checks.append(
                 EnvironmentCheck(
                     name="pymobiledevice3",
                     ok=pmd3_res.ok,
-                    fix=None if pmd3_res.ok else "uv pip install -e \".[dev]\"  # reinstalls the venv",
+                    fix=(
+                        None if pmd3_res.ok
+                        else "pipx install pymobiledevice3   # then re-run check_environment"
+                    ),
                 )
             )
         except Exception as e:
             checks.append(
-                EnvironmentCheck(name="pymobiledevice3", ok=False, detail=str(e)))
+                EnvironmentCheck(
+                    name="pymobiledevice3", ok=False, detail=str(e),
+                    fix="pipx install pymobiledevice3",
+                )
+            )
 
         # tunneld — required for iOS 17+ developer-tier services (screenshot,
         # dvt launch, syslog over tunnel). Best-effort TCP probe.
@@ -112,7 +148,12 @@ class SystemEnvironmentRepository(EnvironmentRepository):
                 fix=(
                     None
                     if tunneld_status.running
-                    else "sudo pymobiledevice3 remote tunneld   # leave running in another terminal"
+                    else (
+                        "# install once (skip if pymobiledevice3_cli is green):\n"
+                        "pipx install pymobiledevice3\n"
+                        "# then leave running in another terminal:\n"
+                        "sudo $(which pymobiledevice3) remote tunneld"
+                    )
                 ),
             )
         )

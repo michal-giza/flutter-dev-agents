@@ -42,6 +42,13 @@ http = [
 debug = [
     "websockets>=13.0",
 ]
+ios = [
+    # Library-side import is enough for our `pymobiledevice3_cli` wrapper.
+    # The SUDO-runnable `pymobiledevice3 remote tunneld` daemon needs a
+    # system-wide binary (sudo doesn't see the venv PATH). Install
+    # separately via `pipx install pymobiledevice3` — see docs/ios_setup.md.
+    "pymobiledevice3>=4.0.0",
+]
 rag = [
     # Vector store (single binary; runs as `docker run -p 6333:6333 qdrant/qdrant`)
     "qdrant-client>=1.9",

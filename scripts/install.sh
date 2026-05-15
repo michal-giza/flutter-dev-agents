@@ -53,6 +53,23 @@ fi
 echo "==> installing phone-controll with dev,ar,http extras"
 uv pip install -e ".[dev,ar,http]"
 
+# --- 5b. system-wide pymobiledevice3 for tunneld (backlog item K2) ---
+# The project's venv-local pymobiledevice3 is fine for library use, but
+# `tunneld` MUST run under sudo and sudo's PATH typically excludes the
+# venv. Install pymobiledevice3 system-wide via pipx so `sudo
+# pymobiledevice3 remote tunneld` works out of the box.
+if ! command -v pymobiledevice3 >/dev/null 2>&1; then
+    if ! command -v pipx >/dev/null 2>&1; then
+        echo "==> installing pipx (needed for system-wide pymobiledevice3)"
+        brew install pipx
+        pipx ensurepath
+    fi
+    echo "==> installing pymobiledevice3 system-wide (for sudo tunneld)"
+    pipx install pymobiledevice3 || pip3 install --user pymobiledevice3
+else
+    echo "==> pymobiledevice3 already on PATH ($(which pymobiledevice3))"
+fi
+
 # --- 6. tests ---
 echo "==> running unit tests"
 "${PACKAGE_DIR}/.venv/bin/pytest" -q || {

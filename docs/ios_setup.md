@@ -65,9 +65,33 @@ If iOS major version is newer than your installed Xcode, auto-mount can fail (Xc
 
 **Leave this running in a separate terminal for every session that uses physical-iPhone screenshot / launch / over-tunnel syslog.** It's the most common gotcha in our setup.
 
+### 3a. Install pymobiledevice3 system-wide (one-time)
+
+**Don't skip this step.** The MCP's venv-local `pymobiledevice3` works for library calls but `tunneld` runs under `sudo`, and `sudo`'s PATH typically excludes the venv. You need a system-wide binary:
+
 ```bash
-sudo /Users/<you>/Desktop/flutter-dev-agents/packages/phone-controll/.venv/bin/pymobiledevice3 remote tunneld
+# Preferred — pipx, isolated and easy to upgrade:
+pipx install pymobiledevice3
+
+# Or, if you don't have pipx:
+pip3 install --user pymobiledevice3
+
+# Or, if neither of those is on PATH for you:
+brew install pipx && pipx install pymobiledevice3
+
+# Verify:
+which pymobiledevice3   # must print SOMETHING (e.g. /opt/homebrew/bin/pymobiledevice3)
 ```
+
+`scripts/install.sh` does this for you on a fresh laptop. `check_environment` reports it explicitly under `pymobiledevice3_cli` — if that check is red, the daemon command below won't run.
+
+### 3b. Start the daemon
+
+```bash
+sudo $(which pymobiledevice3) remote tunneld
+```
+
+The `$(which …)` form is deliberate — it resolves to whichever pipx / user-install location actually has the binary, instead of hard-coding a path that drifts between machines.
 
 You should see:
 
