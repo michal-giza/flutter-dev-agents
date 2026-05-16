@@ -76,7 +76,11 @@ from .data.repositories.vscode_ide_repository import VsCodeIdeRepository
 from .data.repositories.wda_ui_repository import WdaUiRepository
 from .data.repositories.yaml_plan_executor import YamlPlanExecutor
 from .domain.entities import TestFramework
-from .domain.usecases.artifact_retention import DiskUsage, PruneOriginals
+from .domain.usecases.artifact_retention import (
+    CompressPng,
+    DiskUsage,
+    PruneOriginals,
+)
 from .domain.usecases.artifacts import FetchArtifact, GetArtifactsDir, NewSession
 from .domain.usecases.build_install import BuildApp, InstallApp, UninstallApp
 from .domain.usecases.code_quality import (
@@ -486,6 +490,7 @@ def build_runtime(
         notify_webhook=NotifyWebhook(),
         disk_usage=DiskUsage(artifacts_repo),
         prune_originals=PruneOriginals(artifacts_repo),
+        compress_png=CompressPng(),
         inspect_project=InspectProject(inspector),
         prepare_for_test=PrepareForTest(
             lifecycle_repo, ui_repo, observation_repo, artifacts_repo, state_repo

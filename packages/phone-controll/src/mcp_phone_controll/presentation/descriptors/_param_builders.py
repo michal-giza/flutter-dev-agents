@@ -21,7 +21,10 @@ from pathlib import Path
 from ...domain.entities import AnalyzerSeverity as _AnalyzerSeverity
 from ...domain.entities import BuildMode, LogLevel, Platform
 from ...domain.entities import IdeKind as _IdeKind
-from ...domain.usecases.artifact_retention import PruneOriginalsParams
+from ...domain.usecases.artifact_retention import (
+    CompressPngParams,
+    PruneOriginalsParams,
+)
 from ...domain.usecases.artifacts import FetchArtifactParams, NewSessionParams
 from ...domain.usecases.build_install import (
     BuildAppParams,
@@ -596,6 +599,14 @@ def _params_prune_originals(args: JsonDict) -> PruneOriginalsParams:
             int(args["older_than_days"]) if "older_than_days" in args else None
         ),
         dry_run=bool(args.get("dry_run", False)),
+    )
+
+
+def _params_compress_png(args: JsonDict) -> CompressPngParams:
+    max_dim = args.get("max_dim")
+    return CompressPngParams(
+        path=Path(args["path"]).expanduser(),
+        max_dim=int(max_dim) if max_dim is not None else None,
     )
 
 

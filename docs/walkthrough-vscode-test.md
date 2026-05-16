@@ -267,6 +267,31 @@ screenshots, logs, JUnit XML if your plan asked for it. Use
       your IDE attached directly to the chat aren't routed through the
       MCP — Claude Code sees them at native resolution. Crop or resize
       before attaching.
+   5. **A different MCP produced the image.** `computer-use` captures
+      the full macOS desktop at Retina resolution — ~3000×1964 raw,
+      multi-MB per shot. The MCP's safety net only sees PNGs that
+      pass through *our* dispatcher's envelope, not images from other
+      MCPs. When you notice this, call
+      `compress_png(path="/path/to/the/big.png")` from our MCP — it
+      runs the same palette + max-compression pipeline on any file on
+      disk, typically 3-5× smaller in one call. Add `max_dim=1600` to
+      also resize.
+
+5. **"Request too large (max 32MB)"** — the conversation's TOTAL
+   payload exceeded the upstream limit. Distinct from issue #4 (per-image
+   dimension) — this is per-request bytes. Two fixes, in order:
+   1. Newer screenshots from this MCP are already palette-compressed
+      to ~150 KB each since `3f20a72`. If you're hitting the limit on
+      a fresh session, the bloat is almost certainly a different MCP
+      (`computer-use`, IDE plugins).
+   2. Walk back through the conversation's screenshot paths and run
+      `compress_png(path=…)` on each external one. Or for a one-shot
+      maintenance pass on disk:
+      ```bash
+      python -m scripts.audit_artifact_dimensions \
+        --root ~/.mcp_phone_controll/sessions \
+        --cap --max-dim 1600 --max-bytes-kb 250
+      ```
 
 ---
 

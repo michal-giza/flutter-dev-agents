@@ -10,6 +10,7 @@ from typing import Any
 
 from ..domain.result import Err, Result
 from ..domain.usecases.artifact_retention import (
+    CompressPng,
     DiskUsage,
     PruneOriginals,
 )
@@ -199,6 +200,7 @@ from .descriptors._param_builders import (
     _params_clear,
     _params_close_ide_window,
     _params_compare_screenshot,
+    _params_compress_png,
     _params_dart_analyze,
     _params_dart_fix,
     _params_dart_format,
@@ -314,6 +316,7 @@ class UseCases:
     notify_webhook: NotifyWebhook
     disk_usage: DiskUsage
     prune_originals: PruneOriginals
+    compress_png: CompressPng
     inspect_project: InspectProject
     prepare_for_test: PrepareForTest
     run_test_plan: RunTestPlan
@@ -550,6 +553,27 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             ),
             build_params=_params_prune_originals,
             invoke=_bind(uc.prune_originals, _params_prune_originals),
+        ),
+        ToolDescriptor(
+            name="compress_png",
+            description=(
+                "Resize (optional) + palette-recompress a PNG in place. "
+                "Use when an external screenshot (e.g. from computer-use) "
+                "is bloating the conversation; 3-5x smaller, visually "
+                "lossless for UI content. Returns bytes_before/after."
+            ),
+            input_schema=_schema(
+                {
+                    "path": _string("Path to a .png file on disk."),
+                    "max_dim": _int(
+                        "Also resize if the long edge exceeds this. "
+                        "Omit to skip resize and only recompress."
+                    ),
+                },
+                required=["path"],
+            ),
+            build_params=_params_compress_png,
+            invoke=_bind(uc.compress_png, _params_compress_png),
         ),
         ToolDescriptor(
             name="session_summary",

@@ -226,3 +226,112 @@ class PruneOriginals(BaseUseCase[PruneOriginalsParams, PruneOriginalsResult]):
                 sample_paths=sample,
             )
         )
+
+
+# ---------------- compress_png -------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class CompressPngParams:
+    """Compress an arbitrary PNG on disk.
+
+    Use this when the agent is composing tools from multiple MCPs and
+    notices payload bloat — e.g. a `computer-use: screenshot` of the full
+    desktop is ~2 MB at native Retina, and after a dozen of them the API
+    rejects the conversation with "Request too large (max 32MB)".
+
+    The MCP's own `take_screenshot` already routes through the cap +
+    compress pipeline; this tool exposes the same compressor for paths
+    produced *outside* the MCP so the agent has a single one-call lever.
+
+    Lossless re-encode: adaptive palette (256 colors) + zlib level 9.
+    For UI/desktop screenshots this is visually identical to the input
+    and typically 3-5x smaller.
+    """
+
+    path: Path
+    max_dim: int | None = None  # also resize if long edge exceeds this
+
+
+@dataclass(frozen=True, slots=True)
+class CompressPngResult:
+    path: str
+    bytes_before: int
+    bytes_after: int
+    bytes_saved: int
+    width_before: int
+    height_before: int
+    width_after: int
+    height_after: int
+    resized: bool
+    recompressed: bool
+
+
+class CompressPng(BaseUseCase[CompressPngParams, CompressPngResult]):
+    """Resize (optional) + palette-recompress a PNG in place.
+
+    Idempotent: a second call on the same already-compressed file is a
+    no-op (`recompressed=false`, `bytes_saved=0`). Preserves the original
+    at `<path>.orig.png` on the first cap, same convention as the
+    in-MCP `cap_image_in_place`.
+    """
+
+    async def execute(self, params: CompressPngParams) -> Result[CompressPngResult]:
+        from ...data.image_capping import (
+            _read_png_dimensions,
+            cap_image_in_place,
+            compress_png_in_place,
+        )
+
+        path = Path(params.path).expanduser()
+        if not path.is_file():
+            return err(
+                FilesystemFailure(
+                    message=f"PNG not found: {path}",
+                    next_action="fix_arguments",
+                )
+            )
+        if path.suffix.lower() != ".png":
+            return err(
+                FilesystemFailure(
+                    message=f"compress_png only handles .png files; got {path.suffix!r}",
+                    next_action="fix_arguments",
+                )
+            )
+
+        before_dims = _read_png_dimensions(path) or (0, 0)
+        try:
+            bytes_before = path.stat().st_size
+        except OSError as exc:
+            return err(
+                FilesystemFailure(
+                    message=f"could not stat {path}: {exc}",
+                    next_action="check_path",
+                )
+            )
+
+        resized = False
+        if params.max_dim is not None and params.max_dim > 0:
+            resized = cap_image_in_place(path, max_dim=params.max_dim)
+        recompressed = compress_png_in_place(path)
+
+        try:
+            bytes_after = path.stat().st_size
+        except OSError:
+            bytes_after = bytes_before
+        after_dims = _read_png_dimensions(path) or before_dims
+
+        return ok(
+            CompressPngResult(
+                path=str(path),
+                bytes_before=bytes_before,
+                bytes_after=bytes_after,
+                bytes_saved=max(0, bytes_before - bytes_after),
+                width_before=before_dims[0],
+                height_before=before_dims[1],
+                width_after=after_dims[0],
+                height_after=after_dims[1],
+                resized=resized,
+                recompressed=recompressed,
+            )
+        )

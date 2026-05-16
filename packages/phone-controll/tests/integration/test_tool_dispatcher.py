@@ -13,6 +13,7 @@ from mcp_phone_controll.data.repositories.sqlite_skill_library_repository import
     SqliteSkillLibraryRepository,
 )
 from mcp_phone_controll.domain.usecases.artifact_retention import (
+    CompressPng,
     DiskUsage,
     PruneOriginals,
 )
@@ -244,6 +245,7 @@ def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:
         notify_webhook=NotifyWebhook(),
         disk_usage=DiskUsage(artifacts),
         prune_originals=PruneOriginals(artifacts),
+        compress_png=CompressPng(),
         inspect_project=InspectProject(inspector),
         prepare_for_test=_PrepFT(lifecycle, ui, observation, artifacts, state),
         run_test_plan=RunTestPlan(plan_executor, plan_loader),
@@ -459,6 +461,7 @@ async def test_registry_covers_all_use_case_fields(tmp_path: Path):
         "notify_webhook",
         "disk_usage",
         "prune_originals",
+        "compress_png",
         "inspect_project",
         "prepare_for_test",
         "run_test_plan",
