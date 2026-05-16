@@ -36,7 +36,12 @@ class FlutterCli:
         project_path: Path,
         mode: str = "debug",
         flavor: str | None = None,
-        timeout_s: float = 600.0,
+        # Bumped 600 → 1500: first-run Gradle on a clean machine downloads
+        # the Android Gradle Plugin, AAPT2, KGP, and the build cache — easily
+        # 10+ minutes on a slow link. Subsequent builds complete in 30-90 s
+        # so the bump only matters for cold starts. Reported in the field
+        # May 2026.
+        timeout_s: float = 1500.0,
     ) -> ProcessResult:
         argv = [self._flutter, "build", "apk", f"--{mode}"]
         if flavor:

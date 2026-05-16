@@ -90,9 +90,28 @@ def _replace_in_place(node: Any, replacements: dict[str, str]) -> Any:
     return node
 
 
+# Hard ceiling — independent of `MCP_MAX_IMAGE_DIM`. Even if a user (or a
+# stale subprocess running old defaults) sets the env cap to 2200 or
+# higher, the safety net refuses anything > 1900 to protect against the
+# upstream API's 2000px-per-image rejection in multi-image requests.
+# Setting this just below 2000 leaves a small safety margin for any
+# off-by-one in dimension probing across backends.
+_HARD_CEILING_PX = 1900
+
+
 def cap_pngs_in_envelope(envelope: dict) -> dict:
     """Scan `envelope` for PNG file paths, cap any oversized ones, and
     HARD-REFUSE to return paths the cap couldn't fix.
+
+    Two layers of defense, both must pass:
+
+      1. `cap_image_in_place(path)` — soft cap, defaults to
+         `MCP_MAX_IMAGE_DIM` env (1600 today).
+      2. `is_within_cap(path, max_dim=_HARD_CEILING_PX)` — hard 1900 ceiling
+         that ignores env overrides. Catches the case where someone bumped
+         the soft cap past 2000 or a stale subprocess is using the old
+         1920 default that the upstream API can still reject under heavy
+         multi-image accumulation.
 
     Returns the envelope (possibly rewritten if any path was refused).
     Adds `image_cap` metadata describing what was capped vs refused, so
@@ -114,13 +133,19 @@ def cap_pngs_in_envelope(envelope: dict) -> dict:
         if _is_exempt(value):
             continue
         path = Path(value)
-        # First attempt: cap it.
+        # First attempt: soft cap (env-driven default 1600).
         if cap_image_in_place(path):
             capped.append(value)
-        # Now verify — even if cap reported False (meaning "already under
-        # cap" OR "all backends failed"), we want to be sure the file is
-        # actually safe.
-        if not is_within_cap(path):
+        # Second attempt: if still > hard ceiling, try ONCE more with the
+        # hard cap explicitly. This catches the case where env was set
+        # higher than the hard ceiling.
+        if not is_within_cap(path, max_dim=_HARD_CEILING_PX) and cap_image_in_place(
+            path, max_dim=_HARD_CEILING_PX
+        ):
+            capped.append(value)
+        # Final verification against the hard ceiling. If we still can't
+        # bring it under, refuse the path.
+        if not is_within_cap(path, max_dim=_HARD_CEILING_PX):
             # The cap couldn't fix it. Refuse the path.
             refused.append(
                 {

@@ -176,8 +176,85 @@ class SystemEnvironmentRepository(EnvironmentRepository):
                 )
             )
 
+        # image_cap_pipeline — end-to-end self-test. Writes a 3000x2000 PNG
+        # to a temp file, runs the full cap path, asserts the result is
+        # within the hard ceiling. If this is red, the agent's screenshots
+        # WILL trigger the 2000px API error — diagnose this BEFORE first use,
+        # not after losing a long debugging session to it.
+        checks.append(await self._check_image_cap_pipeline())
+
         all_ok = all(c.ok for c in checks if c.name in ("adb", "flutter"))
         return ok(EnvironmentReport(ok=all_ok, checks=checks))
+
+    async def _check_image_cap_pipeline(self) -> EnvironmentCheck:
+        """Verify the image-cap pipeline can actually shrink an oversized PNG.
+
+        Runs entirely in /tmp; ~10 ms on a working machine. Skipped only if
+        no PNG-writing backend is available at all (in which case other
+        checks already complain about that).
+        """
+        import tempfile
+        from pathlib import Path as _Path
+
+        from ...data.image_capping import (
+            _max_dim,
+            available_backends,
+            cap_image_in_place,
+            is_within_cap,
+        )
+
+        backends = available_backends()
+        if not backends:
+            return EnvironmentCheck(
+                name="image_cap_pipeline",
+                ok=False,
+                detail="no cap backends available (need cv2, PIL, or sips)",
+                fix=(
+                    "uv pip install pillow   # or `.[ar]` for cv2; "
+                    "macOS has `sips` natively"
+                ),
+            )
+
+        # Write a synthetic 3000x2000 PNG via the same backend that would
+        # produce real screenshots. PIL is the most portable.
+        try:
+            from PIL import Image
+
+            with tempfile.TemporaryDirectory() as td:
+                src = _Path(td) / "cap_probe.png"
+                Image.new("RGB", (3000, 2000), color=(120, 0, 0)).save(src)
+                capped = cap_image_in_place(src)
+                cap_value = _max_dim()
+                within = is_within_cap(src, max_dim=1900)
+            if capped and within:
+                return EnvironmentCheck(
+                    name="image_cap_pipeline",
+                    ok=True,
+                    detail=(
+                        f"3000x2000 → ≤1900 via "
+                        f"{','.join(backends)} (active cap={cap_value}px)"
+                    ),
+                )
+            return EnvironmentCheck(
+                name="image_cap_pipeline",
+                ok=False,
+                detail=(
+                    f"cap returned capped={capped} within_hard_ceiling="
+                    f"{within} with backends={','.join(backends)}"
+                ),
+                fix=(
+                    "uv pip install --force-reinstall pillow   "
+                    "# or report a bug; cap should always succeed when "
+                    "PIL is installed"
+                ),
+            )
+        except Exception as e:
+            return EnvironmentCheck(
+                name="image_cap_pipeline",
+                ok=False,
+                detail=f"probe raised: {type(e).__name__}: {e}",
+                fix="uv pip install --force-reinstall pillow",
+            )
 
     def _adb_resolved_path(self) -> str | None:
         from pathlib import Path
