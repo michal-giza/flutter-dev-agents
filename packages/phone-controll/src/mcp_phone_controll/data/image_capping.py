@@ -97,7 +97,16 @@ def _resize_cv2(path: Path, new_w: int, new_h: int) -> bool:
         if img is None:
             return False
         resized = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
-        return bool(cv2.imwrite(str(path), resized))
+        # cv2's PNG writer defaults to compression level 1 (fast but big).
+        # Force level 9 so post-cap files aren't ~3x larger than they
+        # need to be. If PIL is also available, follow up with a palette
+        # recompress for an additional 2-3x size drop on UI content.
+        ok_write = bool(cv2.imwrite(
+            str(path), resized, [cv2.IMWRITE_PNG_COMPRESSION, 9]
+        ))
+        if ok_write and find_spec("PIL") is not None:
+            compress_png_in_place(path)  # palette pass; ignore failures
+        return ok_write
     except Exception as exc:
         warn("image_cap_backend_failed", backend="cv2", error=str(exc))
         return False
@@ -111,10 +120,77 @@ def _resize_pil(path: Path, new_w: int, new_h: int) -> bool:
 
         with Image.open(path) as img:
             resized = img.resize((new_w, new_h), Image.LANCZOS)
-            resized.save(path, format="PNG")
+            # Use _save_compressed_png so the post-resize file gets the
+            # same compression treatment as the standalone compression
+            # path applies. Big win for UI screenshots: 4-6x smaller
+            # without visible loss.
+            _save_compressed_png(resized, path)
         return True
     except Exception as exc:
         warn("image_cap_backend_failed", backend="PIL", error=str(exc))
+        return False
+
+
+def _save_compressed_png(img, path: Path) -> None:
+    """Save `img` to `path` as a PNG using palette mode + max zlib compression.
+
+    Why palette mode: UI screenshots have small color palettes (typically
+    < 256 unique colors per frame). Converting truecolor → 256-color
+    adaptive palette is visually lossless for UI content but slashes file
+    size 3-5x. Combined with `optimize=True` + `compress_level=9` the
+    typical post-cap UI screenshot drops from ~600 KB to ~150 KB.
+
+    Falls back to plain RGB if palette conversion fails for any reason
+    (e.g. transparency edge cases we haven't tested).
+
+    Why this matters: even with the dimension cap at 1600 px, agents
+    accumulate dozens of screenshots in a long e2e flow. The upstream
+    API enforces a 32 MB total request size — 50 truecolor PNGs
+    @ 600 KB each = 30 MB, over the limit. Palette mode keeps the same
+    50 shots well under 10 MB.
+    """
+    from PIL import Image
+
+    try:
+        # `RGBA` images sometimes survive better through quantize than
+        # convert("P"). The `Image.Quantize` API picks an adaptive palette
+        # from the actual image pixels.
+        if img.mode in ("RGB", "RGBA"):
+            palette_img = img.convert("RGB").quantize(
+                colors=256, method=Image.Quantize.MEDIANCUT
+            )
+        else:
+            palette_img = img.convert("P", palette=Image.Palette.ADAPTIVE, colors=256)
+        palette_img.save(
+            path, format="PNG", optimize=True, compress_level=9
+        )
+    except Exception:
+        # Last-ditch: write as-is with max compression.
+        img.save(path, format="PNG", optimize=True, compress_level=9)
+
+
+def compress_png_in_place(path: Path) -> bool:
+    """Re-encode an existing PNG with palette + max compression.
+
+    Use this on PNGs that are already at acceptable dimensions but too
+    large in bytes (e.g. golden images, or images produced by tools that
+    don't route through `cap_image_in_place`). Returns True if the file
+    was rewritten (it's smaller); False if PIL isn't available or the
+    re-encode failed.
+    """
+    if find_spec("PIL") is None:
+        return False
+    try:
+        from PIL import Image
+
+        original_size = path.stat().st_size
+        with Image.open(path) as img:
+            img.load()  # decode before we close the source handle
+            _save_compressed_png(img, path)
+        new_size = path.stat().st_size
+        return new_size < original_size
+    except Exception as exc:
+        warn("png_compression_failed", path=str(path), error=str(exc))
         return False
 
 

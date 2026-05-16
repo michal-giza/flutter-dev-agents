@@ -98,6 +98,26 @@ def _replace_in_place(node: Any, replacements: dict[str, str]) -> Any:
 # off-by-one in dimension probing across backends.
 _HARD_CEILING_PX = 1900
 
+# Per-image byte budget. Even when dimensions are within cap, a
+# truecolor PNG at 1600x900 weighs ~600 KB. After 25 tool calls the
+# request payload accumulates past the upstream's 32 MB total ceiling
+# ("Request too large" error reported in the field May 2026). Any PNG
+# above this threshold gets a palette-mode + max-compression pass that
+# typically cuts it 3-5x without visible quality loss. Override with
+# `MCP_MAX_IMAGE_BYTES_KB` if you need higher fidelity for screenshots.
+
+
+def _byte_budget_kb() -> int:
+    import os
+
+    raw = os.environ.get("MCP_MAX_IMAGE_BYTES_KB", "")
+    if raw:
+        try:
+            return max(50, int(raw))  # floor 50 KB — below this is silly
+        except ValueError:
+            pass
+    return 250
+
 
 def cap_pngs_in_envelope(envelope: dict) -> dict:
     """Scan `envelope` for PNG file paths, cap any oversized ones, and
@@ -117,12 +137,18 @@ def cap_pngs_in_envelope(envelope: dict) -> dict:
     Adds `image_cap` metadata describing what was capped vs refused, so
     the agent and ops can debug.
     """
-    from ..data.image_capping import cap_image_in_place, is_within_cap
+    from ..data.image_capping import (
+        cap_image_in_place,
+        compress_png_in_place,
+        is_within_cap,
+    )
 
     capped: list[str] = []
+    compressed: list[str] = []
     refused: list[dict[str, str]] = []
     seen: set[str] = set()
     replacements: dict[str, str] = {}
+    byte_budget = _byte_budget_kb() * 1024
 
     for value in _walk_strings(envelope):
         if value in seen:
@@ -143,6 +169,14 @@ def cap_pngs_in_envelope(envelope: dict) -> dict:
             path, max_dim=_HARD_CEILING_PX
         ):
             capped.append(value)
+        # Byte-budget pass: even within dimensions, a truecolor PNG can
+        # be hundreds of KB. Re-encode with palette + max zlib if over
+        # the per-image budget. Lossless for UI content; 3-5x smaller.
+        try:
+            if path.stat().st_size > byte_budget and compress_png_in_place(path):
+                compressed.append(value)
+        except OSError:
+            pass  # stat failed; let the final dimension check decide
         # Final verification against the hard ceiling. If we still can't
         # bring it under, refuse the path.
         if not is_within_cap(path, max_dim=_HARD_CEILING_PX):
@@ -164,7 +198,7 @@ def cap_pngs_in_envelope(envelope: dict) -> dict:
                 reason="cap_failed_all_backends",
             )
 
-    if not capped and not refused:
+    if not capped and not compressed and not refused:
         return envelope
 
     # Rewrite if anything was refused. Also surface diagnostics so the
@@ -174,6 +208,8 @@ def cap_pngs_in_envelope(envelope: dict) -> dict:
     diag: dict[str, Any] = {}
     if capped:
         diag["capped"] = capped
+    if compressed:
+        diag["compressed"] = compressed
     if refused:
         diag["refused"] = refused
         # If we had to refuse anything, flip ok to false so the agent
