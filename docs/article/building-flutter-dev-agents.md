@@ -92,10 +92,12 @@ Why filesystem and not in-memory: each Claude Code session spawns its own Python
 Problem: every developer-tier iOS service (screenshot, dvt launch, syslog over tunnel) requires `sudo pymobiledevice3 remote tunneld` running in a separate terminal. Forget it once and `take_screenshot` returns a cryptic `InvalidServiceError`.
 
 Solution two-fold:
-- `check_environment` actively probes `127.0.0.1:49151` and reports `ios_tunneld: ok|not_running` with the exact `sudo` command in `fix`.
+- `check_environment` actively probes `127.0.0.1:49151` and reports `ios_tunneld: ok|not_running` with the exact `sudo` command in `fix`. A separate `pymobiledevice3_cli` check verifies the binary is on PATH at all — added after a real-user bug report where the hint said "run `sudo pymobiledevice3 …`" on a machine where that command wasn't installed. The fix now leads with `pipx install pymobiledevice3` and uses `sudo $(which pymobiledevice3) remote tunneld` so the path resolves regardless of how the user installed it.
 - iOS `take_screenshot` failure carries `next_action: "start_tunneld"` + `details.fix_command` + `details.docs_url: "docs/ios_setup.md#tunneld"` so an autonomous agent switches on the canonical action without parsing English.
 
 The whole ladder of iOS prereqs (Developer Mode → DDI → tunneld → WDA) is documented in `docs/ios_setup.md` and linked from every relevant failure envelope.
+
+**iPhone 17 simulator gotcha.** `wda.USBClient(udid)` connects over usbmux, which doesn't exist for simulators — calling it returned a stub whose first method call attribute-errored with `'NoneType' has no attribute 'make_http_connection'`. Reported in production, May 2026. The factory now branches on `xcrun simctl list devices -j`: physical → `wda.USBClient(udid)`; simulator → `wda.Client(f"http://127.0.0.1:{port}")`. A reachability probe fails fast with a typed `WdaUnreachable(next_action="start_wda_on_simulator", fix_command=…)` so agents see the exact xcodebuild command to launch WDA instead of a Python crash.
 
 ### 3. Patrol vs plain `flutter test`
 
@@ -123,6 +125,15 @@ Problem: `dump_ui` returns a 50KB XML tree. `read_logs` returns 200 lines. A 4B 
 
 Solution: dispatcher-level output truncation. Strings cap at 8KB, lists at 200 items, with a `_truncated: N` sentinel and a top-level `data_truncated: true` flag. The truncation envelope adds `next_action: "fetch_full_artifact_if_needed"` so the agent knows to grab the full file from artifacts dir if it actually needs it.
 
+**The image-cap saga** is the same lesson under a different headline. Claude's vision API rejects multi-image conversations where any image exceeds 2000 px on the long edge — a real Galaxy S25 screenshot is 1080×2340, so every single tap-and-verify originally crashed the conversation. The fix evolved through four iterations:
+
+1. **Per-use-case cap (1920 px).** `take_screenshot` resizes after capture. Worked until a different code path (`prepare_for_test`'s evidence) forgot to call it.
+2. **Dispatcher safety net.** A middleware walks every response envelope, caps any oversized PNG it finds. Closed the gap at the cost of 80 px of margin under the 2000 ceiling — every off-by-one or stale subprocess could still leak.
+3. **Defaults dropped to 1600 + hard 1900 ceiling.** The soft cap is env-driven; the hard ceiling is wired into the safety net and ignores env overrides. Setting `MCP_MAX_IMAGE_DIM=2200` still can't leak anything > 1900. Plus a `image_cap_pipeline` doctor check that writes a synthetic 3000×2000 PNG and verifies the cap path actually shrinks it — answerable on first call, not after a session-killing failure.
+4. **Byte budget, not just pixels.** "Request too large (max 32MB)" hit after ~50 screenshots accumulated in one e2e session — each truecolor 1600×900 PNG was ~600 KB, total payload past the 32 MB request limit. Palette-mode encoding (`Image.Quantize.MEDIANCUT`, 256 colors, `compress_level=9`) is visually lossless for UI content and 3-5× smaller. Measured impact on real historical artifacts: 126 files recompressed, ~58 MB freed. A 25-shot session now lands at ~3 MB instead of ~15 MB.
+
+The pattern across both output truncation and image capping: **the model's context is a shared physical resource — defend it in middleware, not in every use case that forgets**. Most of the engineering effort across the four image-cap iterations went into widening the safety net, not narrowing it.
+
 Combined with the **tool ladder** (`describe_capabilities(level="basic")` returns ~18 tools instead of all 74) and **describe_tool** (fetch verbose docs only for the tool you're about to call), a 4B agent operating on the `basic` level keeps a tight context.
 
 ---
@@ -135,11 +146,11 @@ None of this is finished. Here are the gaps a careful read of the code reveals:
 2. **`tail_debug_log` polls every 100ms.** Wasteful — should wake on the FlutterMachineClient's event push.
 3. **`flutter_pub_outdated` returns an empty list.** I parse the human-readable output instead of using `--json` because of API churn across Flutter versions; needs a proper structured parser.
 4. **No DAP-level debugger.** `start_debug_session` exposes hot reload + service extensions, but no breakpoints, step, or variable inspection. Coming next.
-5. **No real-device integration test.** All ~190 unit tests use fakes; we have zero tests that actually exercise `flutter` or `adb` against a real project. The user has caught real bugs (binary-safe screenshot encoding, tunneld port discovery) only via manual testing.
+5. **No real-device integration test.** All ~400 unit tests use fakes; we still have zero tests that actually exercise `flutter` or `adb` against a real project. Manual testing has caught every load-bearing iOS bug (binary-safe screenshot encoding, tunneld port discovery, iPhone 17 sim WDA transport). Mitigated somewhat: the hermetic test surface now includes a scripted-fake `xcrun simctl` + fake `wda` module for the K1 dual-mode factory, latency budgets on the image-cap hot path, and a subprocess-injection guard on `patch_apply_safe` (ADR-0006). Doesn't replace a real-device CI loop but raises the floor.
 6. **The skill is 8K tokens.** Fine for Claude, brutal for a 4B model. Needs a per-level skill variant — "skill-basic.md" with the 18-tool subset and a checklist-shaped flow, vs the current "skill-expert.md".
 7. **Multi-project parallel test runs aren't a tool yet.** The lock layer supports it; no `run_test_plan_on_pool(devices=[...])` convenience.
 8. **No persistent session trace.** `session_summary` is in-memory; once the MCP exits, the audit trail is gone.
-9. **iOS UI driving still needs WebDriverAgent built per device.** `setup_webdriveragent` codifies the recipe but doesn't validate the resulting build before claiming success.
+9. **iOS UI driving still needs WebDriverAgent built per device.** `setup_webdriveragent` codifies the recipe but doesn't validate the resulting build before claiming success. The May 2026 dual-mode-WDA fix closed the worst symptom (sim crashes instead of clear errors) but the developer still needs to launch `xcodebuild test-without-building` against the simulator manually — the MCP surfaces the exact command in `WdaUnreachable.fix_command`, but doesn't run it for you.
 10. **No CI Docker image.** Plan documents the topology; nothing's built. iOS can't be containerised (Apple-side); Android emulator + Patrol can.
 
 ---
@@ -251,6 +262,35 @@ The MCP enforces #2 mechanically via `quality_gate`. #3 and #4 are skill-level r
 10. **Tool description ≤ 30 words** — token economy.
 
 I'm shipping #1 and #2 in the same batch as this article. The rest cascade naturally.
+
+---
+
+## What landed in the May 2026 hardening pass
+
+This is the running changelog for the load-bearing fixes since the article's
+first cut — each bug came from a real user session, the kind of stuff that
+makes "it works on my machine" stop working. Worth tracking in the article
+itself so the published version doesn't drift from the codebase the moment
+something gets fixed.
+
+| Fix | Symptom that drove it | Mechanism |
+|---|---|---|
+| Image-cap default 1920 → 1600 | "exceeds the dimension limit (2000px)" hit after multi-image accumulation despite per-call cap | Wider headroom (400 px instead of 80) + Pillow pinned as core dep + `image_cap_px` in `mcp_ping` so stale subprocesses are visible |
+| Hard 1900 ceiling in safety net | Same error after env-misconfiguration to 2200 | Two-step safety net: soft cap (env) then hard cap (1900) regardless of env |
+| `image_cap_pipeline` doctor probe | "Is my cap pipeline working?" was unanswerable until first failure | `check_environment` writes a synthetic 3000×2000 PNG, runs cap, asserts ≤ 1900. Live status: `3000x2000 -> <=1900 via PIL,sips (active cap=1600px)` |
+| PNG palette compression + byte budget | "Request too large (max 32MB)" after ~50 screenshots in one e2e session | Adaptive palette (256 colors) + `compress_level=9` everywhere; `MCP_MAX_IMAGE_BYTES_KB` (default 250 KB) triggers re-encode pass. Measured: 126 historical files recompressed, ~58 MB freed. |
+| K1: dual-mode WDA factory | `'NoneType' object has no attribute 'make_http_connection'` on iPhone 17 sim | `xcrun simctl list -j` detects sim vs physical; physical → `wda.USBClient(udid)`, sim → `wda.Client("http://127.0.0.1:8100")`. Reachability probe → typed `WdaUnreachable(next_action="start_wda_on_simulator")`. |
+| K2: `pymobiledevice3_cli` doctor row + install-first hints | Tunneld hint said `sudo pymobiledevice3 remote tunneld` on machines where the binary wasn't installed at all | Separate doctor check for the CLI on PATH; hint leads with `pipx install pymobiledevice3`; daemon command becomes `sudo $(which pymobiledevice3) remote tunneld`. `scripts/install.sh` bootstraps pmd3 system-wide. |
+| Build timeout 600s → 1500s | "MCP timed out — building via Bash directly (Gradle first-run can take minutes)" | First-run Gradle on a clean machine pulls AGP + AAPT2 + KGP; 10 min isn't unusual. Subsequent builds unaffected. |
+| `tool_registry.py` split | 2885-LOC god module | Extracted to `presentation/descriptors/_shared.py` (helpers + ToolDescriptor) + `_param_builders.py`. Registry down to 2154 LOC. |
+| `vm_service_client` coverage 0 → 95% | 66 LOC of debug-protocol code had no test | 7 hermetic tests with a scripted fake WebSocket. < 100 ms total. |
+| Pre-commit hook | CI failures only caught after `git push` | `.pre-commit-config.yaml`: ruff (autofix) + pytest -q + `generate_tool_catalogue --check`. Mirrors CI exactly. |
+| ADR-0006: `patch_apply_safe` injection audit | Audit task on the §7 code-review backlog | Proof + 2 canary-file tripwire tests that break if anyone refactors `_run` to `shell=True` |
+| Latency budget on cap path | Cap performance was never asserted | 250 ms budget for 1080×2340 capture; 30 ms for under-cap short-circuit. Tripwires for `cv2 → slow PIL` regressions. |
+
+The composite shape that emerges: **most production bugs in agent
+plumbing aren't logic bugs, they're invariants nobody tested.** The
+fixes are short; the safety nets are widening over time.
 
 ---
 
