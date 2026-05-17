@@ -17,12 +17,40 @@ async def serve_stdio(dispatcher: ToolDispatcher, server_name: str = "phone-cont
 
     server: Any = Server(server_name)
 
+    from .descriptors._shared import default_annotations
+
     @server.list_tools()
     async def _list_tools() -> list[Tool]:
-        return [
-            Tool(name=d.name, description=d.description, inputSchema=d.input_schema)
-            for d in dispatcher.descriptors
-        ]
+        # MCP 2025-06-18 annotations — surface flags from per-tool
+        # overrides on the descriptor, falling back to the centralized
+        # `default_annotations(name)` classifier so all 108 tools get
+        # at least a best-effort annotation. Falls back gracefully on
+        # older mcp SDKs that don't accept `annotations`.
+        out: list[Tool] = []
+        for d in dispatcher.descriptors:
+            kwargs: dict[str, Any] = {
+                "name": d.name,
+                "description": d.description,
+                "inputSchema": d.input_schema,
+            }
+            annotations: dict[str, bool] = dict(default_annotations(d.name))
+            # Per-tool overrides win over the classifier defaults.
+            if d.read_only is not None:
+                annotations["readOnlyHint"] = d.read_only
+            if d.destructive is not None:
+                annotations["destructiveHint"] = d.destructive
+            if d.idempotent is not None:
+                annotations["idempotentHint"] = d.idempotent
+            if d.open_world is not None:
+                annotations["openWorldHint"] = d.open_world
+            if annotations:
+                kwargs["annotations"] = annotations
+            try:
+                out.append(Tool(**kwargs))
+            except TypeError:
+                kwargs.pop("annotations", None)
+                out.append(Tool(**kwargs))
+        return out
 
     @server.call_tool()
     async def _call_tool(name: str, arguments: dict[str, Any] | None) -> list[TextContent]:

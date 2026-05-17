@@ -75,6 +75,28 @@ class FetchArtifact(BaseUseCase[FetchArtifactParams, FetchArtifactResult]):
         self, params: FetchArtifactParams
     ) -> Result[FetchArtifactResult]:
         path = Path(params.path).expanduser()
+        # Path-traversal guard. `fetch_artifact` returns the file
+        # CONTENTS to the model — a prompt-injected
+        # `fetch_artifact(path="/Users/<other>/.ssh/id_rsa")` would leak
+        # credentials into the conversation. Restrict to known-safe
+        # roots (artifacts dir, tmpdirs) + the env-driven extension
+        # for cases the defaults don't cover. See
+        # `domain/path_guard.py` for the shared helper.
+        from ..path_guard import check_path_allowed
+
+        guard = check_path_allowed(path, tool_name="fetch_artifact")
+        if not guard.ok:
+            return err(
+                FilesystemFailure(
+                    message=guard.reason or "path not allowed",
+                    next_action="path_not_in_allowed_roots",
+                    details={
+                        "path": str(path),
+                        "allowed_roots": [str(r) for r in guard.allowed_roots],
+                    },
+                )
+            )
+        path = guard.resolved_path
         if not path.exists():
             return err(
                 FilesystemFailure(
