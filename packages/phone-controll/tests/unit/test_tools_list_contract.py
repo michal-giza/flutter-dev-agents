@@ -58,12 +58,19 @@ def _live_surface() -> list[dict]:
             annotations["idempotentHint"] = d.idempotent
         if d.open_world is not None:
             annotations["openWorldHint"] = d.open_world
-        out.append({
+        entry: dict = {
             "name": d.name,
             "description": d.description,
             "inputSchema": d.input_schema,
             "annotations": annotations,
-        })
+        }
+        # Only include outputSchema in the snapshot when a tool has
+        # actually declared one — otherwise every untouched tool's
+        # snapshot would show `outputSchema: null` and the diff would
+        # be huge on no-op runs.
+        if d.output_schema is not None:
+            entry["outputSchema"] = d.output_schema
+        out.append(entry)
     return out
 
 

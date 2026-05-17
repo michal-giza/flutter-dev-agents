@@ -308,7 +308,50 @@
       "required": [],
       "type": "object"
     },
-    "name": "check_environment"
+    "name": "check_environment",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "checks": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "detail": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "fix": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": "string"
+              },
+              "ok": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "name",
+              "ok"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "ok": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "type": "object"
+    }
   },
   {
     "annotations": {
@@ -1064,7 +1107,65 @@
       ],
       "type": "object"
     },
-    "name": "inspect_project"
+    "name": "inspect_project",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "flavors": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "notes": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "package_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "path": {
+          "type": "string"
+        },
+        "test_frameworks": {
+          "items": {
+            "enum": [
+              "patrol",
+              "flutter",
+              "xcuitest",
+              "espresso",
+              "detox",
+              "playwright",
+              "unknown"
+            ],
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "type": {
+          "enum": [
+            "flutter",
+            "native_android",
+            "native_ios",
+            "react_native",
+            "web",
+            "unknown"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "type",
+        "test_frameworks"
+      ],
+      "type": "object"
+    }
   },
   {
     "annotations": {
@@ -1218,7 +1319,63 @@
       "required": [],
       "type": "object"
     },
-    "name": "list_devices"
+    "name": "list_devices",
+    "outputSchema": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "device_class": {
+            "enum": [
+              "physical",
+              "emulator",
+              "simulator",
+              "unknown"
+            ],
+            "type": "string"
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "os_version": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "platform": {
+            "enum": [
+              "android",
+              "ios"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "serial": {
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "device",
+              "offline",
+              "unauthorized",
+              "unknown"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "serial",
+          "state"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    }
   },
   {
     "annotations": {
@@ -1354,7 +1511,62 @@
       "required": [],
       "type": "object"
     },
-    "name": "mcp_ping"
+    "name": "mcp_ping",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "git_branch": {
+          "type": "string"
+        },
+        "git_dirty": {
+          "type": "boolean"
+        },
+        "git_sha": {
+          "type": "string"
+        },
+        "image_backends": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "image_cap_px": {
+          "type": "integer"
+        },
+        "n_tools": {
+          "type": "integer"
+        },
+        "package_version": {
+          "type": "string"
+        },
+        "pid": {
+          "type": "integer"
+        },
+        "python_version": {
+          "type": "string"
+        },
+        "started_at": {
+          "type": "string"
+        },
+        "uptime_s": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "package_version",
+        "git_sha",
+        "git_branch",
+        "git_dirty",
+        "started_at",
+        "uptime_s",
+        "python_version",
+        "pid",
+        "image_backends",
+        "image_cap_px",
+        "n_tools"
+      ],
+      "type": "object"
+    }
   },
   {
     "annotations": {
@@ -1821,7 +2033,33 @@
       ],
       "type": "object"
     },
-    "name": "recall"
+    "name": "recall",
+    "outputSchema": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "metadata": {
+            "type": "object"
+          },
+          "score": {
+            "type": "number"
+          },
+          "source": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "source",
+          "score"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    }
   },
   {
     "annotations": {
@@ -2230,7 +2468,66 @@
       "required": [],
       "type": "object"
     },
-    "name": "session_summary"
+    "name": "session_summary",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "entries": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "type": "object"
+              },
+              "artifact_paths": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "error_code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "ok": {
+                "type": "boolean"
+              },
+              "sequence": {
+                "type": "integer"
+              },
+              "summary": {
+                "type": "string"
+              },
+              "tool_name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "sequence",
+              "tool_name",
+              "args",
+              "ok",
+              "error_code",
+              "summary"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "session_id": {
+          "type": "string"
+        },
+        "started_at": {}
+      },
+      "required": [
+        "session_id",
+        "started_at",
+        "entries"
+      ],
+      "type": "object"
+    }
   },
   {
     "annotations": {

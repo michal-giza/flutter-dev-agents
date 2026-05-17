@@ -14,9 +14,19 @@ LM Studio, llama.cpp server, or any OpenAI-compat endpoint via base_url.
 from __future__ import annotations
 
 import os
+import time
 from typing import Any
 
 from .schemas import to_openai_functions
+
+# Process-start timestamp for uptime metrics. Set at module import so
+# /health and /metrics agree on the same baseline regardless of which
+# was hit first.
+_APP_STARTED = time.monotonic()
+
+
+def _uptime_s() -> float:
+    return time.monotonic() - _APP_STARTED
 
 
 def _strip_bearer(value: str) -> str:
@@ -94,9 +104,105 @@ def create_app(dispatcher=None, *, allow_agent_proxy: bool = True):
             raise HTTPException(status_code=404, detail=f"unknown tool: {name}")
         return await dispatcher.dispatch(name, args or {})
 
+    # ---- Liveness, readiness, metrics --------------------------------
+    #
+    # /health = liveness probe (am I running?). Always 200 if the
+    #          process can serve a request. Used by Kubernetes
+    #          liveness probes / load balancer keepalives.
+    # /ready  = readiness probe (am I ready to serve traffic?).
+    #          Verifies the dispatcher is wired + at least one
+    #          image-cap backend exists. Returns 503 if degraded —
+    #          the load balancer pulls us out of rotation.
+    # /metrics = Prometheus-format counters + gauges. Always available;
+    #          no auth (Prometheus servers don't typically carry
+    #          headers). If you expose remotely, gate at the
+    #          reverse-proxy layer.
     @app.get("/health")
     async def health():
-        return {"ok": True, "tools": len(dispatcher.descriptors)}
+        # Liveness: cheap. The fact that this responded is the signal.
+        import time as _time
+
+        from ..version_info import version_info as _vinfo
+
+        v = _vinfo()
+        return {
+            "ok": True,
+            "version": v["package_version"],
+            "git_sha": v["git_sha"],
+            "tools": len(dispatcher.descriptors),
+            "uptime_s": round(_time.monotonic() - _APP_STARTED, 1),
+        }
+
+    @app.get("/ready")
+    async def ready():
+        # Readiness: same shape as /health but FAILS (503) if we're
+        # degraded. Specifically: dispatcher has zero tools (config
+        # broken) OR no image-cap backend at all (screenshots will
+        # silently fail the 2000px gate).
+        from fastapi.responses import JSONResponse
+
+        from ..data.image_capping import available_backends
+
+        backends = available_backends()
+        ready_ok = bool(dispatcher.descriptors) and bool(backends)
+        payload = {
+            "ok": ready_ok,
+            "tools": len(dispatcher.descriptors),
+            "image_backends": list(backends),
+            "reasons": (
+                []
+                if ready_ok
+                else [
+                    r
+                    for r in (
+                        "no tools registered" if not dispatcher.descriptors else None,
+                        "no image-cap backend available" if not backends else None,
+                    )
+                    if r
+                ]
+            ),
+        }
+        return JSONResponse(content=payload, status_code=200 if ready_ok else 503)
+
+    @app.get("/metrics")
+    async def metrics():
+        # Prometheus exposition format — text/plain; version 0.0.4.
+        # Counters only (no histograms yet — wiring up the dispatcher
+        # to emit a per-tool timing histogram is the next step).
+        # Pulls from `observability.emit` style fields: we recompute
+        # most metrics lazily from the dispatcher + venv state.
+        from fastapi.responses import PlainTextResponse
+
+        from ..data.image_capping import _max_dim, available_backends
+        from ..version_info import version_info as _vinfo
+
+        v = _vinfo()
+        backends = available_backends()
+        lines = [
+            "# HELP mcp_info Build metadata as labels.",
+            "# TYPE mcp_info gauge",
+            (
+                f'mcp_info{{version="{v["package_version"]}",'
+                f'git_sha="{v["git_sha"]}",'
+                f'branch="{v["git_branch"]}"}} 1'
+            ),
+            "# HELP mcp_tools_total Number of tools registered.",
+            "# TYPE mcp_tools_total gauge",
+            f"mcp_tools_total {len(dispatcher.descriptors)}",
+            "# HELP mcp_image_cap_px Active image cap (long-edge pixels).",
+            "# TYPE mcp_image_cap_px gauge",
+            f"mcp_image_cap_px {_max_dim()}",
+            "# HELP mcp_image_backends_available Number of working image-cap backends.",
+            "# TYPE mcp_image_backends_available gauge",
+            f"mcp_image_backends_available {len(backends)}",
+            "# HELP mcp_uptime_seconds Seconds since process start.",
+            "# TYPE mcp_uptime_seconds counter",
+            f"mcp_uptime_seconds {_uptime_s():.1f}",
+        ]
+        return PlainTextResponse(
+            content="\n".join(lines) + "\n",
+            media_type="text/plain; version=0.0.4; charset=utf-8",
+        )
 
     # Dev-session sub-router: a stable URL prefix exposing only the
     # debug-session + IDE + WDA-setup tools. Lets us extract this surface

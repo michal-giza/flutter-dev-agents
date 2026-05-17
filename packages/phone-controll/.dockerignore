@@ -1,0 +1,37 @@
+# Keep the build context small — speeds up `docker build` + makes
+# rebuilds reproducible by excluding host-specific noise.
+
+# Python build / cache artifacts
+__pycache__/
+*.py[cod]
+*.so
+.Python
+*.egg-info/
+*.egg
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# Test artifacts that shouldn't ship in the image
+tests/
+.github/
+docs/
+
+# Local dev databases / artifacts
+*.db
+*.sqlite
+.mcp_phone_controll/

@@ -99,3 +99,33 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  docker:
+    name: Docker build smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build runtime image
+        run: |
+          cd packages/phone-controll
+          docker build --tag mcp-phone-controll:ci .
+      - name: Smoke test — container starts, /health responds
+        run: |
+          # Disable the agent-proxy (LLM endpoint), and bind to a
+          # random host port so concurrent CI jobs don't collide.
+          docker run -d --rm --name mcp-smoke \
+            -e MCP_QUIET=1 \
+            -p 18765:8765 \
+            mcp-phone-controll:ci
+          # Wait up to 30s for /health.
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:18765/health > /dev/null 2>&1; then
+              echo "health ok after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+          # Final hit; non-200 fails the job.
+          curl -fsS http://localhost:18765/health
+          curl -fsS http://localhost:18765/metrics | head -20
+          docker stop mcp-smoke
