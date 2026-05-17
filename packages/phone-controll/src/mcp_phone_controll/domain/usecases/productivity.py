@@ -273,7 +273,27 @@ class GrepLogs(BaseUseCase[GrepLogsParams, GrepLogsResult]):
     """
 
     async def execute(self, params: GrepLogsParams) -> Result[GrepLogsResult]:
-        path = Path(params.path).expanduser()
+        # Path-traversal guard. grep_logs returns FILE CONTENTS (matched
+        # lines + context) to the model, so a prompt-injected
+        # `grep_logs(path="~/.ssh/known_hosts", pattern=".*")` would leak
+        # creds into the conversation. Restrict to artifact roots + tmp.
+        from ..path_guard import check_path_allowed
+
+        guard = check_path_allowed(
+            Path(params.path).expanduser(), tool_name="grep_logs"
+        )
+        if not guard.ok:
+            return err(
+                FilesystemFailure(
+                    message=guard.reason or "path not allowed",
+                    next_action="path_not_in_allowed_roots",
+                    details={
+                        "path": str(params.path),
+                        "allowed_roots": [str(r) for r in guard.allowed_roots],
+                    },
+                )
+            )
+        path = guard.resolved_path
         if not path.is_file():
             return err(
                 FilesystemFailure(

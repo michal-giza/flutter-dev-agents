@@ -36,6 +36,27 @@ _DEFAULT_ROOTS = [
     Path("/private/var/folders"),
 ]
 
+# Locations developers typically keep code projects on macOS / Linux.
+# Permissive on purpose — agents need to operate on real projects
+# wherever the user actually keeps them. The threat we close: paths
+# like `/etc/passwd`, `/root/...`, `~/.ssh/`, `/Library/...`,
+# `/System/...` — cross-user / cross-system paths that have nothing
+# to do with development.
+_DEFAULT_PROJECT_ROOTS = [
+    Path.home() / "Desktop",
+    Path.home() / "Documents",
+    Path.home() / "Projects",
+    Path.home() / "projects",
+    Path.home() / "Developer",
+    Path.home() / "dev",
+    Path.home() / "code",
+    Path.home() / "src",
+    Path.home() / "work",
+    Path.home() / "workspace",
+    Path.home() / "repos",
+    Path.home() / "git",
+]
+
 
 @dataclass(frozen=True, slots=True)
 class PathGuardResult:
@@ -96,5 +117,62 @@ def check_path_allowed(
         reason=(
             f"{resolved} is not under an allowed root for {tool_name}. "
             f"Set {env_name} (colon-separated paths) to extend the allowlist."
+        ),
+    )
+
+
+def check_project_path_allowed(
+    path: Path,
+    *,
+    tool_name: str,
+    env_var_override: str | None = None,
+) -> PathGuardResult:
+    """Permissive variant for tools that take a `project_path` arg.
+
+    Agents legitimately operate on Flutter / native projects in
+    ``~/Desktop``, ``~/Projects``, ``~/code``, etc. Strict
+    `check_path_allowed` (restricted to MCP sessions + tmpdirs)
+    would break the dev loop.
+
+    Policy: allow paths under any common project-root directory in
+    the user's home (Desktop, Documents, Projects, Developer, dev,
+    code, src, work, workspace, repos, git) OR under the strict
+    default roots (sessions + tmpdirs) OR explicitly listed in
+    `MCP_PROJECT_PATHS_ROOTS` (colon-separated).
+
+    What this blocks: `/etc/...`, `/root/...`, `~/.ssh/...`,
+    `/System/...`, `/Library/...`, `/var/log/...`, paths under
+    another user's home directory. The agent can no longer
+    accidentally (or via prompt injection) scaffold a feature into
+    `/etc/cron.daily/` or grep `~/other_user/.aws/credentials`.
+
+    Default-permissive on purpose: false positives (someone keeps
+    code in `~/funny_place`) just need `MCP_PROJECT_PATHS_ROOTS`;
+    false negatives let an attacker overwrite system files.
+    """
+    resolved = path.expanduser().resolve()
+    allowed: list[Path] = [r.resolve() for r in _DEFAULT_PROJECT_ROOTS]
+    allowed.extend(r.resolve() for r in _DEFAULT_ROOTS)
+
+    env_name = env_var_override or "MCP_PROJECT_PATHS_ROOTS"
+    extra_env = os.environ.get(env_name, "")
+    if extra_env:
+        for raw in extra_env.split(":"):
+            if raw.strip():
+                allowed.append(Path(raw).expanduser().resolve())
+
+    if any(is_within(resolved, root) for root in allowed):
+        return PathGuardResult(
+            ok=True, resolved_path=resolved, allowed_roots=allowed
+        )
+    return PathGuardResult(
+        ok=False,
+        resolved_path=resolved,
+        allowed_roots=allowed,
+        reason=(
+            f"{resolved} is not under a recognised project-root location "
+            f"for {tool_name}. Common project dirs (~/Desktop, ~/Projects, "
+            "~/code, …) are accepted by default; set "
+            f"{env_name} (colon-separated) to add your own."
         ),
     )

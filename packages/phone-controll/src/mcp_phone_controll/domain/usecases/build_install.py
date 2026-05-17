@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ..entities import AppBundle, BuildMode, Platform
-from ..failures import InvalidArgumentFailure
+from ..failures import FilesystemFailure, InvalidArgumentFailure
 from ..repositories import (
     BuildRepository,
     DeviceRepository,
@@ -78,6 +78,61 @@ class InstallApp(BaseUseCase[InstallAppParams, AppBundle]):
                     message="install requires either bundle_path or project_path"
                 )
             )
+
+        # Path-traversal guard. install_app EXECUTES the supplied bundle
+        # on the device — a prompt-injected `install_app(bundle_path=
+        # "/path/to/attacker-controlled.apk")` would install whatever
+        # the attacker pointed at. Restrict bundle_path to artifact /
+        # tmp / project roots; restrict project_path to project roots.
+        from ..path_guard import check_path_allowed, check_project_path_allowed
+
+        if params.bundle_path is not None:
+            g = check_path_allowed(
+                Path(params.bundle_path).expanduser(),
+                tool_name="install_app",
+            )
+            if not g.ok:
+                # Also accept project roots — APKs built from a project
+                # legitimately live under ~/Projects/<app>/build/...
+                g2 = check_project_path_allowed(
+                    Path(params.bundle_path).expanduser(),
+                    tool_name="install_app",
+                )
+                if not g2.ok:
+                    return err(
+                        FilesystemFailure(
+                            message=(
+                                f"bundle_path {params.bundle_path} is not "
+                                "under an artifact root or a recognised "
+                                "project root. Set MCP_INSTALL_APP_ALLOWED_ROOTS "
+                                "or MCP_PROJECT_PATHS_ROOTS to extend."
+                            ),
+                            next_action="path_not_in_allowed_roots",
+                            details={
+                                "path": str(params.bundle_path),
+                                "tried_roots": (
+                                    [str(r) for r in g.allowed_roots]
+                                    + [str(r) for r in g2.allowed_roots]
+                                ),
+                            },
+                        )
+                    )
+        if params.project_path is not None:
+            g = check_project_path_allowed(
+                Path(params.project_path).expanduser(),
+                tool_name="install_app",
+            )
+            if not g.ok:
+                return err(
+                    FilesystemFailure(
+                        message=g.reason or "project_path not allowed",
+                        next_action="path_not_in_allowed_roots",
+                        details={
+                            "project_path": str(params.project_path),
+                            "allowed_roots": [str(r) for r in g.allowed_roots],
+                        },
+                    )
+                )
 
         serial_res = await resolve_serial(params.serial, self._state)
         if isinstance(serial_res, Err):

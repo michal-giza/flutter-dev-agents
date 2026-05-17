@@ -67,7 +67,30 @@ class PatchApplySafe(BaseUseCase[PatchApplySafeParams, PatchApplyResult]):
     async def execute(
         self, params: PatchApplySafeParams
     ) -> Result[PatchApplyResult]:
-        project = Path(params.project_path).expanduser()
+        # Path-traversal guard. patch_apply_safe WRITES to the project
+        # tree. A prompt-injected `patch_apply_safe(project_path="/etc/")`
+        # with a hostile diff would target system config. Restrict to
+        # recognised project roots; the .git check below is a second
+        # gate but doesn't substitute for path validation (an attacker
+        # could `git init /etc/foo/`).
+        from ..path_guard import check_project_path_allowed
+
+        guard = check_project_path_allowed(
+            Path(params.project_path).expanduser(),
+            tool_name="patch_apply_safe",
+        )
+        if not guard.ok:
+            return err(
+                FilesystemFailure(
+                    message=guard.reason or "project_path not allowed",
+                    next_action="path_not_in_allowed_roots",
+                    details={
+                        "project_path": str(params.project_path),
+                        "allowed_roots": [str(r) for r in guard.allowed_roots],
+                    },
+                )
+            )
+        project = guard.resolved_path
         if not (project / ".git").exists():
             return err(
                 FilesystemFailure(

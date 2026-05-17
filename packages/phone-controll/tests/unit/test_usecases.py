@@ -116,15 +116,21 @@ async def test_install_without_selected_device_errors(tmp_path: Path):
 
 
 @pytest.mark.asyncio
-async def test_install_builds_when_only_project_path_given():
+async def test_install_builds_when_only_project_path_given(tmp_path: Path, monkeypatch):
     builds = FakeBuildRepository(bundle_path=Path("/tmp/built.apk"))
     lifecycle = FakeLifecycleRepository()
     devices = FakeDeviceRepository()
     state = FakeSessionStateRepository(serial="EMU01")
     uc = InstallApp(builds, lifecycle, devices, state)
 
+    # tmp_path is under /private/var/folders → strict guard accepts;
+    # the project-path guard also needs explicit extension via the
+    # env var (tmp_path isn't a "project root" by default).
+    monkeypatch.setenv("MCP_PROJECT_PATHS_ROOTS", str(tmp_path))
+    project = tmp_path / "myapp"
+    project.mkdir()
     result = await uc(
-        InstallAppParams(project_path=Path("/work/myapp"), mode=BuildMode.DEBUG)
+        InstallAppParams(project_path=project, mode=BuildMode.DEBUG)
     )
     assert isinstance(result, Ok)
     assert result.value.path == Path("/tmp/built.apk")
