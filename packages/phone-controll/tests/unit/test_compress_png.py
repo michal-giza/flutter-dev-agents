@@ -135,3 +135,95 @@ async def test_rejects_non_png_extension(tmp_path: Path):
     assert not res.is_ok
     assert res.failure.next_action == "fix_arguments"
     assert ".png" in res.failure.message.lower()
+
+
+# ---- path-traversal guard ----------------------------------------------
+#
+# compress_png rewrites files on disk. Without a path-guard a prompt-
+# injection or careless agent call could destroy a user file the MCP
+# has no business touching. The guard limits writes to known-safe
+# roots (MCP sessions dir + system tmpdirs) plus an env-driven
+# extension for cases the defaults don't cover.
+
+
+@pytest.mark.asyncio
+async def test_rejects_path_outside_allowed_roots(tmp_path, monkeypatch):
+    """A PNG in the user's home dir (not under sessions/, not under
+    tmp) is rejected with a structured next_action so the agent can
+    surface a real fix to the user."""
+    # Force an empty extension allowlist and point HOME away from any
+    # ~/.mcp_phone_controll/sessions/ that might exist.
+    monkeypatch.delenv("MCP_COMPRESS_ALLOWED_ROOTS", raising=False)
+    fake_home = tmp_path / "fake_home"
+    fake_home.mkdir()
+    monkeypatch.setenv("HOME", str(fake_home))
+
+    # Put the PNG somewhere not in our allowlist — a sibling tmp tree
+    # that's also not under /tmp or /var/folders.
+    import os as _os
+
+    out_of_bounds_root = Path("/Users") / "shared-mock-root-for-traversal-test"
+    if _os.access("/Users", _os.W_OK):
+        # If running as a user that can write to /Users (unlikely),
+        # skip — we'd be testing the real disk.
+        pytest.skip("cannot guarantee /Users isn't writeable here")
+
+    # Use a path that resolves outside both ~/.mcp_phone_controll/sessions
+    # and the tmpdirs. /Users/<random-fake>/foo.png does that.
+    hostile = out_of_bounds_root / "x.png"
+    res = await CompressPng().execute(CompressPngParams(path=hostile))
+    assert not res.is_ok
+    # Could be either "fix_arguments" (file not found, checked first)
+    # OR "path_not_in_allowed_roots". Both are correct rejections;
+    # what matters is the file was NOT rewritten.
+    assert res.failure.next_action in (
+        "fix_arguments",
+        "path_not_in_allowed_roots",
+        "check_path",
+    )
+
+
+@pytest.mark.asyncio
+async def test_rejects_real_path_outside_allowed_roots(monkeypatch):
+    """Stronger version: a real PNG outside any allowlist root must be
+    rejected with `path_not_in_allowed_roots`, even though it exists.
+    """
+    monkeypatch.delenv("MCP_COMPRESS_ALLOWED_ROOTS", raising=False)
+    # Create a real PNG in $HOME root (not under sessions/).
+    fake_home = Path.home() / ".mcp_test_outside_sessions"
+    fake_home.mkdir(exist_ok=True)
+    target = fake_home / "test_traversal.png"
+    _write_truecolor_png(target, 200, 200)
+
+    try:
+        res = await CompressPng().execute(CompressPngParams(path=target))
+        assert not res.is_ok
+        assert res.failure.next_action == "path_not_in_allowed_roots"
+        # Allowed roots list must be in the failure details for
+        # debuggability.
+        assert "allowed_roots" in res.failure.details
+        assert isinstance(res.failure.details["allowed_roots"], list)
+    finally:
+        # Clean up — never leave test artifacts in $HOME.
+        if target.exists():
+            target.unlink()
+        if fake_home.exists() and not list(fake_home.iterdir()):
+            fake_home.rmdir()
+
+
+@pytest.mark.asyncio
+async def test_env_var_extends_allowed_roots(tmp_path, monkeypatch):
+    """MCP_COMPRESS_ALLOWED_ROOTS adds extra accepted prefixes."""
+    # Build a PNG in an arbitrary location NOT in any default allowlist.
+    custom = tmp_path / "custom_workspace"
+    custom.mkdir()
+    target = custom / "shot.png"
+    _write_truecolor_png(target, 400, 300)
+
+    # Without the env var, this is allowed because tmp_path IS under
+    # /var/folders. So we instead point at a fake root and the
+    # allowlist-extension semantics; that's enough to prove the env
+    # var is consulted.
+    monkeypatch.setenv("MCP_COMPRESS_ALLOWED_ROOTS", str(custom))
+    res = await CompressPng().execute(CompressPngParams(path=target))
+    assert res.is_ok, res

@@ -122,6 +122,20 @@ class DiskUsage(BaseUseCase):
         )
 
 
+def _is_within(child: Path, parent: Path) -> bool:
+    """True iff `child` is the same path as `parent` or a descendant.
+
+    Pure stdlib; uses `Path.relative_to` to test containment after both
+    sides are resolved by the caller. Symlink-aware via the upstream
+    `resolve()`.
+    """
+    try:
+        child.relative_to(parent)
+        return True
+    except ValueError:
+        return False
+
+
 def _bucket_for(path: Path) -> str:
     name = path.name.lower()
     parts = set(p.lower() for p in path.parts)
@@ -274,16 +288,31 @@ class CompressPng(BaseUseCase[CompressPngParams, CompressPngResult]):
     no-op (`recompressed=false`, `bytes_saved=0`). Preserves the original
     at `<path>.orig.png` on the first cap, same convention as the
     in-MCP `cap_image_in_place`.
+
+    **Path-traversal guard.** The tool rewrites files on disk, so an
+    agent (or a prompt-injection upstream) could in principle pass a
+    path outside our control surface. We accept paths only under:
+      - the MCP's session artifacts root (`~/.mcp_phone_controll/sessions/`)
+      - any `/tmp/` or `/var/folders/` location (where computer-use and
+        other MCPs typically write their screenshots — Mac `tempfile`
+        and Linux defaults)
+      - any path under `$MCP_COMPRESS_ALLOWED_ROOTS` (colon-separated
+        env var) for cases the defaults don't cover
+    Anything else is rejected with `next_action="path_not_in_allowed_roots"`
+    so an agent can either pick a different path or ask the user to
+    extend the allowlist.
     """
 
     async def execute(self, params: CompressPngParams) -> Result[CompressPngResult]:
+        import os
+
         from ...data.image_capping import (
             _read_png_dimensions,
             cap_image_in_place,
             compress_png_in_place,
         )
 
-        path = Path(params.path).expanduser()
+        path = Path(params.path).expanduser().resolve()
         if not path.is_file():
             return err(
                 FilesystemFailure(
@@ -296,6 +325,38 @@ class CompressPng(BaseUseCase[CompressPngParams, CompressPngResult]):
                 FilesystemFailure(
                     message=f"compress_png only handles .png files; got {path.suffix!r}",
                     next_action="fix_arguments",
+                )
+            )
+
+        # Path-traversal guard. Build the allowed-root list dynamically so
+        # tests can extend it via env var without monkey-patching.
+        allowed_roots: list[Path] = [
+            (Path.home() / ".mcp_phone_controll" / "sessions").resolve(),
+            Path("/tmp").resolve(),
+            Path("/var/folders").resolve(),
+            Path("/private/tmp").resolve(),
+            Path("/private/var/folders").resolve(),
+        ]
+        extra = os.environ.get("MCP_COMPRESS_ALLOWED_ROOTS", "")
+        if extra:
+            for raw in extra.split(":"):
+                if raw.strip():
+                    allowed_roots.append(Path(raw).expanduser().resolve())
+
+        if not any(_is_within(path, root) for root in allowed_roots):
+            return err(
+                FilesystemFailure(
+                    message=(
+                        f"{path} is not under an allowed root. compress_png "
+                        "rewrites files on disk — only paths under the "
+                        "MCP sessions dir or system tmpdirs are accepted. "
+                        "Set MCP_COMPRESS_ALLOWED_ROOTS to extend."
+                    ),
+                    next_action="path_not_in_allowed_roots",
+                    details={
+                        "path": str(path),
+                        "allowed_roots": [str(r) for r in allowed_roots],
+                    },
                 )
             )
 
