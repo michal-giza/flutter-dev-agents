@@ -33,6 +33,11 @@ async def serve_stdio(dispatcher: ToolDispatcher, server_name: str = "phone-cont
                 "description": d.description,
                 "inputSchema": d.input_schema,
             }
+            # MCP 2025-06-18 outputSchema — opportunistic. Tools without
+            # one fall back to unstructured `content` only. As we
+            # migrate the BASIC tier, more will populate.
+            if d.output_schema is not None:
+                kwargs["outputSchema"] = d.output_schema
             annotations: dict[str, bool] = dict(default_annotations(d.name))
             # Per-tool overrides win over the classifier defaults.
             if d.read_only is not None:
@@ -48,7 +53,10 @@ async def serve_stdio(dispatcher: ToolDispatcher, server_name: str = "phone-cont
             try:
                 out.append(Tool(**kwargs))
             except TypeError:
+                # Older mcp SDKs may not accept `annotations` and/or
+                # `outputSchema`. Strip them and retry.
                 kwargs.pop("annotations", None)
+                kwargs.pop("outputSchema", None)
                 out.append(Tool(**kwargs))
         return out
 

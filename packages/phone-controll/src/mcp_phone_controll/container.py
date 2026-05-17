@@ -157,6 +157,7 @@ from .domain.usecases.preparation import PrepareForTest
 from .domain.usecases.productivity import (
     FindFlutterWidget,
     GrepLogs,
+    ListMissingWidgetKeys,
     RunQuickCheck,
     ScaffoldFeature,
     SummarizeSession,
@@ -576,6 +577,7 @@ def build_runtime(
         grep_logs=GrepLogs(),
         summarize_session=SummarizeSession(trace_repo),
         find_flutter_widget=FindFlutterWidget(),
+        list_missing_widget_keys=ListMissingWidgetKeys(),
         # RAG retrieval (Tier G — optional, gated by [rag] extras)
         recall=Recall(rag_repo),
         recall_corrective=CorrectiveRecall(Recall(rag_repo)),

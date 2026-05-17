@@ -100,6 +100,7 @@ from mcp_phone_controll.domain.usecases.plan import RunTestPlan, ValidateTestPla
 from mcp_phone_controll.domain.usecases.productivity import (
     FindFlutterWidget,
     GrepLogs,
+    ListMissingWidgetKeys,
     RunQuickCheck,
     ScaffoldFeature,
     SummarizeSession,
@@ -331,6 +332,7 @@ def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:
         grep_logs=GrepLogs(),
         summarize_session=SummarizeSession(trace),
         find_flutter_widget=FindFlutterWidget(),
+        list_missing_widget_keys=ListMissingWidgetKeys(),
         recall=Recall(_null_rag),
         recall_corrective=CorrectiveRecall(Recall(_null_rag)),
         index_project=IndexProject(_null_rag, _chunker),
@@ -547,6 +549,7 @@ async def test_registry_covers_all_use_case_fields(tmp_path: Path):
         "grep_logs",
         "summarize_session",
         "find_flutter_widget",
+        "list_missing_widget_keys",
         "recall",
         "recall_corrective",
         "index_project",

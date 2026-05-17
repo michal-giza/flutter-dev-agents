@@ -112,6 +112,7 @@ from ..domain.usecases.preparation import PrepareForTest
 from ..domain.usecases.productivity import (
     FindFlutterWidget,
     GrepLogs,
+    ListMissingWidgetKeys,
     RunQuickCheck,
     ScaffoldFeature,
     SummarizeSession,
@@ -226,6 +227,7 @@ from .descriptors._param_builders import (
     _params_install_app,
     _params_is_ide_available,
     _params_launch,
+    _params_list_missing_widget_keys,
     _params_list_patrol,
     _params_list_simulators,
     _params_narrate,
@@ -296,6 +298,7 @@ from .descriptors._shared import (
     _params_no,
     _schema,
     _string,
+    dataclass_to_json_schema,
 )
 from .serialization import to_jsonable
 
@@ -398,6 +401,7 @@ class UseCases:
     grep_logs: GrepLogs
     summarize_session: SummarizeSession
     find_flutter_widget: FindFlutterWidget
+    list_missing_widget_keys: ListMissingWidgetKeys
     recall: Recall
     recall_corrective: CorrectiveRecall
     index_project: IndexProject
@@ -480,6 +484,13 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             input_schema=_schema({}),
             build_params=_params_no,
             invoke=_bind(uc.mcp_ping, _params_no),
+            # MCP 2025-06-18 outputSchema — first BASIC tool migrated
+            # as proof-of-pattern. Hosts validate structuredContent
+            # against this; agents can rely on the field shapes.
+            output_schema=dataclass_to_json_schema(__import__(
+                "mcp_phone_controll.domain.usecases.mcp_ping",
+                fromlist=["McpPingResult"],
+            ).McpPingResult),
         ),
         ToolDescriptor(
             name="set_agent_profile",
@@ -1765,6 +1776,37 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             invoke=_bind(uc.find_flutter_widget, _params_find_flutter_widget),
         ),
         ToolDescriptor(
+            name="list_missing_widget_keys",
+            description=(
+                "Scan lib/ for tap-target widgets (Buttons, GestureDetector, "
+                "InkWell, Switch, Checkbox, etc.) that lack a `key:` "
+                "parameter. The single highest-leverage diagnostic for "
+                "agents driving Flutter via Patrol or tap_text — selectors "
+                "without Keys are the dominant source of test fragility "
+                "(Drizz May 2026: 30-50% of Flutter QA time is selector "
+                "maintenance). Returns file paths, line numbers, snippets."
+            ),
+            input_schema=_schema(
+                {
+                    "project_path": _string(""),
+                    "target_widgets": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": (
+                            "Override the default tap-target widget set. "
+                            "Useful for codebases using custom button types."
+                        ),
+                    },
+                    "max_results": _int("Default 200."),
+                },
+                ["project_path"],
+            ),
+            build_params=_params_list_missing_widget_keys,
+            invoke=_bind(
+                uc.list_missing_widget_keys, _params_list_missing_widget_keys
+            ),
+        ),
+        ToolDescriptor(
             name="recall",
             description=(
                 "Retrieve top-k chunks matching a query (skill, docs, code, "
@@ -2117,6 +2159,24 @@ class ToolDispatcher:
         return name in self._by_name
 
     async def dispatch(self, name: str, args: JsonDict | None) -> JsonDict:
+        # Structured-log every dispatch. Two records per call:
+        #   tool_dispatch_start  — pid + tool + arg key names
+        #   tool_dispatch_end    — pid + tool + duration_ms + ok + error_code
+        # Driven by `observability.emit` (MCP_LOG_FORMAT=json for ingest;
+        # text default; MCP_QUIET=1 disables in tests). The fields are
+        # stable enough to grep / aggregate / alert on.
+        import time as _time
+
+        from ..observability import emit as _emit
+
+        arg_keys = sorted(args.keys()) if isinstance(args, dict) else []
+        _emit(
+            "tool_dispatch_start",
+            tool=name,
+            arg_keys=arg_keys,
+        )
+        started = _time.monotonic()
+
         # 1. Pre-dispatch hooks in order. Any may short-circuit.
         for idx, mw in enumerate(self._middlewares):
             guard = await mw.pre_dispatch(name, args)
@@ -2127,6 +2187,7 @@ class ToolDispatcher:
                 # so trace + seatbelt see the rejection envelope too.
                 for prev in reversed(self._middlewares[: idx + 1]):
                     envelope = await prev.post_dispatch(name, args, envelope)
+                self._emit_end(name, started, envelope, short_circuited=True)
                 return envelope
 
         # 2. Invoke the use case.
@@ -2135,7 +2196,43 @@ class ToolDispatcher:
         # 3. Post-dispatch in reverse order (LIFO so wrappers compose).
         for mw in reversed(self._middlewares):
             envelope = await mw.post_dispatch(name, args, envelope)
+
+        self._emit_end(name, started, envelope, short_circuited=False)
         return envelope
+
+    @staticmethod
+    def _emit_end(
+        name: str,
+        started_monotonic: float,
+        envelope: JsonDict,
+        short_circuited: bool,
+    ) -> None:
+        import time as _time
+
+        from ..observability import emit as _emit
+
+        duration_ms = int((_time.monotonic() - started_monotonic) * 1000)
+        ok_flag = bool(envelope.get("ok", False))
+        fields: dict[str, Any] = {
+            "tool": name,
+            "duration_ms": duration_ms,
+            "ok": ok_flag,
+            "short_circuited": short_circuited,
+        }
+        if not ok_flag:
+            err = envelope.get("error") or {}
+            if isinstance(err, dict):
+                if "code" in err:
+                    fields["error_code"] = err["code"]
+                if "next_action" in err:
+                    fields["next_action"] = err["next_action"]
+        # Level: warn on error, info on success. Hot paths can grep
+        # `level=warn` for failed dispatches.
+        _emit(
+            "tool_dispatch_end",
+            level="warn" if not ok_flag else "info",
+            **fields,
+        )
 
     async def _dispatch_unrecorded(
         self, name: str, args: JsonDict | None

@@ -52,6 +52,11 @@ class ToolDescriptor:
     destructive: bool | None = None
     idempotent: bool | None = None
     open_world: bool | None = None
+    # MCP 2025-06-18 `outputSchema`. When set, the host can validate
+    # `structuredContent` field of the response. Rollout is per-tier:
+    # BASIC tools first, then expert. See dataclass_to_json_schema()
+    # below for the helper that produces this from a Result dataclass.
+    output_schema: JsonDict | None = None
 
 
 # ---- schema helpers ----------------------------------------------------
@@ -238,3 +243,124 @@ def default_annotations(tool_name: str) -> dict[str, bool]:
 def _params_no(_: JsonDict) -> NoParams:
     """Builder for tools that take no arguments."""
     return NoParams()
+
+
+def dataclass_to_json_schema(cls: type) -> JsonDict:
+    """Best-effort JSON Schema from a dataclass type for MCP outputSchema.
+
+    Supports the dataclass shapes our use-case Result types actually
+    use:
+      - primitives: str, int, float, bool
+      - pathlib.Path → "string"
+      - list[T], tuple[T, ...] → array of T
+      - dict[str, Any] → "object" (no inner schema)
+      - Optional[T] (T | None) → union with null
+      - nested dataclasses → recursive object
+      - enums → string with enum values
+
+    Anything we can't classify becomes `{"type": "any"}` (i.e. unconstrained).
+    The schema is intentionally loose — it's advisory for the host, not
+    a strict gate; our envelope already does runtime validation.
+
+    Usage:
+        ToolDescriptor(
+            ...,
+            output_schema=dataclass_to_json_schema(NotifyWebhookResult),
+        )
+
+    See:
+      - https://modelcontextprotocol.io/specification/2025-06-18/server/tools
+      - https://json-schema.org/understanding-json-schema/reference/object
+    """
+    import dataclasses
+    import enum
+    import types
+    import typing
+    from pathlib import Path as _Path
+
+    def _type_to_schema(t: Any) -> JsonDict:
+        # Handle Optional[T] / T | None — collapse to oneOf or wrap with null
+        origin = typing.get_origin(t)
+        args = typing.get_args(t)
+
+        # Python 3.10+ `X | None` is types.UnionType; typing.Optional is
+        # typing.Union. Treat both the same way.
+        if origin in (typing.Union, types.UnionType):
+            non_none = [a for a in args if a is not type(None)]
+            if len(non_none) == 1:
+                inner = _type_to_schema(non_none[0])
+                # Allow null too — common for "optional result" patterns.
+                if "type" in inner and isinstance(inner["type"], str):
+                    return {**inner, "type": [inner["type"], "null"]}
+                return inner
+            return {"oneOf": [_type_to_schema(a) for a in non_none]}
+
+        # list[T] / tuple[T, ...]
+        if origin in (list, tuple):
+            if args:
+                return {"type": "array", "items": _type_to_schema(args[0])}
+            return {"type": "array"}
+        # Bare `list` / `tuple` (no subscript).
+        if t is list or t is tuple:
+            return {"type": "array"}
+
+        # dict[str, V]
+        if origin is dict:
+            return {"type": "object"}
+        # Bare `dict` (no subscript).
+        if t is dict:
+            return {"type": "object"}
+
+        # Primitives + standard library mappings.
+        if t is str or t is _Path:
+            return {"type": "string"}
+        if t is bool:
+            return {"type": "boolean"}
+        if t is int:
+            return {"type": "integer"}
+        if t is float:
+            return {"type": "number"}
+        if t is type(None):
+            return {"type": "null"}
+
+        # Enum → string with enum values.
+        if isinstance(t, type) and issubclass(t, enum.Enum):
+            return {
+                "type": "string",
+                "enum": [e.value if isinstance(e.value, str) else e.name for e in t],
+            }
+
+        # Nested dataclass → recurse.
+        if dataclasses.is_dataclass(t):
+            return dataclass_to_json_schema(t)
+
+        # Fallback: anything goes.
+        return {}
+
+    if not dataclasses.is_dataclass(cls):
+        return {}
+
+    fields = dataclasses.fields(cls)
+    # `get_type_hints` resolves forward refs but fails for types defined
+    # in non-module scopes (e.g. test fixtures inside functions). Fall
+    # back to raw `f.type` strings in that case — schema becomes
+    # advisory `{}` for those fields rather than crashing.
+    try:
+        type_hints = typing.get_type_hints(cls)
+    except (NameError, AttributeError):
+        type_hints = {}
+    properties: JsonDict = {}
+    required: list[str] = []
+    for f in fields:
+        ftype = type_hints.get(f.name, Any)
+        properties[f.name] = _type_to_schema(ftype)
+        # A field is required if it has no default — the dataclass
+        # default sentinel is MISSING.
+        if f.default is dataclasses.MISSING and f.default_factory is dataclasses.MISSING:
+            required.append(f.name)
+    return {
+        "type": "object",
+        "properties": properties,
+        "required": required,
+        "additionalProperties": False,
+    }

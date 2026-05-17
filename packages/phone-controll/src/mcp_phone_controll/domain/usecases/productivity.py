@@ -472,3 +472,182 @@ class FindFlutterWidget(
                 truncated=truncated,
             )
         )
+
+
+# ---- list_missing_widget_keys ------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class ListMissingWidgetKeysParams:
+    project_path: Path
+    # Tap-target widgets that the agent's `tap_text` / Patrol selectors
+    # need keys to address reliably. Override with a custom set if your
+    # codebase uses unusual button widgets.
+    target_widgets: tuple[str, ...] = (
+        "ElevatedButton",
+        "TextButton",
+        "OutlinedButton",
+        "IconButton",
+        "FilledButton",
+        "FloatingActionButton",
+        "GestureDetector",
+        "InkWell",
+        "Switch",
+        "Checkbox",
+    )
+    max_results: int = 200
+
+
+@dataclass(frozen=True, slots=True)
+class WidgetMissingKey:
+    widget: str
+    path: str
+    line_no: int
+    snippet: str  # 1-line snippet showing the construction
+
+
+@dataclass(frozen=True, slots=True)
+class ListMissingWidgetKeysResult:
+    findings: tuple[WidgetMissingKey, ...]
+    files_scanned: int
+    truncated: bool
+    rationale: str  # human-friendly summary the agent can echo
+
+
+_KEY_HINT_RE = re.compile(r"\bkey\s*:")
+
+
+class ListMissingWidgetKeys(
+    BaseUseCase[ListMissingWidgetKeysParams, ListMissingWidgetKeysResult]
+):
+    """Scan `lib/` for tap-target widgets that lack a `key:` parameter.
+
+    The highest-leverage diagnostic for agents driving Flutter apps via
+    Patrol or `tap_text`: selectors are the single biggest source of
+    test fragility (Drizz, May 2026: "30-50% of QA time spent on
+    selector maintenance"). A button without a Key forces the agent to
+    fall back to text-based or coordinate-based selectors — both
+    locale-fragile and screen-size-fragile.
+
+    Heuristic, not a parser: we look for `<TargetWidget>(` constructions
+    and check whether `key:` appears within the next ~5 lines (rough
+    proxy for "in the constructor's argument list"). False-positive
+    rate is acceptable because the cost of a false positive is "look
+    at one extra widget that's already keyed" — much smaller than
+    missing a real un-keyed button.
+
+    Returns up to `max_results` findings. For very large projects
+    consider running with a tighter `target_widgets` filter.
+    """
+
+    async def execute(
+        self, params: ListMissingWidgetKeysParams
+    ) -> Result[ListMissingWidgetKeysResult]:
+        project = Path(params.project_path).expanduser()
+        lib = project / "lib"
+        if not lib.is_dir():
+            return err(
+                FilesystemFailure(
+                    message="lib/ not found in project",
+                    next_action="check_path",
+                )
+            )
+        # Pre-compile constructor patterns. Match `<Widget>(` either at
+        # start of line (after whitespace) or after `return ` / `child:`.
+        construction_re = re.compile(
+            r"\b(" + "|".join(map(re.escape, params.target_widgets)) + r")\s*\("
+        )
+        findings: list[WidgetMissingKey] = []
+        files_scanned = 0
+        truncated = False
+        for dart_file in sorted(lib.rglob("*.dart")):
+            try:
+                lines = dart_file.read_text(errors="replace").splitlines()
+            except OSError:
+                continue
+            files_scanned += 1
+            for idx, line in enumerate(lines):
+                m = construction_re.search(line)
+                if not m:
+                    continue
+                widget = m.group(1)
+                # Walk forward tracking paren depth to find THIS
+                # constructor's closing `)`. Search for `key:` only
+                # within those bounds — avoids matching a sibling
+                # widget's key on adjacent lines. Cap at 30 lines so
+                # a malformed file can't make us loop forever.
+                start_col = m.end() - 1  # position of the `(`
+                depth = 0
+                end_line = idx
+                end_col = start_col
+                found_end = False
+                for j in range(idx, min(idx + 30, len(lines))):
+                    scan = lines[j][(start_col + 1) if j == idx else 0:]
+                    for k, ch in enumerate(scan):
+                        if ch == "(":
+                            depth += 1
+                        elif ch == ")":
+                            if depth == 0:
+                                end_line = j
+                                end_col = (start_col + 1 if j == idx else 0) + k
+                                found_end = True
+                                break
+                            depth -= 1
+                    if found_end:
+                        break
+                if found_end:
+                    if end_line == idx:
+                        window = lines[idx][start_col + 1 : end_col]
+                    else:
+                        first = lines[idx][start_col + 1:]
+                        middle = "\n".join(lines[idx + 1 : end_line])
+                        last = lines[end_line][:end_col]
+                        window = first + "\n" + middle + "\n" + last
+                else:
+                    # No matching `)` within 30 lines — fall back to
+                    # the original 6-line peek as a best-effort.
+                    window = "\n".join(lines[idx : idx + 6])
+                if _KEY_HINT_RE.search(window):
+                    continue
+                findings.append(
+                    WidgetMissingKey(
+                        widget=widget,
+                        path=str(dart_file.relative_to(project)),
+                        line_no=idx + 1,
+                        snippet=line.strip()[:160],
+                    )
+                )
+                if len(findings) >= params.max_results:
+                    truncated = True
+                    break
+            if truncated:
+                break
+
+        if findings:
+            by_widget: dict[str, int] = {}
+            for f in findings:
+                by_widget[f.widget] = by_widget.get(f.widget, 0) + 1
+            top = sorted(by_widget.items(), key=lambda kv: -kv[1])[:5]
+            rationale = (
+                f"Found {len(findings)} tap-target widget(s) without `key:` "
+                f"across {files_scanned} dart file(s). Most common: "
+                + ", ".join(f"{n} {w}" for w, n in top)
+                + ". Add Keys to make Patrol / tap_text selectors locale- and "
+                "screen-size-independent. Drizz May 2026: 30-50% of Flutter "
+                "QA time is selector maintenance — keys are the fix."
+            )
+        else:
+            rationale = (
+                f"All {files_scanned} dart file(s) under lib/ have keys on "
+                f"the {len(params.target_widgets)} tap-target widget types "
+                "we scanned. Patrol / tap_text selectors should be stable."
+            )
+
+        return ok(
+            ListMissingWidgetKeysResult(
+                findings=tuple(findings),
+                files_scanned=files_scanned,
+                truncated=truncated,
+                rationale=rationale,
+            )
+        )

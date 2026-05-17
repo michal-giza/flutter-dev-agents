@@ -103,6 +103,7 @@ from ...domain.usecases.preparation import PrepareForTestParams
 from ...domain.usecases.productivity import (
     FindFlutterWidgetParams,
     GrepLogsParams,
+    ListMissingWidgetKeysParams,
     RunQuickCheckParams,
     ScaffoldFeatureParams,
     SummarizeSessionParams,
@@ -432,6 +433,28 @@ def _params_find_flutter_widget(args: JsonDict) -> FindFlutterWidgetParams:
         project_path=Path(args["project_path"]).expanduser(),
         name_pattern=args.get("name_pattern", ".*"),
         max_results=int(args.get("max_results", 50)),
+    )
+
+
+def _params_list_missing_widget_keys(
+    args: JsonDict,
+) -> ListMissingWidgetKeysParams:
+    target = args.get("target_widgets")
+    return ListMissingWidgetKeysParams(
+        project_path=Path(args["project_path"]).expanduser(),
+        target_widgets=tuple(target) if target else (
+            "ElevatedButton",
+            "TextButton",
+            "OutlinedButton",
+            "IconButton",
+            "FilledButton",
+            "FloatingActionButton",
+            "GestureDetector",
+            "InkWell",
+            "Switch",
+            "Checkbox",
+        ),
+        max_results=int(args.get("max_results", 200)),
     )
 
 

@@ -1256,6 +1256,39 @@
       "idempotentHint": true,
       "readOnlyHint": true
     },
+    "description": "Scan lib/ for tap-target widgets (Buttons, GestureDetector, InkWell, Switch, Checkbox, etc.) that lack a `key:` parameter. The single highest-leverage diagnostic for agents driving Flutter via Patrol or tap_text \u2014 selectors without Keys are the dominant source of test fragility (Drizz May 2026: 30-50% of Flutter QA time is selector maintenance). Returns file paths, line numbers, snippets.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "max_results": {
+          "description": "Default 200.",
+          "type": "integer"
+        },
+        "project_path": {
+          "description": "",
+          "type": "string"
+        },
+        "target_widgets": {
+          "description": "Override the default tap-target widget set. Useful for codebases using custom button types.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "project_path"
+      ],
+      "type": "object"
+    },
+    "name": "list_missing_widget_keys"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
     "description": "PREFERRED for Flutter. Discover Patrol-style integration test files under `integration_test/` (any *_test.dart). Returns paths Claude can feed into run_patrol_test.",
     "inputSchema": {
       "additionalProperties": false,
