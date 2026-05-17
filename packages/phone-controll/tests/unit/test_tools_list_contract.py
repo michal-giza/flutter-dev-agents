@@ -30,8 +30,14 @@ from mcp_phone_controll.presentation.descriptors._shared import (
     default_annotations,
 )
 
+# tests/unit/test_tools_list_contract.py → repo-root via parents[4]:
+#   parents[0] = tests/unit
+#   parents[1] = tests
+#   parents[2] = packages/phone-controll
+#   parents[3] = packages
+#   parents[4] = REPO ROOT
 SNAPSHOT_PATH = (
-    Path(__file__).resolve().parents[3] / "docs" / "tools-contract.json"
+    Path(__file__).resolve().parents[4] / "docs" / "tools-contract.json"
 )
 
 

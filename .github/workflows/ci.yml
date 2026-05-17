@@ -35,3 +35,67 @@ jobs:
           export PATH="$HOME/.local/bin:$PATH"
           cd packages/${{ matrix.package }}
           .venv/bin/ruff check src tests
+
+  security:
+    name: Security audit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Set up Python 3.11 + project
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          cd packages/phone-controll
+          uv venv --python 3.11
+          uv pip install -e ".[dev]" pip-audit cyclonedx-bom
+
+      # ----- CVE scan -----
+      # pip-audit hits the OSV.dev + PyPI vulnerability databases.
+      # `--skip-editable` excludes our own package (which isn't on
+      # PyPI yet). Exit code is non-zero IFF there's at least one
+      # un-ignored vulnerability, which is what we want CI to fail on.
+      #
+      # Excluded vulns (document rationale here; review quarterly):
+      # - PYSEC-2022-42969 (`py` 1.11.0): the `py` package is
+      #   abandoned upstream with no fix release. We pull it via a
+      #   transitive of a transitive (`pytest-forked` -> `py`). The
+      #   vulnerability is a ReDoS in `py.path.svnurl` which we
+      #   don't use. Re-evaluate when `py` is removed from our tree.
+      - name: pip-audit (CVE scan)
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          cd packages/phone-controll
+          .venv/bin/pip-audit \
+            --progress-spinner=off \
+            --skip-editable \
+            --ignore-vuln PYSEC-2022-42969
+
+      # ----- SBOM generation -----
+      # CycloneDX is the standard SBOM format procurement teams expect.
+      # We emit JSON to artifacts; release workflow uploads it alongside
+      # the wheel.
+      - name: Generate SBOM (CycloneDX)
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          cd packages/phone-controll
+          .venv/bin/cyclonedx-py environment .venv --of JSON -o /tmp/sbom.json
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-cyclonedx-${{ github.sha }}
+          path: /tmp/sbom.json
+          retention-days: 90
+
+      # ----- Secret scan -----
+      # gitleaks catches AWS keys, GitHub tokens, GCP service-account JSON
+      # accidentally committed. Runs against the full history on push to
+      # main; against the diff on PRs.
+      - name: Secret scan (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
