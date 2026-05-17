@@ -47,9 +47,11 @@ def create_app(dispatcher=None, *, allow_agent_proxy: bool = True):
 
         _, dispatcher = build_runtime()
 
+    from .. import __version__ as _pkg_version
+
     app = FastAPI(
         title="mcp-phone-controll HTTP adapter",
-        version="0.1.0",
+        version=_pkg_version,
         description=(
             "OpenAI-compat function-calling surface for the mcp-phone-controll "
             "MCP server. Use with any local LLM (Ollama, vLLM, LM Studio, "

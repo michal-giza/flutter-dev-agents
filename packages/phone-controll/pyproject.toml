@@ -32,11 +32,6 @@ classifiers = [
     "Topic :: Software Development :: Testing",
 ]
 
-[project.urls]
-Homepage = "https://github.com/michal-giza/flutter-dev-agents"
-Repository = "https://github.com/michal-giza/flutter-dev-agents"
-Issues = "https://github.com/michal-giza/flutter-dev-agents/issues"
-Changelog = "https://github.com/michal-giza/flutter-dev-agents/blob/main/CHANGELOG.md"
 dependencies = [
     "mcp>=1.2.0",
     "uiautomator2>=3.2.0",
@@ -56,6 +51,12 @@ dependencies = [
     # without this pin gets the vulnerable 2.6.3.
     "urllib3>=2.7.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/michal-giza/flutter-dev-agents"
+Repository = "https://github.com/michal-giza/flutter-dev-agents"
+Issues = "https://github.com/michal-giza/flutter-dev-agents/issues"
+Changelog = "https://github.com/michal-giza/flutter-dev-agents/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 dev = [
@@ -96,6 +97,7 @@ rag = [
 [project.scripts]
 mcp-phone-controll = "mcp_phone_controll.__main__:main"
 mcp-phone-controll-http = "mcp_phone_controll.adapters.__main__:main"
+phone-controll = "mcp_phone_controll.cli:main"
 
 [build-system]
 requires = ["hatchling"]

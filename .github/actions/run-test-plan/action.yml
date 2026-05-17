@@ -1,0 +1,153 @@
+name: 'flutter-dev-agents · run-test-plan'
+description: >
+  Run an autonomous mobile-test plan (YAML) via mcp-phone-controll against
+  an attached Android device or emulator. Drop into any GitHub Actions
+  workflow that has a flutter project + adb on PATH.
+
+branding:
+  icon: 'smartphone'
+  color: 'orange'
+
+inputs:
+  plan:
+    description: |
+      Path to the test plan YAML (relative to the workspace) OR the YAML
+      content inline. Inline must start with `apiVersion:`.
+    required: true
+  device-serial:
+    description: |
+      adb serial of the target device. If empty, the action picks the
+      first booted Android device/emulator.
+    required: false
+    default: ''
+  project-path:
+    description: |
+      Path to the Flutter project under test. Defaults to the workspace
+      root (good for monorepo CI where the workflow lives at the project
+      level).
+    required: false
+    default: '.'
+  python-version:
+    description: 'Python version to install mcp-phone-controll under.'
+    required: false
+    default: '3.11'
+  extras:
+    description: |
+      Comma-separated pip extras to install. Default `[dev,ar,http]`
+      covers the standard test loop. Add `ios` if you target iOS.
+    required: false
+    default: 'dev,ar,http'
+
+outputs:
+  envelope:
+    description: |
+      JSON envelope returned by `run_test_plan`. Includes ok/data/error
+      so downstream steps can branch on the verdict.
+    value: ${{ steps.run.outputs.envelope }}
+  passed:
+    description: '"true" if the plan succeeded (ok=true), else "false".'
+    value: ${{ steps.run.outputs.passed }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install uv + mcp-phone-controll
+      shell: bash
+      run: |
+        if ! command -v uv >/dev/null 2>&1; then
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          export PATH="$HOME/.local/bin:$PATH"
+        fi
+        # Build a scratch venv for the action — keeps the consumer's
+        # toolchain unaffected.
+        SCRATCH=$(mktemp -d)
+        echo "MCP_VENV=$SCRATCH" >> $GITHUB_ENV
+        cd "$SCRATCH"
+        uv venv --python ${{ inputs.python-version }}
+        # Install from the repo. When this action is consumed from
+        # elsewhere, the calling workflow has flutter-dev-agents
+        # checked out — install from there.
+        uv pip install -e "$GITHUB_ACTION_PATH/../../../packages/phone-controll[${{ inputs.extras }}]"
+
+    - name: Pick device (if not supplied)
+      id: pick
+      shell: bash
+      run: |
+        if [ -z "${{ inputs.device-serial }}" ]; then
+          SERIAL=$(adb devices | awk '/\tdevice$/ {print $1; exit}')
+          if [ -z "$SERIAL" ]; then
+            echo "::error::no booted Android device — boot an emulator first or pass device-serial"
+            exit 1
+          fi
+          echo "serial=$SERIAL" >> $GITHUB_OUTPUT
+          echo "Picked device: $SERIAL"
+        else
+          echo "serial=${{ inputs.device-serial }}" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Run plan via MCP
+      id: run
+      shell: bash
+      run: |
+        export PATH="$MCP_VENV/.venv/bin:$PATH"
+        cd "$MCP_VENV"
+        PLAN_INPUT="${{ inputs.plan }}"
+        if [ -f "$GITHUB_WORKSPACE/$PLAN_INPUT" ]; then
+          PLAN_ARG="--plan-path=$GITHUB_WORKSPACE/$PLAN_INPUT"
+        elif [[ "$PLAN_INPUT" == apiVersion:* ]]; then
+          # Inline YAML — write to a temp file.
+          TMP_PLAN=$(mktemp --suffix=.yaml)
+          echo "$PLAN_INPUT" > "$TMP_PLAN"
+          PLAN_ARG="--plan-path=$TMP_PLAN"
+        else
+          echo "::error::plan input is neither a file path nor inline YAML"
+          exit 1
+        fi
+
+        # Drive the dispatcher via python — no HTTP server needed for CI.
+        python3 - <<PY > /tmp/envelope.json
+        import asyncio, json, os, sys
+        from mcp_phone_controll.container import build_runtime
+
+        async def main():
+            _, d = build_runtime()
+            # 1. Select the device.
+            sel = await d.dispatch("select_device", {
+                "serial": "${{ steps.pick.outputs.serial }}",
+                "force": True,
+                "note": "GitHub Action: flutter-dev-agents/run-test-plan"
+            })
+            if not sel.get("ok"):
+                print(json.dumps(sel)); sys.exit(1)
+            try:
+                # 2. Run the plan.
+                env = await d.dispatch("run_test_plan", {
+                    "plan_path": "$( [ -n "$TMP_PLAN" ] && echo "$TMP_PLAN" || echo "$GITHUB_WORKSPACE/$PLAN_INPUT" )"
+                })
+                print(json.dumps(env))
+            finally:
+                # 3. Always release.
+                await d.dispatch("release_device", {})
+        asyncio.run(main())
+        PY
+
+        ENVELOPE=$(cat /tmp/envelope.json)
+        # GitHub Actions outputs need to escape newlines.
+        echo "envelope<<__EOF__" >> $GITHUB_OUTPUT
+        echo "$ENVELOPE" >> $GITHUB_OUTPUT
+        echo "__EOF__" >> $GITHUB_OUTPUT
+        PASSED=$(echo "$ENVELOPE" | python3 -c 'import json,sys; print("true" if json.load(sys.stdin).get("ok") else "false")')
+        echo "passed=$PASSED" >> $GITHUB_OUTPUT
+        # Mirror to job summary so reviewers can see it without
+        # digging through logs.
+        {
+          echo "## flutter-dev-agents test-plan result"
+          echo ""
+          echo "**passed**: \`$PASSED\`"
+          echo ""
+          echo '```json'
+          echo "$ENVELOPE" | python3 -m json.tool || echo "$ENVELOPE"
+          echo '```'
+        } >> $GITHUB_STEP_SUMMARY
+
+        if [ "$PASSED" != "true" ]; then exit 1; fi
