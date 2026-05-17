@@ -155,7 +155,10 @@ from ...domain.usecases.vision_advanced import (
     SaveGoldenImageParams,
     WaitForArSessionReadyParams,
 )
-from ...domain.usecases.wda_setup import SetupWebDriverAgentParams
+from ...domain.usecases.wda_setup import (
+    SetupWebDriverAgentParams,
+    StartWdaOnSimulatorParams,
+)
 from ._shared import JsonDict, _path
 
 # ---- devices ------------------------------------------------------------
@@ -903,4 +906,16 @@ def _params_setup_wda(args: JsonDict) -> SetupWebDriverAgentParams:
         repo_url=args.get("repo_url", "https://github.com/appium/WebDriverAgent.git"),
         scheme=args.get("scheme", "WebDriverAgentRunner"),
         skip_if_built=bool(args.get("skip_if_built", True)),
+    )
+
+
+def _params_start_wda_on_simulator(
+    args: JsonDict,
+) -> StartWdaOnSimulatorParams:
+    return StartWdaOnSimulatorParams(
+        udid=args["udid"],
+        port=int(args.get("port", 8100)),
+        wda_dir=Path(args["wda_dir"]).expanduser() if args.get("wda_dir") else None,
+        scheme=args.get("scheme", "WebDriverAgentRunner"),
+        ready_timeout_s=float(args.get("ready_timeout_s", 60.0)),
     )

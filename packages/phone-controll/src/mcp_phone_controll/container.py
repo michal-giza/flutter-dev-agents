@@ -194,7 +194,7 @@ from .domain.usecases.vision_advanced import (
     SaveGoldenImage,
     WaitForArSessionReady,
 )
-from .domain.usecases.wda_setup import SetupWebDriverAgent
+from .domain.usecases.wda_setup import SetupWebDriverAgent, StartWdaOnSimulator
 from .infrastructure.adb_client import AdbClient
 from .infrastructure.android_emulator_cli import AndroidEmulatorCli
 from .infrastructure.dart_cli import DartCli, FlutterPubCli
@@ -559,6 +559,7 @@ def build_runtime(
         write_vscode_launch_config=WriteVscodeLaunchConfig(),
         # WDA setup
         setup_webdriveragent=SetupWebDriverAgent(wda_setup_cli),
+        start_wda_on_simulator=StartWdaOnSimulator(wda_setup_cli),
         # Code quality
         dart_analyze=DartAnalyze(quality_repo),
         dart_format=DartFormat(quality_repo),

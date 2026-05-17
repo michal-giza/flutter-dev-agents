@@ -10,10 +10,21 @@ Codifies the manual recipe the user discovered for tap-driven iOS testing:
 This use case is long-running (minutes) — `xcodebuild build-for-testing`
 compiles the runner and signs it for the target device. The agent should
 expect to wait, not poll prematurely.
+
+Sibling use case `StartWdaOnSimulator` (below) handles the SIMULATOR
+side: kicks off `xcodebuild test-without-building` against a sim
+destination, polls the WDA port for reachability, returns when WDA
+is up. Closes the loop opened by K1: K1 detects WDA-not-running with
+`WdaUnreachable(next_action="start_wda_on_simulator")`; this tool is
+what the agent calls to satisfy that next_action.
 """
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
+import socket
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -144,3 +155,205 @@ class SetupWebDriverAgent(BaseUseCase[SetupWebDriverAgentParams, WdaBuildResult]
                 xcodebuild_stderr=build_res.stderr[-2000:] if build_res.stderr else "",
             )
         )
+
+
+# ---- start_wda_on_simulator -------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class StartWdaOnSimulatorParams:
+    udid: str
+    port: int = 8100
+    wda_dir: Path | None = None  # defaults to ~/.mcp_phone_controll/WebDriverAgent
+    scheme: str = "WebDriverAgentRunner"
+    ready_timeout_s: float = 60.0  # how long to wait for the WDA port
+
+
+@dataclass(frozen=True, slots=True)
+class StartWdaOnSimulatorResult:
+    udid: str
+    port: int
+    pid: int
+    ready: bool
+    elapsed_s: float
+    wda_dir: str
+
+
+class StartWdaOnSimulator(BaseUseCase[
+    StartWdaOnSimulatorParams, StartWdaOnSimulatorResult
+]):
+    """Spawn `xcodebuild test-without-building` against a sim, wait for
+    WDA to listen on `port`, return.
+
+    The xcodebuild process is detached: it keeps running after this use
+    case returns. Killing it cleanly is left to the agent / lifecycle
+    layer — typically `pkill -f "test-without-building.*UDID"` or just
+    quitting the simulator.
+
+    On success: WDA is reachable on `127.0.0.1:port`, the K1 WDA factory
+    will route to it, every subsequent tap/swipe just works.
+
+    On timeout: kills the spawned xcodebuild, returns a structured
+    failure with `next_action="setup_webdriveragent"` if the build
+    isn't on disk yet.
+    """
+
+    def __init__(self, wda_setup_cli) -> None:
+        # We don't actually use the CLI wrapper here — we spawn directly
+        # so we can detach — but accepting it keeps wiring symmetric
+        # with `SetupWebDriverAgent` for testability + DI.
+        self._cli = wda_setup_cli
+
+    async def execute(
+        self, params: StartWdaOnSimulatorParams
+    ) -> Result[StartWdaOnSimulatorResult]:
+        if not params.udid:
+            return err(
+                InvalidArgumentFailure(
+                    message="udid is required",
+                    next_action="fix_arguments",
+                )
+            )
+
+        wda_dir = params.wda_dir or (
+            Path.home() / ".mcp_phone_controll" / "WebDriverAgent"
+        )
+        if not wda_dir.exists():
+            return err(
+                FlutterCliFailure(
+                    message=(
+                        f"WebDriverAgent not found at {wda_dir} — run "
+                        "setup_webdriveragent first to clone + build it."
+                    ),
+                    next_action="setup_webdriveragent",
+                    details={"udid": params.udid, "wda_dir": str(wda_dir)},
+                )
+            )
+        proj = wda_dir / "WebDriverAgent.xcodeproj"
+        if not proj.exists():
+            return err(
+                FlutterCliFailure(
+                    message=f"missing {proj} — wda_dir doesn't look like a WDA checkout",
+                    next_action="setup_webdriveragent",
+                    details={"wda_dir": str(wda_dir)},
+                )
+            )
+
+        # Fast path: WDA already listening (e.g. user started it
+        # manually in another terminal). Return success without
+        # spawning anything.
+        if _port_open("127.0.0.1", params.port):
+            return ok(
+                StartWdaOnSimulatorResult(
+                    udid=params.udid,
+                    port=params.port,
+                    pid=0,
+                    ready=True,
+                    elapsed_s=0.0,
+                    wda_dir=str(wda_dir),
+                )
+            )
+
+        # Spawn xcodebuild detached. We don't await — the process should
+        # outlive this use case. stdout/stderr → DEVNULL so it doesn't
+        # fill our pipe buffers and block.
+        loop = asyncio.get_event_loop()
+        started = loop.time()
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "xcodebuild",
+                "test-without-building",
+                "-project",
+                "WebDriverAgent.xcodeproj",
+                "-scheme",
+                params.scheme,
+                "-destination",
+                f"platform=iOS Simulator,id={params.udid}",
+                f"USE_PORT={params.port}",
+                cwd=str(wda_dir),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+                start_new_session=True,  # detach from our process group
+            )
+        except FileNotFoundError:
+            return err(
+                FlutterCliFailure(
+                    message="xcodebuild not found on PATH",
+                    next_action="install_xcode_command_line_tools",
+                    details={"hint": "xcode-select --install"},
+                )
+            )
+
+        # Poll the port until ready or timeout.
+        deadline = started + params.ready_timeout_s
+        ready = False
+        while loop.time() < deadline:
+            if _port_open("127.0.0.1", params.port):
+                ready = True
+                break
+            await asyncio.sleep(0.5)
+            # If xcodebuild itself died (e.g. build error), bail early
+            # with whatever it told us.
+            if proc.returncode is not None:
+                return err(
+                    FlutterCliFailure(
+                        message=(
+                            "xcodebuild test-without-building exited before "
+                            f"WDA came up (returncode={proc.returncode})"
+                        ),
+                        next_action="check_xcode_signing",
+                        details={
+                            "udid": params.udid,
+                            "wda_dir": str(wda_dir),
+                            "hint": (
+                                "run `xcodebuild test-without-building "
+                                "-project WebDriverAgent.xcodeproj "
+                                f"-scheme {params.scheme} -destination "
+                                f"'platform=iOS Simulator,id={params.udid}' "
+                                f"USE_PORT={params.port}` in a terminal to "
+                                "see the real error"
+                            ),
+                        },
+                    )
+                )
+
+        elapsed = loop.time() - started
+
+        if not ready:
+            # Timeout — try to kill the xcodebuild we spawned.
+            with contextlib.suppress(ProcessLookupError):
+                proc.terminate()
+            return err(
+                FlutterCliFailure(
+                    message=(
+                        f"WDA didn't come up on 127.0.0.1:{params.port} within "
+                        f"{params.ready_timeout_s:.0f}s"
+                    ),
+                    next_action="check_xcode_signing",
+                    details={
+                        "udid": params.udid,
+                        "wda_dir": str(wda_dir),
+                        "elapsed_s": round(elapsed, 1),
+                    },
+                )
+            )
+
+        return ok(
+            StartWdaOnSimulatorResult(
+                udid=params.udid,
+                port=params.port,
+                pid=proc.pid,
+                ready=True,
+                elapsed_s=round(elapsed, 2),
+                wda_dir=str(wda_dir),
+            )
+        )
+
+
+def _port_open(host: str, port: int, timeout: float = 0.5) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False

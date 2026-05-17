@@ -180,6 +180,7 @@ from ..domain.usecases.vision_advanced import (
 )
 from ..domain.usecases.wda_setup import (
     SetupWebDriverAgent,
+    StartWdaOnSimulator,
 )
 
 # ToolDescriptor + schema helpers + all param-builders were extracted to
@@ -261,6 +262,7 @@ from .descriptors._param_builders import (
     _params_start_debug_session,
     _params_start_emulator,
     _params_start_recording,
+    _params_start_wda_on_simulator,
     _params_stop,
     _params_stop_debug_session,
     _params_stop_recording,
@@ -381,6 +383,7 @@ class UseCases:
     write_vscode_launch_config: WriteVscodeLaunchConfig
     # WDA setup
     setup_webdriveragent: SetupWebDriverAgent
+    start_wda_on_simulator: StartWdaOnSimulator
     # Code quality
     dart_analyze: DartAnalyze
     dart_format: DartFormat
@@ -1526,6 +1529,36 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             ),
             build_params=_params_setup_wda,
             invoke=_bind(uc.setup_webdriveragent, _params_setup_wda),
+        ),
+        ToolDescriptor(
+            name="start_wda_on_simulator",
+            description=(
+                "Launch WebDriverAgent against an iOS simulator (detached) "
+                "and wait for it to serve HTTP on `port`. Call this when "
+                "`tap`/`swipe` returned next_action='start_wda_on_simulator'. "
+                "Requires setup_webdriveragent to have run once. Returns "
+                "when ready or fails clearly with the xcodebuild error."
+            ),
+            input_schema=_schema(
+                {
+                    "udid": _string("Simulator UDID (from list_simulators)."),
+                    "port": _int(
+                        "WDA listen port. Default 8100. "
+                        "Override with MCP_IOS_SIM_WDA_PORT for global default."
+                    ),
+                    "wda_dir": _string(
+                        "WebDriverAgent checkout dir. "
+                        "Defaults to ~/.mcp_phone_controll/WebDriverAgent."
+                    ),
+                    "scheme": _string("Default WebDriverAgentRunner."),
+                    "ready_timeout_s": _number(
+                        "How long to wait for WDA to come up. Default 60."
+                    ),
+                },
+                ["udid"],
+            ),
+            build_params=_params_start_wda_on_simulator,
+            invoke=_bind(uc.start_wda_on_simulator, _params_start_wda_on_simulator),
         ),
         # ---- code quality ---------------------------------------------
         ToolDescriptor(

@@ -156,7 +156,10 @@ from mcp_phone_controll.domain.usecases.vision_advanced import (
     SaveGoldenImage,
     WaitForArSessionReady,
 )
-from mcp_phone_controll.domain.usecases.wda_setup import SetupWebDriverAgent
+from mcp_phone_controll.domain.usecases.wda_setup import (
+    SetupWebDriverAgent,
+    StartWdaOnSimulator,
+)
 from mcp_phone_controll.presentation.tool_registry import (
     ToolDispatcher,
     UseCases,
@@ -313,6 +316,7 @@ def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:
         write_vscode_launch_config=WriteVscodeLaunchConfig(),
         # WDA setup
         setup_webdriveragent=SetupWebDriverAgent(FakeWdaSetupCli()),
+        start_wda_on_simulator=StartWdaOnSimulator(FakeWdaSetupCli()),
         # Code quality
         dart_analyze=DartAnalyze(FakeCodeQualityRepository()),
         dart_format=DartFormat(FakeCodeQualityRepository()),
@@ -529,6 +533,7 @@ async def test_registry_covers_all_use_case_fields(tmp_path: Path):
         "is_ide_available",
         "write_vscode_launch_config",
         "setup_webdriveragent",
+        "start_wda_on_simulator",
         "dart_analyze",
         "dart_format",
         "dart_fix",

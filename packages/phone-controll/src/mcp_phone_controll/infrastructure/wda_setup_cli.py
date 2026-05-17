@@ -57,3 +57,44 @@ class WdaSetupCli:
             cwd=wda_dir,
             timeout_s=timeout_s,
         )
+
+    async def test_without_building_for_sim(
+        self,
+        wda_dir: Path,
+        udid: str,
+        port: int = 8100,
+        scheme: str = "WebDriverAgentRunner",
+        timeout_s: float = 60.0,
+    ) -> ProcessResult:
+        """Launch the WDA test runner against an iOS simulator.
+
+        This is the simulator equivalent of `build_for_testing`: it
+        spawns `xcodebuild test-without-building` against a sim
+        destination, which keeps WDA serving HTTP on `USE_PORT` for
+        the lifetime of the xcodebuild process. The caller is expected
+        to leave it running in the background — the timeout here
+        bounds how long we wait for WDA to come up, NOT the full test
+        runner. A reachability poll on the port is the right way to
+        confirm WDA is ready.
+
+        Reported in the field May 2026: agents that detected
+        `WdaUnreachable` on the iPhone 17 sim had no way to actually
+        START WDA from inside the MCP — they'd surface the
+        `xcodebuild …` recipe but the user had to run it manually in
+        a separate terminal. This tool closes that loop.
+        """
+        return await self._runner.run(
+            [
+                "xcodebuild",
+                "test-without-building",
+                "-project",
+                "WebDriverAgent.xcodeproj",
+                "-scheme",
+                scheme,
+                "-destination",
+                f"platform=iOS Simulator,id={udid}",
+                f"USE_PORT={port}",
+            ],
+            cwd=wda_dir,
+            timeout_s=timeout_s,
+        )

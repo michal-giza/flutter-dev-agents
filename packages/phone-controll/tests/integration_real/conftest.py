@@ -46,3 +46,35 @@ def flutter_cli() -> str:
     if not path:
         pytest.skip("flutter SDK not on PATH")
     return path
+
+
+@pytest.fixture(scope="session")
+def adb_cli() -> str:
+    path = shutil.which("adb") or "/opt/homebrew/bin/adb"
+    if not Path(path).exists():
+        pytest.skip("adb not on PATH and not at /opt/homebrew/bin/adb")
+    return path
+
+
+@pytest.fixture(scope="session")
+def real_device_required() -> str:
+    """Skip unless a real Android device or emulator is attached AND
+    `MCP_REAL_DEVICE=1` is set. Returns the device serial."""
+    import subprocess
+
+    if os.environ.get("MCP_REAL_DEVICE") != "1":
+        pytest.skip(
+            "device-attached tests skipped; set MCP_REAL_DEVICE=1 + "
+            "have an Android device or emulator booted",
+            allow_module_level=False,
+        )
+    out = subprocess.run(
+        ["adb", "devices"], capture_output=True, text=True, timeout=10
+    )
+    lines = [
+        line.strip() for line in out.stdout.splitlines()
+        if line.strip() and "\tdevice" in line and not line.startswith("List")
+    ]
+    if not lines:
+        pytest.skip("MCP_REAL_DEVICE=1 set but no devices visible to adb")
+    return lines[0].split("\t")[0]

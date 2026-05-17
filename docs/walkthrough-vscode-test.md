@@ -293,6 +293,56 @@ screenshots, logs, JUnit XML if your plan asked for it. Use
         --cap --max-dim 1600 --max-bytes-kb 250
       ```
 
+6. **iOS sim: `'NoneType' has no attribute 'make_http_connection'`**
+   — fixed in May 2026 (commit `f95401f`). If you still see this,
+   your MCP subprocess is stale. After full quit + relaunch, the
+   error becomes the structured envelope below instead.
+
+7. **iOS sim: `next_action: "start_wda_on_simulator"`** — WDA isn't
+   running against the sim. Three options:
+   1. **One-call fix from the agent** (preferred):
+      ```
+      start_wda_on_simulator(udid="<SIM-UDID>")
+      ```
+      Spawns `xcodebuild test-without-building` detached, polls
+      `127.0.0.1:8100` for reachability, returns when WDA is up.
+      Requires `setup_webdriveragent` to have run once (clones +
+      builds the WDA project on first use).
+   2. **Manual** (if the auto-spawn fails — usually a signing
+      issue):
+      ```bash
+      cd ~/.mcp_phone_controll/WebDriverAgent
+      xcodebuild test-without-building \
+        -project WebDriverAgent.xcodeproj \
+        -scheme WebDriverAgentRunner \
+        -destination "platform=iOS Simulator,id=<SIM-UDID>" \
+        USE_PORT=8100
+      ```
+      Leave it running in a separate terminal.
+   3. **Override the port** if 8100 is taken:
+      ```
+      MCP_IOS_SIM_WDA_PORT=8200 start_wda_on_simulator(udid="…", port=8200)
+      ```
+
+8. **macOS: "would land on UserNotificationCenter, not in allowed
+   applications"** — this is **NOT a phone-controll error**. It's
+   the macOS `computer-use` MCP refusing to click because a system
+   notification banner stole focus invisibly. Diagnose:
+   1. Look for a notification banner in the top-right corner of
+      your screen. Dismiss any pending notifications.
+   2. Re-request access from the agent — `request_access` with the
+      app you actually want to click in, so the focus-stealing
+      check has the right allowlist.
+   3. If the issue is on the iOS simulator specifically, prefer the
+      MCP's `tap(x, y)` over `computer-use: left_click` — it
+      routes through WDA's HTTP API and isn't subject to macOS's
+      foreground-app gate. Combine with #7 above to get WDA
+      running first.
+
+   Documented because the agent's recovery instinct ("just retry
+   the click") doesn't help — the focus-stealing usually persists
+   until the underlying notification is dismissed.
+
 ---
 
 ## See also
