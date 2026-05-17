@@ -1,10 +1,42 @@
 [project]
 name = "mcp-phone-controll"
-version = "0.1.0"
-description = "MCP server for building, deploying and testing Flutter apps on real Android devices"
+version = "0.2.0"
+description = "MCP server for building, deploying and testing Flutter apps on real Android + iOS devices"
 readme = "README.md"
 requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
 authors = [{ name = "Michal Giza", email = "msquaregiza@gmail.com" }]
+keywords = [
+    "mcp",
+    "model-context-protocol",
+    "flutter",
+    "android",
+    "ios",
+    "agent",
+    "patrol",
+    "appium",
+    "claude",
+    "anthropic",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Testing",
+]
+
+[project.urls]
+Homepage = "https://github.com/michal-giza/flutter-dev-agents"
+Repository = "https://github.com/michal-giza/flutter-dev-agents"
+Issues = "https://github.com/michal-giza/flutter-dev-agents/issues"
+Changelog = "https://github.com/michal-giza/flutter-dev-agents/blob/main/CHANGELOG.md"
 dependencies = [
     "mcp>=1.2.0",
     "uiautomator2>=3.2.0",
