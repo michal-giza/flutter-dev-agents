@@ -8,6 +8,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from ..domain.entities import (
+    Device,
+    EnvironmentReport,
+    ProjectInfo,
+    SessionTrace,
+)
 from ..domain.result import Err, Result
 from ..domain.usecases.artifact_retention import (
     CompressPng,
@@ -81,7 +87,7 @@ from ..domain.usecases.lifecycle import (
     LaunchApp,
     StopApp,
 )
-from ..domain.usecases.mcp_ping import McpPing
+from ..domain.usecases.mcp_ping import McpPing, McpPingResult
 from ..domain.usecases.narrate import Narrate
 from ..domain.usecases.notify_webhook import (
     NotifyWebhook,
@@ -121,6 +127,7 @@ from ..domain.usecases.projects import InspectProject
 from ..domain.usecases.recall import (
     IndexProject,
     Recall,
+    RecallChunk,
 )
 from ..domain.usecases.release_screenshot import (
     CaptureReleaseScreenshot,
@@ -444,6 +451,7 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             input_schema=_schema({}),
             build_params=_params_no,
             invoke=_bind(uc.check_environment, _params_no),
+            output_schema=dataclass_to_json_schema(EnvironmentReport),
         ),
         ToolDescriptor(
             name="describe_capabilities",
@@ -484,13 +492,11 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             input_schema=_schema({}),
             build_params=_params_no,
             invoke=_bind(uc.mcp_ping, _params_no),
-            # MCP 2025-06-18 outputSchema — first BASIC tool migrated
-            # as proof-of-pattern. Hosts validate structuredContent
-            # against this; agents can rely on the field shapes.
-            output_schema=dataclass_to_json_schema(__import__(
-                "mcp_phone_controll.domain.usecases.mcp_ping",
-                fromlist=["McpPingResult"],
-            ).McpPingResult),
+            # MCP 2025-06-18 outputSchema. See dataclass_to_json_schema()
+            # in descriptors/_shared.py. Tier 0 rollout: BASIC tools that
+            # return structured dataclasses (list/Path/None returns get
+            # trivial schemas, so we skip them).
+            output_schema=dataclass_to_json_schema(McpPingResult),
         ),
         ToolDescriptor(
             name="set_agent_profile",
@@ -598,6 +604,7 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             input_schema=_schema({"session_id": _string("Defaults to current.")}),
             build_params=_params_session_summary,
             invoke=_bind(uc.session_summary, _params_session_summary),
+            output_schema=dataclass_to_json_schema(SessionTrace),
         ),
         ToolDescriptor(
             name="tool_usage_report",
@@ -677,6 +684,7 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             ),
             build_params=_params_inspect_project,
             invoke=_bind(uc.inspect_project, _params_inspect_project),
+            output_schema=dataclass_to_json_schema(ProjectInfo),
         ),
         ToolDescriptor(
             name="list_devices",
@@ -684,6 +692,12 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             input_schema=_schema({}),
             build_params=_params_no,
             invoke=_bind(uc.list_devices, _params_no),
+            # list_devices returns list[Device] — schema is a JSON array
+            # of Device objects.
+            output_schema={
+                "type": "array",
+                "items": dataclass_to_json_schema(Device),
+            },
         ),
         ToolDescriptor(
             name="select_device",
@@ -1826,6 +1840,11 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             ),
             build_params=_params_recall,
             invoke=_bind(uc.recall, _params_recall),
+            # recall returns list[RecallChunk]
+            output_schema={
+                "type": "array",
+                "items": dataclass_to_json_schema(RecallChunk),
+            },
         ),
         ToolDescriptor(
             name="recall_corrective",
