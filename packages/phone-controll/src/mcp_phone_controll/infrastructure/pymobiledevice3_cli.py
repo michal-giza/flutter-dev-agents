@@ -15,6 +15,7 @@ import sys
 from pathlib import Path
 
 from .process_runner import ProcessResult, ProcessRunner
+from .tunneld_probe import resolve_rsd
 
 
 def _default_pymobiledevice3_path() -> str:
@@ -59,35 +60,59 @@ class PyMobileDevice3Cli:
             timeout_s=timeout_s,
         )
 
-    # --- developer-tier (route through tunneld via --tunnel) ---------------
+    # --- developer-tier (route through tunneld) ----------------------------
+    #
+    # On iOS 17+, every developer-tier subcommand needs explicit RSD
+    # coordinates (`--rsd HOST PORT`). The older `--tunnel UDID` shortcut
+    # still works for SOME subcommands in newer pymobiledevice3 builds but
+    # not all of them — `developer dvt screenshot` in particular fails with
+    # "Failed to start service" unless --rsd is provided. We resolve the
+    # RSD endpoint via tunneld's HTTP API first, then fall back to the
+    # --tunnel shortcut so older iOS 16 setups still work.
+
+    async def _device_route(self, udid: str) -> list[str]:
+        rsd = await resolve_rsd(udid)
+        if rsd is not None:
+            return ["--rsd", rsd.host, str(rsd.port)]
+        return ["--tunnel", udid]
 
     async def launch(
         self, udid: str, bundle_id: str, timeout_s: float = 30.0
     ) -> ProcessResult:
+        route = await self._device_route(udid)
         return await self._runner.run(
-            [self._bin, "developer", "dvt", "launch", bundle_id, "--tunnel", udid],
+            [self._bin, "developer", "dvt", "launch", bundle_id, *route],
             timeout_s=timeout_s,
         )
 
     async def kill(
         self, udid: str, bundle_id: str, timeout_s: float = 15.0
     ) -> ProcessResult:
+        route = await self._device_route(udid)
         return await self._runner.run(
-            [self._bin, "developer", "dvt", "kill", bundle_id, "--tunnel", udid],
+            [self._bin, "developer", "dvt", "kill", bundle_id, *route],
             timeout_s=timeout_s,
         )
 
     async def screenshot(
         self, udid: str, output_path: Path, timeout_s: float = 30.0
     ) -> ProcessResult:
+        """Capture a screenshot via the DVT screenshot service.
+
+        Uses `developer dvt screenshot` (NOT `developer screenshot` — the
+        latter is the deprecated lockdown API Apple removed on iOS 17+ and
+        returns "service unavailable" even with --rsd). DVT route requires
+        tunneld + DDI mounted + Developer Mode ON.
+        """
+        route = await self._device_route(udid)
         return await self._runner.run(
             [
                 self._bin,
                 "developer",
+                "dvt",
                 "screenshot",
                 str(output_path),
-                "--tunnel",
-                udid,
+                *route,
             ],
             timeout_s=timeout_s,
         )
@@ -97,8 +122,9 @@ class PyMobileDevice3Cli:
 
         On iOS 17+, syslog runs over the developer tunnel.
         """
+        route = await self._device_route(udid)
         return await self._runner.stream(
-            [self._bin, "syslog", "live", "--tunnel", udid]
+            [self._bin, "syslog", "live", *route]
         )
 
     # --- one-shot setup helpers --------------------------------------------
