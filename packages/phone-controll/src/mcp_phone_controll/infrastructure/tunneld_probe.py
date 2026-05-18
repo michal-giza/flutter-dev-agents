@@ -14,7 +14,9 @@ needs sudo and stays as a manual setup step), it just answers the question
 from __future__ import annotations
 
 import asyncio
+import json
 import socket
+import urllib.request
 from dataclasses import dataclass
 
 DEFAULT_TUNNELD_HOST = "127.0.0.1"
@@ -27,6 +29,65 @@ class TunneldStatus:
     host: str
     port: int
     detail: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RsdEndpoint:
+    """Per-device RemoteServiceDiscovery endpoint exposed by tunneld.
+
+    `developer dvt screenshot`, `developer dvt launch`, `syslog live` and
+    every other developer-tier subcommand on iOS 17+ requires `--rsd HOST
+    PORT` (the deprecated `--tunnel UDID` shortcut was retired on the
+    DVT path — pymobiledevice3 returns "Failed to start service" without
+    explicit RSD coordinates).
+    """
+
+    host: str
+    port: int
+
+
+async def resolve_rsd(
+    udid: str,
+    tunneld_host: str = DEFAULT_TUNNELD_HOST,
+    tunneld_port: int = DEFAULT_TUNNELD_PORT,
+    timeout_s: float = 2.0,
+) -> RsdEndpoint | None:
+    """Resolve a UDID to its RSD endpoint by querying tunneld's HTTP API.
+
+    Tunneld serves a JSON blob at `http://<host>:<port>/` keyed by UDID:
+        {"<UDID>": [{"tunnel-address": "...", "tunnel-port": N, ...}]}
+
+    Returns None if tunneld is unreachable, the UDID isn't in the
+    advertised set, or the response is malformed. Caller is expected to
+    fall back to the `--tunnel UDID` shortcut and surface the upstream
+    failure if that doesn't work either.
+    """
+    url = f"http://{tunneld_host}:{tunneld_port}/"
+    try:
+        body = await asyncio.wait_for(
+            asyncio.get_event_loop().run_in_executor(None, _http_get, url),
+            timeout=timeout_s,
+        )
+    except (TimeoutError, OSError, ValueError):
+        return None
+    try:
+        data = json.loads(body)
+        tunnels = data.get(udid) or []
+        if not tunnels:
+            return None
+        first = tunnels[0]
+        host = first.get("tunnel-address")
+        port = first.get("tunnel-port")
+        if not host or not isinstance(port, int):
+            return None
+        return RsdEndpoint(host=host, port=port)
+    except (json.JSONDecodeError, AttributeError, TypeError):
+        return None
+
+
+def _http_get(url: str) -> str:
+    with urllib.request.urlopen(url, timeout=1.5) as r:
+        return r.read().decode("utf-8", errors="replace")
 
 
 async def probe_tunneld(
