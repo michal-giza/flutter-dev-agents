@@ -6,12 +6,13 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ..entities import Artifact, ArtifactKind, LogEntry, LogLevel
+from ..failures import FilesystemFailure
 from ..repositories import (
     ArtifactRepository,
     ObservationRepository,
     SessionStateRepository,
 )
-from ..result import Err, Result, ok
+from ..result import Err, Result, err, ok
 from ._helpers import resolve_serial
 from .base import BaseUseCase
 
@@ -46,10 +47,61 @@ class TakeScreenshot(BaseUseCase[TakeScreenshotParams, Path]):
         # Cap dimensions for vision-model compatibility (Claude 2000px hard
         # limit on multi-image conversations; LLaVA/Qwen-VL prefer ≤1024px).
         # Original is preserved at `<path>.orig.png` for visual-diff workflows.
-        # Fails open if cv2 isn't installed.
-        from ...data.image_capping import cap_image_in_place
+        from ...data.image_capping import (
+            _read_png_dimensions,
+            cap_image_in_place,
+            is_within_cap,
+        )
 
         cap_image_in_place(shot_res.value)
+        # Defense-in-depth verification (May 2026 incident):
+        #   On a stale subprocess running pre-cap code, `cap_image_in_place`
+        #   silently doesn't run, and the agent receives a path to a
+        #   1080x2340 PNG that crashes the conversation with the 2000px
+        #   API error. The dispatcher's safety-net middleware should
+        #   catch this — but if that middleware itself is from a stale
+        #   subprocess, both layers are broken. This third check sits
+        #   inside the use case where every code path producing a
+        #   screenshot MUST pass through. Hard ceiling 1900 px is the
+        #   API limit minus 100 px of safety margin.
+        from ...observability import warn
+
+        if not is_within_cap(shot_res.value, max_dim=1900):
+            dims = _read_png_dimensions(shot_res.value) or (0, 0)
+            warn(
+                "take_screenshot_cap_failed_post_check",
+                path=str(shot_res.value),
+                dims=f"{dims[0]}x{dims[1]}",
+                hint=(
+                    "cap pipeline failed silently — check available_backends() "
+                    "and consider restarting the MCP subprocess if you suspect "
+                    "stale code (mcp_ping reports image_cap_px and git_sha)"
+                ),
+            )
+            # Return a structured failure rather than the oversized path.
+            # Agent gets `next_action="install_image_backend"` and the
+            # diagnostic to bring up to the operator.
+            return err(
+                FilesystemFailure(
+                    message=(
+                        f"Screenshot at {shot_res.value} is {dims[0]}x{dims[1]} — "
+                        "over the 1900px API hard ceiling. The image-cap "
+                        "pipeline failed to bring it down. Likely cause: a "
+                        "stale MCP subprocess running pre-cap code, or no "
+                        "image-cap backend available (cv2/PIL/sips). Call "
+                        "mcp_ping to verify version + backends; fully quit "
+                        "and relaunch the host if image_cap_px is missing "
+                        "or > 1900."
+                    ),
+                    next_action="install_image_backend",
+                    details={
+                        "path": str(shot_res.value),
+                        "width": dims[0],
+                        "height": dims[1],
+                        "max_allowed_px": 1900,
+                    },
+                )
+            )
         await self._artifacts.register(
             Artifact(path=shot_res.value, kind=ArtifactKind.SCREENSHOT, label=params.label)
         )
