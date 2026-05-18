@@ -327,7 +327,11 @@ def build_runtime(
     # Per-platform repositories
     android_devices = AdbDeviceRepository(adb)
     android_lifecycle = AdbLifecycleRepository(adb)
-    android_ui = UiAutomator2UiRepository(u2_factory)
+    # Pass the adb client so taps can fall back to `adb shell input
+    # tap` on Samsung devices where Accessibility-injected events
+    # occasionally drop. Env override: `MCP_ANDROID_PREFER_ADB_TAP=1`
+    # to force adb on every device.
+    android_ui = UiAutomator2UiRepository(u2_factory, adb_client=adb)
     android_observation = AdbObservationRepository(adb)
 
     # Physical iOS (pymobiledevice3) + simulator iOS (xcrun simctl), merged.
