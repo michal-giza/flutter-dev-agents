@@ -1319,63 +1319,7 @@
       "required": [],
       "type": "object"
     },
-    "name": "list_devices",
-    "outputSchema": {
-      "items": {
-        "additionalProperties": false,
-        "properties": {
-          "device_class": {
-            "enum": [
-              "physical",
-              "emulator",
-              "simulator",
-              "unknown"
-            ],
-            "type": "string"
-          },
-          "model": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "os_version": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "platform": {
-            "enum": [
-              "android",
-              "ios"
-            ],
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "serial": {
-            "type": "string"
-          },
-          "state": {
-            "enum": [
-              "device",
-              "offline",
-              "unauthorized",
-              "unknown"
-            ],
-            "type": "string"
-          }
-        },
-        "required": [
-          "serial",
-          "state"
-        ],
-        "type": "object"
-      },
-      "type": "array"
-    }
+    "name": "list_devices"
   },
   {
     "annotations": {
@@ -2033,33 +1977,7 @@
       ],
       "type": "object"
     },
-    "name": "recall",
-    "outputSchema": {
-      "items": {
-        "additionalProperties": false,
-        "properties": {
-          "metadata": {
-            "type": "object"
-          },
-          "score": {
-            "type": "number"
-          },
-          "source": {
-            "type": "string"
-          },
-          "text": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "text",
-          "source",
-          "score"
-        ],
-        "type": "object"
-      },
-      "type": "array"
-    }
+    "name": "recall"
   },
   {
     "annotations": {
