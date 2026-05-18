@@ -159,13 +159,45 @@ class FakeCodeQualityRepository:
 
 
 class FakeWdaSetupCli:
-    """Pretends to clone + xcodebuild without doing anything."""
+    """Pretends to clone + xcodebuild without doing anything.
+
+    Records the most recent `build_for_testing` call so tests can
+    assert that `team_id` was threaded through. Configure
+    `fail_with_signing_error=True` to simulate the "requires a
+    development team" failure mode.
+    """
+
+    def __init__(self, fail_with_signing_error: bool = False) -> None:
+        self.last_build_call: dict | None = None
+        self._fail_with_signing_error = fail_with_signing_error
 
     async def clone(self, target_dir, repo_url=None, timeout_s=300.0):
         target_dir.mkdir(parents=True, exist_ok=True)
         return ProcessResult(returncode=0, stdout="cloned", stderr="")
 
     async def build_for_testing(
-        self, wda_dir, udid, scheme="WebDriverAgentRunner", timeout_s=1800.0
+        self,
+        wda_dir,
+        udid,
+        scheme="WebDriverAgentRunner",
+        team_id: str | None = None,
+        timeout_s: float = 1800.0,
     ):
+        self.last_build_call = {
+            "wda_dir": wda_dir,
+            "udid": udid,
+            "scheme": scheme,
+            "team_id": team_id,
+        }
+        if self._fail_with_signing_error:
+            return ProcessResult(
+                returncode=65,
+                stdout="",
+                stderr=(
+                    "error: Signing for 'WebDriverAgentRunner' requires a "
+                    "development team. Select a development team in the "
+                    "Signing & Capabilities editor. (in target "
+                    "'WebDriverAgentRunner' from project 'WebDriverAgent')"
+                ),
+            )
         return ProcessResult(returncode=0, stdout="** TEST BUILD SUCCEEDED **", stderr="")

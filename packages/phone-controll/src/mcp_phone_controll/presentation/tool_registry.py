@@ -1531,6 +1531,7 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             description=(
                 "Build WebDriverAgent for an iOS device (one-time per device). "
                 "Clones the repo if needed, runs `xcodebuild build-for-testing`. "
+                "Physical devices need team_id (or MCP_WDA_TEAM_ID env). "
                 "Short-circuits if a previous successful build is recorded "
                 "(unless skip_if_built=false)."
             ),
@@ -1541,6 +1542,11 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
                     "repo_url": _string(""),
                     "scheme": _string("Default WebDriverAgentRunner."),
                     "skip_if_built": _bool("Default true; set false to force rebuild."),
+                    "team_id": _string(
+                        "Apple Developer Team ID (10-char alphanumeric) for "
+                        "signing the WDA test runner. Required on physical "
+                        "devices. Falls back to MCP_WDA_TEAM_ID env var."
+                    ),
                 },
                 ["udid"],
             ),

@@ -74,3 +74,76 @@ async def test_wda_setup_rejects_missing_udid(tmp_path: Path):
     res = await uc(SetupWebDriverAgentParams(udid="", wda_dir=tmp_path))
     assert isinstance(res, Err)
     assert res.failure.next_action == "fix_arguments"
+
+
+# ---- team_id / DEVELOPMENT_TEAM threading -----------------------------
+
+
+@pytest.mark.asyncio
+async def test_wda_setup_passes_team_id_to_xcodebuild(tmp_path: Path):
+    """Physical-device builds need DEVELOPMENT_TEAM. Plumb team_id from
+    params through to the CLI call so xcodebuild sees it."""
+    cli = FakeWdaSetupCli()
+    uc = SetupWebDriverAgent(cli)
+    res = await uc(
+        SetupWebDriverAgentParams(
+            udid="udid-physical",
+            wda_dir=tmp_path,
+            team_id="ABCDE12345",
+        )
+    )
+    assert isinstance(res, Ok)
+    assert cli.last_build_call is not None
+    assert cli.last_build_call["team_id"] == "ABCDE12345"
+
+
+@pytest.mark.asyncio
+async def test_wda_setup_team_id_falls_back_to_env(
+    tmp_path: Path, monkeypatch
+):
+    """Operators prefer setting MCP_WDA_TEAM_ID once over passing it on
+    every call. Env var must fill in when param is None."""
+    monkeypatch.setenv("MCP_WDA_TEAM_ID", "ZZZZZ99999")
+    cli = FakeWdaSetupCli()
+    uc = SetupWebDriverAgent(cli)
+    res = await uc(SetupWebDriverAgentParams(udid="udid-physical", wda_dir=tmp_path))
+    assert isinstance(res, Ok)
+    assert cli.last_build_call["team_id"] == "ZZZZZ99999"
+
+
+@pytest.mark.asyncio
+async def test_wda_setup_explicit_param_overrides_env(
+    tmp_path: Path, monkeypatch
+):
+    monkeypatch.setenv("MCP_WDA_TEAM_ID", "FROM_ENV_X9")
+    cli = FakeWdaSetupCli()
+    uc = SetupWebDriverAgent(cli)
+    res = await uc(
+        SetupWebDriverAgentParams(
+            udid="udid-physical",
+            wda_dir=tmp_path,
+            team_id="EXPLICIT_AB",
+        )
+    )
+    assert isinstance(res, Ok)
+    assert cli.last_build_call["team_id"] == "EXPLICIT_AB"
+
+
+@pytest.mark.asyncio
+async def test_wda_setup_signing_failure_surfaces_actionable_envelope(
+    tmp_path: Path, monkeypatch
+):
+    """The whole point of plumbing team_id: when xcodebuild fails with
+    the signing error, the envelope must tell the agent exactly what
+    to do — not bury it as a generic 'check_xcode_signing'."""
+    monkeypatch.delenv("MCP_WDA_TEAM_ID", raising=False)
+    cli = FakeWdaSetupCli(fail_with_signing_error=True)
+    uc = SetupWebDriverAgent(cli)
+    res = await uc(
+        SetupWebDriverAgentParams(udid="udid-physical", wda_dir=tmp_path)
+    )
+    assert isinstance(res, Err)
+    assert res.failure.next_action == "provide_team_id"
+    assert "team_id" in res.failure.message.lower()
+    assert "MCP_WDA_TEAM_ID" in res.failure.message
+    assert res.failure.details["team_id_passed"] is False
