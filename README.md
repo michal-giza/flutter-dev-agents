@@ -100,6 +100,10 @@ pre-commit run --all-files   # one-time baseline; CI parity check
 
 Three gates: `ruff` (lint+autofix), `pytest -q` (fast suite, no `tests/agent`), `generate_tool_catalogue --check` (refuses if `docs/tools.md` drifts from the live registry). See [`.pre-commit-config.yaml`](.pre-commit-config.yaml).
 
+## Design
+
+A shippable visual-asset brief pack lives in [`docs/design/`](docs/design/README.md) — six self-contained briefs (logo, social preview, landing page, architecture diagram, demo video, pitch deck) each with concrete specs + a Claude-designer prompt. Total ~12 person-days of design work to ship the full pack; the first 3 briefs (~7 days) cover 80% of the launch surface.
+
 ## License
 
-TBD.
+Apache License 2.0 — see [`LICENSE`](LICENSE). Inbound contributions follow the same license; no separate CLA.
