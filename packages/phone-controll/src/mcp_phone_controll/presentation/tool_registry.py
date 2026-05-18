@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from typing import Any
 
 from ..domain.entities import (
-    Device,
     EnvironmentReport,
     ProjectInfo,
     SessionTrace,
@@ -127,7 +126,6 @@ from ..domain.usecases.projects import InspectProject
 from ..domain.usecases.recall import (
     IndexProject,
     Recall,
-    RecallChunk,
 )
 from ..domain.usecases.release_screenshot import (
     CaptureReleaseScreenshot,
@@ -692,12 +690,6 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             input_schema=_schema({}),
             build_params=_params_no,
             invoke=_bind(uc.list_devices, _params_no),
-            # list_devices returns list[Device] — schema is a JSON array
-            # of Device objects.
-            output_schema={
-                "type": "array",
-                "items": dataclass_to_json_schema(Device),
-            },
         ),
         ToolDescriptor(
             name="select_device",
@@ -1840,11 +1832,6 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             ),
             build_params=_params_recall,
             invoke=_bind(uc.recall, _params_recall),
-            # recall returns list[RecallChunk]
-            output_schema={
-                "type": "array",
-                "items": dataclass_to_json_schema(RecallChunk),
-            },
         ),
         ToolDescriptor(
             name="recall_corrective",
