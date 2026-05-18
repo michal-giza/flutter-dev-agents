@@ -2482,7 +2482,7 @@
       "openWorldHint": true,
       "readOnlyHint": false
     },
-    "description": "Build WebDriverAgent for an iOS device (one-time per device). Clones the repo if needed, runs `xcodebuild build-for-testing`. Short-circuits if a previous successful build is recorded (unless skip_if_built=false).",
+    "description": "Build WebDriverAgent for an iOS device (one-time per device). Clones the repo if needed, runs `xcodebuild build-for-testing`. Physical devices need team_id (or MCP_WDA_TEAM_ID env). Short-circuits if a previous successful build is recorded (unless skip_if_built=false).",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -2497,6 +2497,10 @@
         "skip_if_built": {
           "description": "Default true; set false to force rebuild.",
           "type": "boolean"
+        },
+        "team_id": {
+          "description": "Apple Developer Team ID (10-char alphanumeric) for signing the WDA test runner. Required on physical devices. Falls back to MCP_WDA_TEAM_ID env var.",
+          "type": "string"
         },
         "udid": {
           "description": "",

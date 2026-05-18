@@ -48,6 +48,47 @@ def _normalise(text: str) -> str:
     return unicodedata.normalize("NFC", text).strip()
 
 
+# Unicode whitespace variants Android localization commonly emits that
+# look identical to ASCII space on screen but break byte-eq matching:
+#   U+00A0  NO-BREAK SPACE   — Polish typography between word + particle
+#   U+202F  NARROW NBSP      — French/Polish "espace fine insécable"
+#   U+2009  THIN SPACE
+#   U+200A  HAIR SPACE
+#   U+200B  ZERO-WIDTH SPACE — Android occasionally emits this in chips
+#   U+2060  WORD JOINER
+#   U+FEFF  BYTE-ORDER MARK  — paste artifacts from translation tools
+_WHITESPACE_LOOKALIKES = str.maketrans(
+    {
+        " ": " ",
+        " ": " ",
+        " ": " ",
+        " ": " ",
+        "​": "",
+        "⁠": "",
+        "﻿": "",
+    }
+)
+
+
+def _normalise_loose(text: str) -> str:
+    """Looser form of `_normalise` for the XML-dump fallback path.
+
+    On top of NFC + strip, fold Unicode whitespace lookalikes
+    (NBSP / NNBSP / thin space) to ASCII space and collapse internal
+    whitespace runs to a single space. Android's Polish localization
+    emits `"Podczas\\u00a0używania\\u00a0aplikacji"` between words —
+    visually identical to the ASCII-space version an agent would type
+    but byte-unequal, so the strict NFC scan misses.
+
+    Only applied in the fallback path: the primary uiautomator2
+    selector path stays exact so legitimate strict matches don't drift.
+    """
+    nfc = unicodedata.normalize("NFC", text).translate(_WHITESPACE_LOOKALIKES)
+    # Collapse runs of whitespace to a single space — handles tab,
+    # newline, multiple-space-from-pretty-printed-XML cases.
+    return " ".join(nfc.split())
+
+
 def _prefer_adb_tap_via_env() -> bool:
     val = os.environ.get("MCP_ANDROID_PREFER_ADB_TAP", "").strip().lower()
     return val in ("1", "true", "yes", "on")
@@ -78,8 +119,9 @@ def _find_bounds_for_text(
     The fallback path tap_text uses when uiautomator2's selector
     machinery loses to encoding edge cases on diacritics.
     """
-    target = _normalise(target)
-    if not target:
+    target_strict = _normalise(target)
+    target_loose = _normalise_loose(target)
+    if not target_strict:
         return None
     # The XML attribute order on Android is stable enough that
     # `text="...."` and `content-desc="..."` are easy to extract.
@@ -89,21 +131,39 @@ def _find_bounds_for_text(
     desc_attr = re.compile(r'\bcontent-desc="([^"]*)"')
     bounds_attr = re.compile(r'\bbounds="(\[[^"]+\])"')
 
+    # Two passes: strict NFC first (fast, preserves intent), then loose
+    # (whitespace-folded + case-folded substring) so Android's NBSP-
+    # separated localized strings still match.
+    strict_hit: Bounds | None = None
+    loose_hit: Bounds | None = None
+
     for match in node_re.finditer(xml):
         attrs = match.group(1)
-        candidates: list[str] = []
+        strict_candidates: list[str] = []
+        loose_candidates: list[str] = []
         if (m := text_attr.search(attrs)) is not None:
-            candidates.append(_normalise(m.group(1)))
+            raw = m.group(1)
+            strict_candidates.append(_normalise(raw))
+            loose_candidates.append(_normalise_loose(raw).casefold())
         if (m := desc_attr.search(attrs)) is not None:
-            candidates.append(_normalise(m.group(1)))
-        if not candidates:
+            raw = m.group(1)
+            strict_candidates.append(_normalise(raw))
+            loose_candidates.append(_normalise_loose(raw).casefold())
+        if not strict_candidates:
             continue
-        hit = (
-            any(c == target for c in candidates)
-            if exact
-            else any(target in c for c in candidates if c)
-        )
-        if not hit:
+
+        if exact:
+            strict_match = any(c == target_strict for c in strict_candidates)
+            loose_match = any(
+                c == target_loose.casefold() for c in loose_candidates
+            )
+        else:
+            strict_match = any(target_strict in c for c in strict_candidates if c)
+            loose_match = any(
+                target_loose.casefold() in c for c in loose_candidates if c
+            )
+
+        if not (strict_match or loose_match):
             continue
         bm = bounds_attr.search(attrs)
         if not bm:
@@ -111,8 +171,16 @@ def _find_bounds_for_text(
         bounds = _bounds_from_string(bm.group(1))
         if bounds.width <= 0 or bounds.height <= 0:
             continue
-        return bounds
-    return None
+        if strict_match and strict_hit is None:
+            strict_hit = bounds
+            # Strict beats loose; return immediately on first strict.
+            return strict_hit
+        if loose_match and loose_hit is None:
+            loose_hit = bounds
+            # Don't return yet — keep scanning in case a later node
+            # has a strict match (rare but possible in long dumps).
+
+    return strict_hit or loose_hit
 
 
 def _element_from_info(info: dict) -> UiElement:

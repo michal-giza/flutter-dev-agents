@@ -43,6 +43,13 @@ class SetupWebDriverAgentParams:
     repo_url: str = "https://github.com/appium/WebDriverAgent.git"
     scheme: str = "WebDriverAgentRunner"
     skip_if_built: bool = True         # Honor a previous successful build's marker file.
+    # Apple Developer Team ID (10-char alphanumeric, e.g. "ABCDE12345").
+    # Required for physical-device builds — without it xcodebuild fails
+    # with "Signing for 'WebDriverAgentRunner' requires a development
+    # team". Fetch via `xcrun altool --list-providers` or from Xcode
+    # → Account → Manage Certificates. Falls back to env var
+    # MCP_WDA_TEAM_ID if not provided here.
+    team_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,20 +127,50 @@ class SetupWebDriverAgent(BaseUseCase[SetupWebDriverAgentParams, WdaBuildResult]
             except OSError:
                 pass
 
+        # team_id resolution: explicit param wins, env fallback for ops
+        # who'd rather set MCP_WDA_TEAM_ID once than thread it through
+        # every plan. Missing team_id is allowed (so simulator code
+        # paths that share this CLI still work) — the surfaced error
+        # below tells the agent exactly what to pass next time.
+        import os as _os
+        team_id = params.team_id or _os.environ.get(
+            "MCP_WDA_TEAM_ID", ""
+        ).strip() or None
+
         build_res = await self._cli.build_for_testing(
-            wda_dir=wda_dir, udid=params.udid, scheme=params.scheme
+            wda_dir=wda_dir,
+            udid=params.udid,
+            scheme=params.scheme,
+            team_id=team_id,
         )
         if not build_res.ok:
+            stderr_tail = build_res.stderr[-2000:] if build_res.stderr else ""
+            # Detect the most common failure mode and surface the
+            # actionable next step instead of a generic "check_xcode_signing".
+            signing_hint = (
+                "requires a development team" in stderr_tail
+                or "DEVELOPMENT_TEAM" in stderr_tail
+                or "Code signing is required" in stderr_tail
+            )
             return err(
                 FlutterCliFailure(
-                    message="xcodebuild build-for-testing failed",
+                    message=(
+                        "xcodebuild build-for-testing failed: signing requires "
+                        "DEVELOPMENT_TEAM — pass team_id (10-char Apple Team "
+                        "ID, e.g. 'ABCDE12345') or set MCP_WDA_TEAM_ID env var"
+                        if signing_hint
+                        else "xcodebuild build-for-testing failed"
+                    ),
                     details={
-                        "stderr_tail": build_res.stderr[-2000:] if build_res.stderr else "",
+                        "stderr_tail": stderr_tail,
                         "stdout_tail": build_res.stdout[-2000:] if build_res.stdout else "",
                         "udid": params.udid,
                         "wda_dir": str(wda_dir),
+                        "team_id_passed": bool(team_id),
                     },
-                    next_action="check_xcode_signing",
+                    next_action=(
+                        "provide_team_id" if signing_hint else "check_xcode_signing"
+                    ),
                 )
             )
         # Record success so subsequent calls can short-circuit.

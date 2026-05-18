@@ -92,6 +92,67 @@ exceeds 32MB.
 Then start a fresh agent session. The shipped agent will from now
 on auto-cap with the palette-mode compressor (3-5× smaller per shot).
 
+### 2b. `setup_webdriveragent` fails with "requires a development team"
+
+**Cause**: WDA build needs `DEVELOPMENT_TEAM` for physical-device
+code-signing. The Appium WDA project ships with empty signing
+settings on purpose, so xcodebuild fails until a team is selected.
+
+**Symptom**:
+```
+error: Signing for 'WebDriverAgentRunner' requires a development team.
+Select a development team in the Signing & Capabilities editor.
+```
+
+**Fix**: pass `team_id` (your 10-char Apple Developer Team ID):
+
+```
+setup_webdriveragent(udid="…", team_id="ABCDE12345")
+```
+
+Or set it once and forget:
+
+```bash
+export MCP_WDA_TEAM_ID=ABCDE12345
+# (add to ~/.zshrc to persist)
+```
+
+Find your team ID in: Xcode → Settings → Accounts → click team →
+"Manage Certificates" (the 10-char string above the table). Or:
+
+```bash
+xcrun altool --list-providers \
+    -u <your-apple-id> -p @keychain:AC_PASSWORD 2>/dev/null \
+    | grep -E "^\s+[A-Z0-9]{10}\s"
+```
+
+The MCP surfaces `next_action: "provide_team_id"` when this
+specific signing error is detected so agents know exactly what to
+do next.
+
+### 2c. `tap_text` misses Polish/French diacritics or NBSP-separated strings
+
+**Cause**: Android localization sometimes uses U+00A0 (NO-BREAK SPACE)
+or U+202F (NARROW NBSP) between words for typography. Visually
+identical to ASCII space on screen, byte-unequal in the dump. Same
+class of bug as combining diacritics (NFC vs NFD).
+
+**Symptom**: `tap_text("Podczas używania aplikacji")` returns
+`UiElementNotFoundFailure` even though the button is visible.
+
+**Fix (already in v0.2.1+)**: the dump-scan fallback now NFC-normalizes,
+folds NBSP/NNBSP/thin space to ASCII, strips zero-width chars, and
+case-folds in substring mode. No agent action needed — call as
+normal:
+
+```
+tap_text(text="Podczas używania aplikacji")
+```
+
+If it still misses on a specific string, the dump may have it split
+across multiple text nodes (Flutter widget composition). Workaround:
+match a shorter unique substring with `tap_text(text="używania", exact=false)`.
+
 ### 3. iPhone 17 simulator: `'NoneType' has no attribute 'make_http_connection'`
 
 **Cause**: WebDriverAgent not running on the simulator.

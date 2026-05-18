@@ -923,12 +923,14 @@ def _params_quality_gate(args: JsonDict) -> QualityGateParams:
 
 
 def _params_setup_wda(args: JsonDict) -> SetupWebDriverAgentParams:
+    team_id = args.get("team_id")
     return SetupWebDriverAgentParams(
         udid=args["udid"],
         wda_dir=Path(args["wda_dir"]).expanduser() if args.get("wda_dir") else None,
         repo_url=args.get("repo_url", "https://github.com/appium/WebDriverAgent.git"),
         scheme=args.get("scheme", "WebDriverAgentRunner"),
         skip_if_built=bool(args.get("skip_if_built", True)),
+        team_id=str(team_id).strip() if team_id else None,
     )
 
 

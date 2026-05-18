@@ -41,22 +41,35 @@ class WdaSetupCli:
         wda_dir: Path,
         udid: str,
         scheme: str = "WebDriverAgentRunner",
+        team_id: str | None = None,
         timeout_s: float = 1800.0,
     ) -> ProcessResult:
-        return await self._runner.run(
-            [
-                "xcodebuild",
-                "build-for-testing",
-                "-project",
-                "WebDriverAgent.xcodeproj",
-                "-scheme",
-                scheme,
-                "-destination",
-                f"platform=iOS,id={udid}",
-            ],
-            cwd=wda_dir,
-            timeout_s=timeout_s,
-        )
+        """Build WebDriverAgent for a physical iOS device.
+
+        `team_id` is the Apple Developer Team ID (10-char alphanumeric)
+        used to sign the test runner. Without it, the WebDriverAgent
+        project ships with empty signing settings — xcodebuild fails
+        with "Signing for 'WebDriverAgentRunner' requires a development
+        team" on every physical device. Pass `DEVELOPMENT_TEAM=ABCDE12345`
+        to xcodebuild and it picks the matching team from the user's
+        keychain. Simulator builds don't need signing → omit.
+        """
+        argv = [
+            "xcodebuild",
+            "build-for-testing",
+            "-project",
+            "WebDriverAgent.xcodeproj",
+            "-scheme",
+            scheme,
+            "-destination",
+            f"platform=iOS,id={udid}",
+        ]
+        if team_id:
+            argv.append(f"DEVELOPMENT_TEAM={team_id}")
+            # Force automatic signing — keeps the build resilient to
+            # whatever signing style the WDA project shipped with.
+            argv.append("CODE_SIGN_STYLE=Automatic")
+        return await self._runner.run(argv, cwd=wda_dir, timeout_s=timeout_s)
 
     async def test_without_building_for_sim(
         self,

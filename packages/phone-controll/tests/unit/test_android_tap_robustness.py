@@ -25,6 +25,7 @@ from mcp_phone_controll.data.repositories.uiautomator2_ui_repository import (
     UiAutomator2UiRepository,
     _find_bounds_for_text,
     _normalise,
+    _normalise_loose,
 )
 
 # ---- helpers -----------------------------------------------------------
@@ -165,6 +166,86 @@ def test_find_bounds_for_text_polish_diacritics():
 def test_find_bounds_for_text_returns_none_when_no_match():
     xml = '<node text="Other text" bounds="[0,0][100,100]" />'
     assert _find_bounds_for_text(xml, "Rozumiem", exact=True) is None
+
+
+# ---- loose-match fallback for Android localization quirks -------------
+
+
+def test_normalise_loose_folds_nbsp_to_ascii_space():
+    """Android's Polish localization emits NO-BREAK SPACE (U+00A0)
+    between words for typography. Visually identical to ASCII space
+    but breaks byte-eq matching. The loose-normaliser folds them."""
+    with_nbsp = "Podczas używania aplikacji"
+    with_ascii = "Podczas używania aplikacji"
+    assert with_nbsp != with_ascii  # bytes differ
+    assert _normalise_loose(with_nbsp) == _normalise_loose(with_ascii)
+
+
+def test_normalise_loose_folds_narrow_nbsp_and_thin_space():
+    """French/Polish localizations also emit U+202F (NNBSP) and
+    U+2009 (thin space) as word separators."""
+    cases = [
+        "Podczas używania aplikacji",
+        "Podczas używania aplikacji",
+    ]
+    ref = _normalise_loose("Podczas używania aplikacji")
+    for c in cases:
+        assert _normalise_loose(c) == ref
+
+
+def test_normalise_loose_strips_zero_width_chars():
+    """ZWSP / word-joiner / BOM occasionally appear from translation
+    tools. They render invisibly — should be stripped, not folded
+    to a space (otherwise we'd insert phantom spaces)."""
+    assert _normalise_loose("Rozu​miem") == "Rozumiem"
+    assert _normalise_loose("﻿Rozumiem") == "Rozumiem"
+
+
+def test_normalise_loose_collapses_internal_whitespace_runs():
+    """Pretty-printed XML dumps sometimes have multiple spaces or
+    tabs inside attribute values. Collapse those."""
+    assert _normalise_loose("Podczas   używania\taplikacji") == (
+        "Podczas używania aplikacji"
+    )
+
+
+def test_find_bounds_matches_nbsp_separated_polish_dialog():
+    """The actual field failure: Android renders the permission
+    dialog button as `"Podczas używania aplikacji"` but the dump XML
+    encodes it with NBSP between words. Agent passes ASCII spaces.
+    Strict scan misses; loose scan must catch it."""
+    xml = (
+        '<node text="Podczas używania aplikacji" '
+        'bounds="[40,1800][680,1900]" />'
+    )
+    bounds = _find_bounds_for_text(
+        xml, "Podczas używania aplikacji", exact=True
+    )
+    assert bounds is not None
+    assert bounds.x == 40 and bounds.y == 1800
+
+
+def test_find_bounds_loose_match_is_case_insensitive_in_substring_mode():
+    """Agents reliably type "rozumiem" or "ROZUMIEM" expecting it to
+    match the button labelled "Rozumiem". Strict mode keeps casing
+    intact, loose mode case-folds for substring matching only."""
+    xml = '<node text="Rozumiem" bounds="[10,20][110,80]" />'
+    assert _find_bounds_for_text(xml, "rozumiem", exact=False) is not None
+    assert _find_bounds_for_text(xml, "ROZUMIEM", exact=False) is not None
+
+
+def test_find_bounds_strict_match_still_preferred_over_loose():
+    """If both a strict-match and a loose-match node exist, the
+    strict one wins — don't let case-folding accidentally pick a
+    wrong target when there's an exact one available."""
+    xml = (
+        '<node text="rozumiem (cancel)" bounds="[0,0][100,50]" />'
+        '<node text="Rozumiem" bounds="[200,200][400,250]" />'
+    )
+    bounds = _find_bounds_for_text(xml, "Rozumiem", exact=True)
+    assert bounds is not None
+    # Strict match wins → the second node's bounds.
+    assert bounds.x == 200 and bounds.y == 200
 
 
 def test_find_bounds_for_text_falls_back_to_content_desc():
