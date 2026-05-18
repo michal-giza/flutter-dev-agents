@@ -130,11 +130,22 @@ are launch-week assets.
 
 ## Working with Claude designer / Figma Make / similar
 
-Every brief ends with a **Claude prompt** block — copy-paste it into
-Claude (preferably with the `design:design-system` or
-`design:design-handoff` skill loaded) and you'll get a usable
-first draft. Then iterate with the designer using the same brief
-as the shared reference.
+Every brief ends with a **Claude prompt** block — copy-paste it
+into Claude.ai and you get a usable first draft. Full walkthrough
+(which Claude surface to use for which brief, the iteration
+loop, common pitfalls): **[`HOW-TO-USE-CLAUDE-DESIGNER.md`](HOW-TO-USE-CLAUDE-DESIGNER.md)**.
+
+TL;DR:
+1. Open `brief-NN-<slug>.md`.
+2. Copy the `## Claude prompt` block at the bottom.
+3. Paste into Claude.ai → iterate 3-5 turns → save the artifact.
+4. In Claude Code, run `/design-critique` on the saved asset
+   against the brief.
+5. Apply critique, save final to `docs/design/assets/`, commit.
+
+Surface map: Claude.ai (web, artifacts) for **generation**;
+Claude Code with `design:` skills for **critique, accessibility,
+dev handoff**. Use both.
 
 ## What is intentionally NOT in this pack
 
