@@ -1,11 +1,49 @@
-"""MCP server adapter — wires the ToolDispatcher to the Anthropic MCP SDK over stdio."""
+"""MCP server adapter — wires the ToolDispatcher to the Anthropic MCP SDK over stdio.
+
+`MCP_TOOL_TIER` env var (May 2026 hardening): some MCP hosts apply a
+tool-count ceiling on `tools/list` — Cursor caps at 40; Claude
+Desktop's UI silently drops the inventory when our 109-tool surface
+arrives. Setting `MCP_TOOL_TIER=basic` (recommended for Claude
+Desktop) advertises only the 24 BASIC tools and routes the long
+tail through `describe_capabilities` for agents that need it.
+
+Values:
+  - `basic`        (default for Claude Desktop) — 24 tools
+  - `intermediate` — BASIC + INTERMEDIATE
+  - `expert` or unset — all 109 (original behaviour)
+
+The full dispatcher is always wired; the filter only affects what's
+advertised via `tools/list`. Calling a non-advertised tool by name
+still works for clients that know it.
+"""
 
 from __future__ import annotations
 
 import json
+import os
 from typing import Any
 
 from .tool_registry import ToolDispatcher
+
+
+def _allowed_tool_names(all_names: list[str]) -> set[str] | None:
+    """Return the set of tool names to advertise per `MCP_TOOL_TIER`.
+
+    None = no filtering (advertise everything). Used by `_list_tools`
+    below; importable so tests can pin the contract independently.
+    """
+    tier = os.environ.get("MCP_TOOL_TIER", "").strip().lower()
+    if not tier or tier == "expert" or tier == "all":
+        return None
+    from ..domain.tool_levels import BASIC_TOOLS, INTERMEDIATE_TOOLS
+
+    if tier == "basic":
+        return set(BASIC_TOOLS)
+    if tier == "intermediate":
+        return set(BASIC_TOOLS) | set(INTERMEDIATE_TOOLS)
+    # Unknown value — fail open (advertise everything) so a typo
+    # doesn't accidentally remove tools.
+    return None
 
 
 async def serve_stdio(dispatcher: ToolDispatcher, server_name: str = "phone-controll") -> None:
@@ -26,8 +64,15 @@ async def serve_stdio(dispatcher: ToolDispatcher, server_name: str = "phone-cont
         # `default_annotations(name)` classifier so all 108 tools get
         # at least a best-effort annotation. Falls back gracefully on
         # older mcp SDKs that don't accept `annotations`.
+        #
+        # MCP_TOOL_TIER filter — hosts that drop oversized tool lists
+        # (Claude Desktop UI silently dropped our 109-tool surface)
+        # can scope down to BASIC (24) or BASIC+INTERMEDIATE.
+        allowed = _allowed_tool_names([d.name for d in dispatcher.descriptors])
         out: list[Tool] = []
         for d in dispatcher.descriptors:
+            if allowed is not None and d.name not in allowed:
+                continue
             kwargs: dict[str, Any] = {
                 "name": d.name,
                 "description": d.description,

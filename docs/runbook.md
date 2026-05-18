@@ -30,6 +30,33 @@ curl -fsS http://<host>:8765/metrics | grep mcp_image_cap_px
 
 ## Top 10 production failures (and the fix)
 
+### 0. Claude Desktop Connectors panel shows "no tools available"
+
+**Cause**: Claude Desktop's UI silently drops the tool inventory when
+our 109-tool surface exceeds whatever ceiling the host applies (Cursor
+documents 40; Claude Desktop is undocumented). The MCP server delivers
+all 109 tools — the Connectors UI just doesn't display them.
+
+**Fix**: set `MCP_TOOL_TIER=basic` in the env block. The server then
+advertises only the 24 BASIC tools, well under any ceiling.
+
+```bash
+CONFIG="$HOME/Library/Application Support/Claude/claude_desktop_config.json"
+cp "$CONFIG" "$CONFIG.bak.$(date +%s)"
+jq '.mcpServers["phone-controll"].env.MCP_TOOL_TIER = "basic"' "$CONFIG" \
+    > "$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG"
+# Then cmd+Q Claude Desktop and start a NEW chat.
+```
+
+Other tier values:
+- `intermediate` — BASIC + INTERMEDIATE (~40 tools)
+- `expert` or `all` or unset — all 109 (default)
+
+Verify with `mcp_ping` (always BASIC tier) — if it returns, you're
+fixed. Calling a tool that's NOT in the advertised set still works
+for clients that know its name; the filter only affects what's
+listed.
+
 ### 1. "An image in the conversation exceeds the dimension limit (2000px)"
 
 **Cause**: a PNG with long-edge > 2000 px reached the API.
