@@ -1,0 +1,72 @@
+version: 2
+# Dependabot configuration — automated dependency PRs for the
+# repo's two ecosystems (Python deps + GitHub Actions deps).
+#
+# Pinning rationale:
+# - Weekly cadence (not daily): patch noise is real; weekly batches
+#   amortize the review cost.
+# - groups: combine all minor/patch bumps into one PR per ecosystem
+#   per week, so the maintainer reviews one diff instead of N.
+# - target-branch: main is fine — every PR still has to pass CI
+#   + branch protection requires a status-check pass.
+
+updates:
+  # ---- Python packages used by phone-controll ----
+  - package-ecosystem: "pip"
+    directory: "/packages/phone-controll"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "Europe/Warsaw"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "python"
+    commit-message:
+      prefix: "deps(python)"
+      include: "scope"
+    groups:
+      python-minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+      python-security:
+        applies-to: security-updates
+        update-types:
+          - "minor"
+          - "patch"
+          - "major"
+    # `urllib3` is pinned tight in pyproject.toml for CVE coverage —
+    # let Dependabot bump it freely so we never lag behind CVEs.
+    allow:
+      - dependency-name: "*"
+    ignore:
+      # `pillow` is our cap-pipeline fallback; major bumps occasionally
+      # change API shapes (Pillow 11 removed `compose_dither`). Hold
+      # for manual review until our test suite covers them.
+      - dependency-name: "pillow"
+        update-types: ["version-update:semver-major"]
+
+  # ---- GitHub Actions versions ----
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "Europe/Warsaw"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "ci"
+    commit-message:
+      prefix: "deps(ci)"
+      include: "scope"
+    groups:
+      actions-minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"

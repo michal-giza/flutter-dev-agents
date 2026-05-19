@@ -1,0 +1,151 @@
+name: 🐛 Bug report
+description: Something's broken or doesn't match what the docs say.
+title: "[bug] "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. Two minutes of context
+        upfront saves hours of back-and-forth. Have your MCP session open
+        — fields 3, 5, and 6 below are easiest if you can paste tool
+        output directly.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: One-sentence summary. ("`tap_text` failed silently on a Polish-locale Galaxy S25.")
+      placeholder: One sentence please.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+      description: |
+        What were you trying to accomplish? What output did you expect?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: |
+        The exact prompt or tool sequence. If you used Claude, paste
+        the prompt verbatim. If you called the MCP from code, paste the
+        Python or curl invocation.
+      placeholder: |
+        1. Started Claude Code with the MCP registered.
+        2. Pasted prompt: "Using phone-controll, ..."
+        3. Observed: ...
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: mcp_ping
+    attributes:
+      label: Output of `mcp_ping`
+      description: |
+        Run `mcp_ping` from your agent and paste the response.
+        This gives us version, git SHA, image-cap value, and tool count.
+      placeholder: |
+        {
+          "ok": true,
+          "data": {
+            "version": "0.2.2",
+            "git_sha": "abc1234",
+            ...
+          }
+        }
+      render: json
+    validations:
+      required: true
+
+  - type: textarea
+    id: failure_envelope
+    attributes:
+      label: The failing tool's response envelope
+      description: |
+        Paste the structured error verbatim. We need `code`, `message`,
+        `next_action`, and `details` — these usually tell us where to
+        look in 30 seconds.
+      placeholder: |
+        {
+          "ok": false,
+          "error": {
+            "code": "UiElementNotFoundFailure",
+            "message": "...",
+            "next_action": "check_text_or_use_dump_ui",
+            "details": {...}
+          }
+        }
+      render: json
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform involved
+      multiple: true
+      options:
+        - Android (physical device)
+        - Android (emulator)
+        - iOS (physical device)
+        - iOS (simulator)
+        - Host-only (no device — MCP itself misbehaved)
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: Device model + OS version
+      description: e.g. "Galaxy S25, Android 15"
+      placeholder: Galaxy S25, Android 15 / pl-PL locale
+    validations:
+      required: true
+
+  - type: input
+    id: host
+    attributes:
+      label: MCP host
+      description: Where you ran the MCP from.
+      placeholder: Claude Desktop 1.4.2 / Claude Code 0.6 / Cursor / custom HTTP
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: |
+        Paste the last ~30 seconds of `read_logs` output, or the
+        stderr of the MCP process if you have it.
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: workaround
+    attributes:
+      label: Workaround (if any)
+      description: |
+        Did you find a way around the bug? Knowing this helps us decide
+        priority and gives future readers something to try.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Pre-flight
+      options:
+        - label: I've read the [runbook](https://github.com/michal-giza/flutter-dev-agents/blob/main/docs/runbook.md) and [operational-gotchas](https://github.com/michal-giza/flutter-dev-agents/blob/main/docs/operational-gotchas.md) — the failure isn't already documented there.
+          required: true
+        - label: I've searched existing issues — this isn't a duplicate.
+          required: true

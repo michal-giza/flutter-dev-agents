@@ -1,0 +1,95 @@
+name: ✨ Feature request / new tool
+description: A tool or capability you wish existed.
+title: "[feature] "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Concrete user stories with a real scenario beat abstract
+        "wouldn't it be nice if…" by an order of magnitude. Spend
+        2 minutes on field 2 and the request lands with weight.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's the problem this would solve?
+      description: |
+        Describe the situation today. What can't you do? What workaround
+        are you stuck with? Avoid jumping to a solution — the problem
+        space matters more than the proposed tool.
+      placeholder: |
+        Today I have to call dump_ui + parse the XML + extract bounds
+        manually whenever a tap_text gets ambiguous results...
+    validations:
+      required: true
+
+  - type: textarea
+    id: scenario
+    attributes:
+      label: Concrete scenario — show, don't tell
+      description: |
+        Walk through a specific run that would benefit. Real device,
+        real app, real numbers. The more concrete, the better.
+      placeholder: |
+        I'm testing checkaiapp on a Galaxy S25, Polish locale. I hit
+        the permission dialog and run tap_text("Allow"). Three nodes
+        match...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed tool / API shape
+      description: |
+        Sketch the tool name + arguments + return shape if you have one.
+        Skip if you only have a problem and want the maintainer to design.
+      placeholder: |
+        tap_text(text, exact=False, system=False, ambiguity="top_k:3") →
+          {ok: true, data: {candidates: [{x, y, confidence}, ...]}}
+      render: text
+    validations:
+      required: false
+
+  - type: dropdown
+    id: tier
+    attributes:
+      label: Which tool tier would this live in?
+      description: See `docs/tools-by-category.md` for tier discipline.
+      options:
+        - BASIC — canonical happy path, must be visible everywhere
+        - INTERMEDIATE — routine workflow, but specialized
+        - EXPERT — power-user, composes with others
+        - I don't know
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: |
+        What did you try first? Why didn't it work? (Existing tools
+        sometimes cover this already — `inspect_image_safety`,
+        `find_element`, etc.)
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution intent
+      options:
+        - label: I'd be willing to submit a PR for this if accepted.
+          required: false
+        - label: I just want to file the request — happy for someone else to build it.
+          required: false
+
+  - type: checkboxes
+    id: roadmap_check
+    attributes:
+      label: Roadmap alignment
+      options:
+        - label: I've read [ROADMAP.md](https://github.com/michal-giza/flutter-dev-agents/blob/main/ROADMAP.md) — this isn't in "Not on the roadmap".
+          required: true
