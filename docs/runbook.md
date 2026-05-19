@@ -59,9 +59,25 @@ listed.
 
 ### 1. "An image in the conversation exceeds the dimension limit (2000px)"
 
-**Cause**: a PNG with long-edge > 2000 px reached the API.
-**99% of the time**: stale subprocess running pre-`fe00b85` code with
-the 1920 cap.
+**Cause** (in order of field frequency):
+
+1. **The agent used raw `adb exec-out screencap -p` via Bash instead
+   of `take_screenshot`.** Our 1600px cap runs inside the MCP — when
+   the agent goes around it through Bash, the cap doesn't fire. Pixel
+   emulators ship at 1080×2400, blowing the 2000px limit on every
+   shot.
+
+   **Fix**: instruct the agent to use `take_screenshot` exclusively.
+   If a bot routinely reaches for raw adb (small models often do
+   when they've already used `Bash` for `adb shell input tap`), call
+   `compress_png(path=…)` on the raw output before reading it. Both
+   tools are on the BASIC tier so they're always available.
+
+   May 2026 incident: an overnight automation accumulated 5 raw-adb
+   PNGs at 2400px each, crashed on the 6th. The MCP itself was
+   working correctly — the agent never invoked it for screenshots.
+
+2. **Stale subprocess running pre-`fe00b85` code with the 1920 cap.**
 
 **Fix**:
 ```bash

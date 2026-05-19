@@ -72,6 +72,26 @@ def test_unknown_value_fails_open_with_none(monkeypatch):
     assert _allowed_tool_names([]) is None
 
 
+def test_compress_png_lives_in_basic_tier():
+    """Field incident, May 2026: an overnight bot grabbed screenshots
+    via raw `adb exec-out screencap` (bypassing take_screenshot's
+    1600px cap), accumulated 6 oversized PNGs, then crashed with
+    "image exceeds 2000px dimension limit". `compress_png` is the
+    escape hatch — must be on the BASIC tier so agents never get
+    stuck holding a 2400px PNG with no way out."""
+    assert "compress_png" in BASIC_TOOLS, (
+        "compress_png must stay on BASIC so agents using raw adb "
+        "screencap always have a remediation tool available without "
+        "escalating to expert tier."
+    )
+
+
+def test_take_screenshot_is_also_in_basic_tier():
+    """The preferred path (caps automatically). If an agent has both
+    available, take_screenshot beats raw adb + compress_png."""
+    assert "take_screenshot" in BASIC_TOOLS
+
+
 def test_basic_subset_is_reasonable_for_host_ceilings():
     """Cursor caps at 40 tools; Claude Desktop's UI dropped 109.
     BASIC tier must stay well under 40 so we never trip that
