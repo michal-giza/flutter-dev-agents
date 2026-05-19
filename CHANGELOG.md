@@ -5,6 +5,119 @@ All notable changes to `flutter-dev-agents` / `mcp-phone-controll`.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] — 2026-05-19
+
+Field-bug-driven patch release. Five issues surfaced during the first
+overnight automated run against a Samsung Galaxy S25 + a physical
+iPhone 15 on iOS 26. Each fix carries a regression test so the same
+class of bug can't ship a third time.
+
+### Fixed — MCP visibility in Claude Code (#1)
+- `list_devices` and `recall` had `outputSchema.type = "array"`,
+  which violates MCP 2025-06-18 (the `structuredContent` field is
+  always an object). Claude Code's Zod validator drops the **entire
+  server** when any tool's schema is invalid — symptom was "✓
+  Connected" with zero tools visible.
+- Removed both invalid outputSchemas; data payloads still validate
+  via the standard envelope.
+- New tripwire test (`tests/unit/test_output_schema_validity.py`,
+  4 assertions) scans every descriptor on every CI run.
+
+### Fixed — iOS 17+ developer-tier commands (#2)
+- `take_screenshot` on physical iPhones running iOS 17+ failed with
+  "Failed to start service" because the wrapper used the deprecated
+  `developer screenshot` lockdown API (Apple removed the underlying
+  service on iOS 17) and passed `--tunnel UDID` instead of the now-
+  required `--rsd HOST PORT`.
+- New `resolve_rsd(udid)` helper queries tunneld's HTTP API at
+  `127.0.0.1:49151/` and returns the device's RSD endpoint.
+- New `PyMobileDevice3Cli._device_route()` prefers `--rsd` when
+  resolvable, falls back to `--tunnel` so iOS 16 setups keep
+  working.
+- Switched to `developer dvt screenshot`. Same routing applied to
+  `launch`, `kill`, and `syslog live` (latently broken on iOS 17+
+  for the same reason).
+- Verified end-to-end on iPhone 15 / iOS 26: 5 MB PNG captured.
+- 9 new unit tests in `test_tunneld_rsd_resolution.py`.
+
+### Fixed — WebDriverAgent signing on physical devices (#3)
+- `setup_webdriveragent` failed with "Signing for
+  'WebDriverAgentRunner' requires a development team" on every
+  physical iPhone — the Appium WDA project ships with empty
+  signing settings.
+- New `team_id` parameter (10-char Apple Developer Team ID) threaded
+  through to `xcodebuild` as `DEVELOPMENT_TEAM=<id>` plus
+  `CODE_SIGN_STYLE=Automatic`.
+- Falls back to `MCP_WDA_TEAM_ID` env var for operators who want to
+  set it once and forget.
+- On signing-error detection, surface `next_action: "provide_team_id"`
+  with a message that names the exact param/env var — instead of a
+  generic `check_xcode_signing`.
+- 4 new tests in `test_wda_setup.py`.
+
+### Fixed — Polish/French localized `tap_text` (#3)
+- `tap_text("Podczas używania aplikacji")` still failed despite the
+  earlier NFC fix, because Android's `pl-PL` localization uses
+  U+00A0 (NO-BREAK SPACE) between words for typography. Visually
+  identical to ASCII space; byte-unequal.
+- New `_normalise_loose` adds a whitespace-lookalike fold
+  (NBSP / NNBSP / thin space / hair space → ASCII), strips
+  zero-width chars (ZWSP, word-joiner, BOM), collapses internal
+  whitespace runs, and case-folds in substring mode.
+- Wired into the XML-dump fallback path only; the primary
+  uiautomator2 selector stays strict so explicit `exact=True`
+  matches don't drift. Strict-match still wins over loose when
+  both exist in the same dump.
+- 7 new tests in `test_android_tap_robustness.py` covering NBSP,
+  NNBSP, thin space, ZWSP, run collapse, real Polish dialog match,
+  case-insensitive substring, strict-preferred precedence.
+
+### Fixed — overnight bot crashed on 6th raw-adb screenshot (#4)
+- An overnight automation used `adb -s … exec-out screencap -p`
+  via Bash for every screenshot — bypassing the MCP's 1600 px cap.
+  Pixel emulators are 2400 px native; 5 accumulated PNGs + the 6th
+  tripped the API's 2000 px-per-image dimension limit. The MCP
+  itself worked correctly; the agent reached around it.
+- Root cause: missing escape hatch on the BASIC tier.
+
+### Added — `compress_png` promoted to BASIC tier (#4)
+- The recompressor is now visible alongside `take_screenshot` on
+  the BASIC tier so the recovery loop is always one tool-call away,
+  regardless of the host's tool-count ceiling.
+- New tests pin the invariant
+  (`test_compress_png_lives_in_basic_tier`,
+  `test_take_screenshot_is_also_in_basic_tier`).
+
+### Added — `inspect_image_safety(path)` (#4)
+- Pre-Read PNG probe: returns `long_edge_px`, `mcp_produced`
+  (detects MCP cap via the preserved `.orig.png` sibling),
+  `safe_to_read`, and a deterministic `next_action` ∈
+  `{read_safely, compress_png, regenerate_via_take_screenshot,
+  fix_arguments, convert_to_png}`.
+- Cheap (PNG-header parse, < 1 ms, no pixel decode).
+- Promotes `regenerate_via_take_screenshot` over `compress_png` when
+  the file is ≥ 2000 px AND has no MCP provenance marker —
+  `compress_png` can fail on hosts missing all image backends, but
+  `take_screenshot` has the safety-net rewriter behind it.
+- BASIC tier alongside `take_screenshot` + `compress_png` — full
+  recovery loop available at every tier.
+- 9 new tests in `test_inspect_image_safety.py`.
+
+### Changed — docs
+- `docs/runbook.md`: failure mode #1 (2000 px limit) reordered to
+  put raw-adb-screencap as the dominant cause; new entries
+  2b (WDA team_id) and 2c (NBSP + `tap_text`).
+- SKILL-FULL.md: explicit "never use raw `adb screencap`" section
+  plus the four-line probe ↔ remediation pattern.
+
+### Stats
+- Tests: 521 → **556** (+35 across the patch).
+- Tools: 109 → **110** (one new: `inspect_image_safety`).
+- BASIC tier: 24 → **26** (added `compress_png`,
+  `inspect_image_safety`).
+- All four PRs merged via linear rebase;
+  `test (phone-controll)` green on every commit.
+
 ## [0.2.0] — 2026-05-17
 
 First version published with an explicit license, security policy,
