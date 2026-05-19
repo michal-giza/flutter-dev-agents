@@ -95,10 +95,33 @@ jobs:
       # gitleaks catches AWS keys, GitHub tokens, GCP service-account JSON
       # accidentally committed. Runs against the full history on push to
       # main; against the diff on PRs.
+      #
+      # We invoke the binary directly instead of `gitleaks/gitleaks-action@v2`
+      # because that JS action runs on Node 20, which GitHub Actions is
+      # deprecating in 2026, and the action has a known "stderr is not
+      # empty" crash on the new runners. The binary is a clean shell call
+      # with no Node-runtime dependency.
+      - name: Install gitleaks
+        run: |
+          GITLEAKS_VERSION="8.21.2"
+          curl -fsSL \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            -o /tmp/gitleaks.tar.gz
+          tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
+          sudo install -m 0755 /tmp/gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+
       - name: Secret scan (gitleaks)
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # `detect` scans the working tree + git history; `--redact`
+          # ensures any finding in CI logs doesn't itself leak the
+          # secret. Exit non-zero on findings.
+          gitleaks detect \
+            --source . \
+            --redact \
+            --verbose \
+            --no-banner \
+            --exit-code 1
 
   docker:
     name: Docker build smoke
@@ -111,21 +134,45 @@ jobs:
           docker build --tag mcp-phone-controll:ci .
       - name: Smoke test — container starts, /health responds
         run: |
-          # Disable the agent-proxy (LLM endpoint), and bind to a
-          # random host port so concurrent CI jobs don't collide.
-          docker run -d --rm --name mcp-smoke \
+          # Drop --rm so we can read logs even if the container dies
+          # mid-startup. We stop + remove explicitly at the end.
+          # MCP_HTTP_HOST=0.0.0.0 is baked into the image (commit
+          # introducing this CI fix), but we set it again here as a
+          # belt-and-braces against image-cache staleness.
+          docker run -d --name mcp-smoke \
             -e MCP_QUIET=1 \
+            -e MCP_HTTP_HOST=0.0.0.0 \
             -p 18765:8765 \
             mcp-phone-controll:ci
-          # Wait up to 30s for /health.
+
+          # Wait up to 30s for /health, capturing the last cURL error
+          # and the container's stdout/stderr if the loop fails.
+          ok=0
+          last_err=""
           for i in $(seq 1 30); do
-            if curl -fsS http://localhost:18765/health > /dev/null 2>&1; then
+            if last_err=$(curl -fsS http://localhost:18765/health 2>&1 > /dev/null); then
               echo "health ok after ${i}s"
+              ok=1
               break
             fi
             sleep 1
           done
-          # Final hit; non-200 fails the job.
+
+          if [ "$ok" != "1" ]; then
+            echo "::error::container failed /health after 30s; last cURL: $last_err"
+            echo "----- docker ps -a -----"
+            docker ps -a --filter name=mcp-smoke
+            echo "----- docker logs (last 200 lines) -----"
+            docker logs --tail 200 mcp-smoke 2>&1 || true
+            echo "----- container inspect (state) -----"
+            docker inspect mcp-smoke --format '{{json .State}}' || true
+            docker rm -f mcp-smoke || true
+            exit 1
+          fi
+
+          # Final assertions — both endpoints serve.
           curl -fsS http://localhost:18765/health
           curl -fsS http://localhost:18765/metrics | head -20
+
           docker stop mcp-smoke
+          docker rm -f mcp-smoke || true
