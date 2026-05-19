@@ -12,6 +12,7 @@ Copy-paste recipes covering the most common ways to drive
 | Build an autonomous agent loop | [Agent loops](#agent-loops) |
 | Drive it from a non-Claude tool | [HTTP adapter](#http-adapter) |
 | See a complete end-to-end flow | [End-to-end walkthrough](#end-to-end-walkthrough) |
+| Read fully-worked scenarios | [`scenarios/`](scenarios/) (5-min smoke, Polish-locale repro, multi-project debug loop) |
 
 ---
 
