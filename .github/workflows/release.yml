@@ -1,0 +1,95 @@
+name: Release
+
+# Publishes `mcp-phone-controll` to PyPI when a `v*.*.*` tag is pushed.
+#
+# Why a tag trigger (not a release-published trigger): tags are the
+# canonical source of truth in this repo — `v0.2.1` is created from a
+# verified `main` commit AFTER the release PR merges. Pushing the tag
+# becomes the single deterministic step that ships the package.
+#
+# Auth: Trusted Publishing (OIDC). No long-lived `PYPI_TOKEN` secret is
+# stored; PyPI verifies the GitHub OIDC claim against a publisher
+# configured at https://pypi.org/manage/project/mcp-phone-controll/
+# settings/publishing/.  Bootstrap (one-time, BEFORE first push):
+#   1. Create a PENDING publisher on PyPI for project
+#      `mcp-phone-controll`, owner `michal-giza`, repo
+#      `flutter-dev-agents`, workflow `release.yml`, environment
+#      `pypi-publish`.
+#   2. First tag push triggers this workflow, the pending publisher
+#      becomes active, the package is created on first upload.
+#
+# Idempotency: if the workflow re-runs against the same version,
+# the upload step fails (PyPI rejects re-uploads of existing
+# versions). That's the desired safety — bump the version and
+# tag again to re-release.
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:        # allow manual re-runs for debugging
+
+jobs:
+  build-and-publish:
+    name: Build wheel + sdist, publish to PyPI
+    runs-on: ubuntu-latest
+    environment:
+      # The GitHub environment name must match the publisher's
+      # `environment` setting on PyPI. Required by Trusted Publishing.
+      name: pypi-publish
+      url: https://pypi.org/p/mcp-phone-controll
+    permissions:
+      # `id-token: write` is the OIDC permission Trusted Publishing
+      # consumes. No other elevated permissions needed.
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Verify tag matches pyproject version
+        # Defensive check: catches the foot-gun where you tag `v0.2.1`
+        # but pyproject.toml still says `0.2.0`. Without this, the
+        # tag would publish the wrong version to PyPI.
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PROJECT_VERSION=$(
+            python -c 'import tomllib, pathlib; \
+              data=tomllib.loads(pathlib.Path("packages/phone-controll/pyproject.toml").read_text()); \
+              print(data["project"]["version"])'
+          )
+          echo "tag=$TAG_VERSION  pyproject=$PROJECT_VERSION"
+          if [ "$TAG_VERSION" != "$PROJECT_VERSION" ]; then
+            echo "::error::Tag $TAG_VERSION does not match pyproject.toml version $PROJECT_VERSION"
+            exit 1
+          fi
+
+      - name: Build distributions
+        # `python -m build` produces both wheel + sdist in dist/.
+        # We use the standard PyPA `build` tool, not `hatch build`,
+        # so the workflow stays portable across build backends.
+        run: |
+          cd packages/phone-controll
+          python -m pip install --upgrade pip build
+          python -m build --outdir ../../dist .
+
+      - name: Check distributions with twine
+        # Catches missing README/LICENSE in the metadata, malformed
+        # classifiers, etc. — failures here are nearly always a
+        # pyproject.toml issue.
+        run: |
+          python -m pip install --upgrade twine
+          twine check dist/*
+
+      - name: Publish to PyPI (Trusted Publishing)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+          # Don't fail if the version already exists — gives idempotency
+          # for accidental re-runs. The verify-tag step above is what
+          # prevents the actually-bad case (wrong version published).
+          skip-existing: true
