@@ -1,0 +1,17 @@
+# Issue chooser configuration — disables blank issues so every
+# report goes through one of the structured templates.
+#
+# Why: lets us require minimal context (MCP version, mcp_ping
+# output, OS) on every report instead of chasing it.
+blank_issues_enabled: false
+
+contact_links:
+  - name: 💬 Questions & discussions
+    url: https://github.com/michal-giza/flutter-dev-agents/discussions
+    about: For "how do I…" and "should I…" questions. Bug reports go through Issues; design discussion goes here.
+  - name: 🔒 Security vulnerability (private disclosure)
+    url: https://github.com/michal-giza/flutter-dev-agents/security/policy
+    about: DO NOT file a public issue for vulnerabilities. Read SECURITY.md for the disclosure flow.
+  - name: 📚 Read the runbook first
+    url: https://github.com/michal-giza/flutter-dev-agents/blob/main/docs/runbook.md
+    about: Top-10 production failure modes with concrete fixes. ~80% of "it broke" reports are answered here.

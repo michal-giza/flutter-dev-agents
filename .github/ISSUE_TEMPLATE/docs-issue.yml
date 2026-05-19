@@ -1,0 +1,47 @@
+name: 📚 Docs issue
+description: Something in the docs is wrong, missing, or unclear.
+title: "[docs] "
+labels: ["docs", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Doc fixes are some of the most valuable contributions. Half a
+        sentence here is enough — we don't need a long form.
+
+  - type: input
+    id: doc_file
+    attributes:
+      label: Which doc?
+      description: Path or URL. README, FAQ, runbook, a specific ADR…
+      placeholder: docs/runbook.md §2c
+    validations:
+      required: true
+
+  - type: textarea
+    id: issue
+    attributes:
+      label: What's wrong?
+      description: |
+        Pick one: wrong info, missing info, stale info, confusing wording,
+        broken link, broken code sample.
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested fix (optional)
+      description: |
+        If you already know the fix, paste it. Otherwise the maintainer
+        will propose one based on your report.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      options:
+        - label: I'd be happy to PR the fix.
+          required: false

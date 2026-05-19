@@ -1,0 +1,20 @@
+# Auto-assigns the listed users to PRs touching the matched paths.
+#
+# Today: single maintainer, so everything routes to @michal-giza.
+# When the team grows, add specific stewards per directory below.
+
+# Default — everything
+*                                @michal-giza
+
+# Security-sensitive — code that handles paths, subprocesses, auth
+.github/workflows/                @michal-giza
+packages/phone-controll/src/mcp_phone_controll/adapters/  @michal-giza
+packages/phone-controll/src/mcp_phone_controll/domain/usecases/patch_safe.py  @michal-giza
+packages/phone-controll/src/mcp_phone_controll/domain/path_guard.py  @michal-giza
+SECURITY.md                       @michal-giza
+
+# Release surface — anything that ships a public version
+CHANGELOG.md                      @michal-giza
+ROADMAP.md                        @michal-giza
+packages/phone-controll/pyproject.toml  @michal-giza
+.github/workflows/release.yml     @michal-giza
