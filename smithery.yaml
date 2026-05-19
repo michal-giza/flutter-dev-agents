@@ -1,0 +1,96 @@
+# Smithery directory manifest — https://smithery.ai/docs
+#
+# Smithery auto-detects this file when the repo URL is submitted and
+# uses it to (1) populate the directory listing, (2) generate the
+# `npx @smithery/cli install` invocation, and (3) drive the
+# "configure" UX on their dashboard. Keep it accurate or installers
+# will get broken default values.
+
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    properties:
+      MCP_TOOL_TIER:
+        type: string
+        enum: ["basic", "intermediate", "expert"]
+        default: "basic"
+        title: "Tool tier"
+        description: |
+          Curates which subset of the 110 tools is exposed.
+          • basic (26 tools) — fits under Cursor's 40-tool cap and
+            Claude Desktop's UI ceiling; recommended starting point.
+          • intermediate — adds build/install/test/dev-session.
+          • expert — exposes every tool.
+      MCP_WDA_TEAM_ID:
+        type: string
+        title: "Apple Developer Team ID"
+        description: |
+          10-character alphanumeric (e.g. ABCDE12345). Required for
+          building WebDriverAgent on physical iPhones — without it
+          xcodebuild fails on code signing. Find via Xcode →
+          Settings → Accounts. Safe to leave empty if you only test
+          Android.
+      MCP_LOG_FORMAT:
+        type: string
+        enum: ["text", "json"]
+        default: "text"
+        title: "Log format"
+        description: |
+          'json' for structured logs you can pipe to Datadog,
+          Honeycomb, or Loki. 'text' for local development.
+      MCP_MAX_IMAGE_DIM:
+        type: integer
+        default: 1600
+        minimum: 800
+        maximum: 1900
+        title: "Screenshot dimension cap (px)"
+        description: |
+          Hard ceiling on the long edge of every screenshot the
+          agent sees. Default 1600 leaves 400 px of headroom under
+          the API's 2000 px hard limit. Lower for token efficiency,
+          higher for visual-diff fidelity (max 1900).
+  commandFunction: |-
+    (config) => ({
+      command: "python",
+      args: ["-m", "mcp_phone_controll"],
+      env: {
+        MCP_TOOL_TIER: config.MCP_TOOL_TIER || "basic",
+        MCP_WDA_TEAM_ID: config.MCP_WDA_TEAM_ID || "",
+        MCP_LOG_FORMAT: config.MCP_LOG_FORMAT || "text",
+        MCP_MAX_IMAGE_DIM: String(config.MCP_MAX_IMAGE_DIM || 1600),
+      }
+    })
+
+# Metadata Smithery uses for ranking + display.
+metadata:
+  category: "Testing & Mobile Development"
+  tags:
+    - flutter
+    - mobile
+    - ios
+    - android
+    - testing
+    - patrol
+    - ui-automation
+    - agent
+    - autonomous
+    - claude
+    - real-device
+    - webdriveragent
+    - uiautomator2
+    - dart
+  homepage: "https://github.com/michal-giza/flutter-dev-agents"
+  documentation: "https://github.com/michal-giza/flutter-dev-agents#readme"
+  issues: "https://github.com/michal-giza/flutter-dev-agents/issues"
+  license: "Apache-2.0"
+  # Surface the prerequisites so Smithery's installer can warn users
+  # before the python module fails.
+  requirements:
+    python: ">=3.11"
+    notes: |
+      Requires `python` on PATH. For Android device control:
+      `brew install --cask android-platform-tools`. For iOS:
+      Xcode + `pipx install pymobiledevice3` + `sudo
+      pymobiledevice3 remote tunneld` running. See
+      docs/ios_setup.md.
