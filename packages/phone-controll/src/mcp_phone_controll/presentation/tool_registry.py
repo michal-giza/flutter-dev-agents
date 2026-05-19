@@ -80,6 +80,9 @@ from ..domain.usecases.ide import (
     OpenProjectInIde,
     WriteVscodeLaunchConfig,
 )
+from ..domain.usecases.inspect_image_safety import (
+    InspectImageSafety,
+)
 from ..domain.usecases.lifecycle import (
     ClearAppData,
     GrantPermission,
@@ -228,6 +231,7 @@ from .descriptors._param_builders import (
     _params_grep_logs,
     _params_index_project,
     _params_infer_pose,
+    _params_inspect_image_safety,
     _params_inspect_project,
     _params_install_app,
     _params_is_ide_available,
@@ -327,6 +331,7 @@ class UseCases:
     disk_usage: DiskUsage
     prune_originals: PruneOriginals
     compress_png: CompressPng
+    inspect_image_safety: InspectImageSafety
     inspect_project: InspectProject
     prepare_for_test: PrepareForTest
     run_test_plan: RunTestPlan
@@ -592,6 +597,22 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             ),
             build_params=_params_compress_png,
             invoke=_bind(uc.compress_png, _params_compress_png),
+        ),
+        ToolDescriptor(
+            name="inspect_image_safety",
+            description=(
+                "Probe a PNG before Read: returns long_edge_px, "
+                "mcp_produced, safe_to_read, and next_action "
+                "(read_safely | compress_png | "
+                "regenerate_via_take_screenshot). Call this first on "
+                "any image you didn't get from take_screenshot."
+            ),
+            input_schema=_schema(
+                {"path": _string("Path to a PNG to probe.")},
+                required=["path"],
+            ),
+            build_params=_params_inspect_image_safety,
+            invoke=_bind(uc.inspect_image_safety, _params_inspect_image_safety),
         ),
         ToolDescriptor(
             name="session_summary",

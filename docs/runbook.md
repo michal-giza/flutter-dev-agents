@@ -69,9 +69,18 @@ listed.
 
    **Fix**: instruct the agent to use `take_screenshot` exclusively.
    If a bot routinely reaches for raw adb (small models often do
-   when they've already used `Bash` for `adb shell input tap`), call
-   `compress_png(path=…)` on the raw output before reading it. Both
-   tools are on the BASIC tier so they're always available.
+   when they've already used `Bash` for `adb shell input tap`), the
+   discipline pattern is:
+
+   ```
+   Bash("adb -s <serial> exec-out screencap -p > /tmp/x.png")
+   safety = inspect_image_safety(path="/tmp/x.png")
+   # safety.data.next_action ∈ {read_safely, compress_png,
+   #   regenerate_via_take_screenshot, fix_arguments, convert_to_png}
+   ```
+
+   `inspect_image_safety`, `compress_png` and `take_screenshot` are
+   all on the BASIC tier so the recovery loop is always available.
 
    May 2026 incident: an overnight automation accumulated 5 raw-adb
    PNGs at 2400px each, crashed on the 6th. The MCP itself was

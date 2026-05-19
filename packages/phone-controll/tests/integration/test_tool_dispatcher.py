@@ -73,6 +73,7 @@ from mcp_phone_controll.domain.usecases.ide import (
     OpenProjectInIde,
     WriteVscodeLaunchConfig,
 )
+from mcp_phone_controll.domain.usecases.inspect_image_safety import InspectImageSafety
 from mcp_phone_controll.domain.usecases.lifecycle import (
     ClearAppData,
     GrantPermission,
@@ -250,6 +251,7 @@ def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:
         disk_usage=DiskUsage(artifacts),
         prune_originals=PruneOriginals(artifacts),
         compress_png=CompressPng(),
+        inspect_image_safety=InspectImageSafety(),
         inspect_project=InspectProject(inspector),
         prepare_for_test=_PrepFT(lifecycle, ui, observation, artifacts, state),
         run_test_plan=RunTestPlan(plan_executor, plan_loader),
@@ -566,5 +568,6 @@ async def test_registry_covers_all_use_case_fields(tmp_path: Path):
         "new_session",
         "get_artifacts_dir",
         "fetch_artifact",
+        "inspect_image_safety",
     }
     assert names == expected

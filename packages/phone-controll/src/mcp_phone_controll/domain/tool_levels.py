@@ -45,6 +45,13 @@ BASIC_TOOLS: tuple[str, ...] = (
     # running bot crashed on its 6th raw-adb screenshot exceeding the
     # 2000px API limit.)
     "compress_png",
+    # Pre-Read checker: "is this PNG safe to Read directly, or will
+    # it blow the API's 2000px limit?" Cheap (PNG-header parse).
+    # Returns next_action so the agent knows whether to call Read,
+    # compress_png, or regenerate via take_screenshot. The companion
+    # to compress_png — together they close the agent-discipline loop
+    # for images produced outside our cap pipeline.
+    "inspect_image_safety",
     # Verify-after-action flow discipline (Tier A)
     "tap_and_verify",
     "assert_no_errors_since",

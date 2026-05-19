@@ -129,6 +129,7 @@ from .domain.usecases.ide import (
     OpenProjectInIde,
     WriteVscodeLaunchConfig,
 )
+from .domain.usecases.inspect_image_safety import InspectImageSafety
 from .domain.usecases.lifecycle import (
     ClearAppData,
     GrantPermission,
@@ -496,6 +497,7 @@ def build_runtime(
         disk_usage=DiskUsage(artifacts_repo),
         prune_originals=PruneOriginals(artifacts_repo),
         compress_png=CompressPng(),
+        inspect_image_safety=InspectImageSafety(),
         inspect_project=InspectProject(inspector),
         prepare_for_test=PrepareForTest(
             lifecycle_repo, ui_repo, observation_repo, artifacts_repo, state_repo

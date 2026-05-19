@@ -1093,6 +1093,28 @@
       "idempotentHint": true,
       "readOnlyHint": true
     },
+    "description": "Probe a PNG before Read: returns long_edge_px, mcp_produced, safe_to_read, and next_action (read_safely | compress_png | regenerate_via_take_screenshot). Call this first on any image you didn't get from take_screenshot.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "description": "Path to a PNG to probe.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    },
+    "name": "inspect_image_safety"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
     "description": "Detect what kind of project lives at a path (Flutter, native, RN, web) and which test frameworks apply. Call this before run_patrol_* / run_integration_tests so you know which framework will execute.",
     "inputSchema": {
       "additionalProperties": false,
