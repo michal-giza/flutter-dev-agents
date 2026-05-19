@@ -73,6 +73,7 @@ from ...domain.usecases.ide import (
     OpenProjectInIdeParams,
     WriteVscodeLaunchConfigParams,
 )
+from ...domain.usecases.inspect_image_safety import InspectImageSafetyParams
 from ...domain.usecases.lifecycle import (
     ClearAppDataParams,
     GrantPermissionParams,
@@ -634,6 +635,10 @@ def _params_compress_png(args: JsonDict) -> CompressPngParams:
         path=Path(args["path"]).expanduser(),
         max_dim=int(max_dim) if max_dim is not None else None,
     )
+
+
+def _params_inspect_image_safety(args: JsonDict) -> InspectImageSafetyParams:
+    return InspectImageSafetyParams(path=Path(args["path"]).expanduser())
 
 
 def _params_tool_usage_report(args: JsonDict) -> ToolUsageReportParams:
