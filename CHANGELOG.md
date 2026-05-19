@@ -5,6 +5,122 @@ All notable changes to `flutter-dev-agents` / `mcp-phone-controll`.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] — 2026-05-19
+
+Launch-readiness release. No behavior changes for end users — every
+diff is CI hardening, distribution plumbing, or launch-day docs.
+Releasing as 0.2.2 so the `mcp-phone-controll` PyPI listing is
+created with infrastructure in place rather than as a side-effect
+of a behavior change.
+
+### Fixed — CI green for the first time (#6)
+
+Three pre-existing CI failures that went red on every PR in the
+0.2.1 series but never blocked the release (the `test` job was
+always green). All three fixed together in one pass:
+
+- **`gitleaks` action crashed on Node 20 runners.** Replaced the JS
+  action with a direct gitleaks binary install (v8.21.2). Removes
+  the Node-runtime dependency entirely.
+- **Docker smoke "Connection reset by peer".** Root cause:
+  `MCP_HTTP_HOST` defaulted to `127.0.0.1`, so the FastAPI server
+  only listened on the container's loopback. `docker run -p`
+  couldn't reach it. Baked `MCP_HTTP_HOST=0.0.0.0` into the image
+  ENV with belt-and-braces re-set in the CI step.
+- **`libssl-dev` missing from the builder stage.** `sslpsk-pmd3`
+  (transitive `pymobiledevice3` dep) needs `openssl/ssl.h` to
+  compile its C extension. Added to the builder's apt list.
+- Smoke step now dumps `docker logs`, `docker inspect`, captured
+  cURL errors on failure so the next regression surfaces with a
+  useful trace.
+
+First fully-green CI run on the repo lives on this commit.
+
+### Added — PyPI publish workflow (#7)
+
+`.github/workflows/release.yml` triggers on `v*.*.*` tag push and
+publishes a wheel + sdist via PyPI Trusted Publishing (OIDC). No
+long-lived `PYPI_TOKEN` secret stored anywhere — PyPI verifies the
+GitHub OIDC claim against a pre-configured publisher.
+
+Tag-vs-pyproject-version guard catches the foot-gun where a tag
+ships with a stale version. `skip-existing: true` makes the upload
+idempotent for accidental re-runs.
+
+One-time bootstrap step the user owns (the publisher form requires
+a browser session): see `scripts/bootstrap_pypi_publisher.sh`.
+
+### Added — launch infrastructure (#7, #8)
+
+- **README polish.** New one-sentence headline, 6 status badges
+  (tests / license / MCP spec / Python / PyPI / CI), "Why it
+  matters" section above-the-fold, "Try in 5 minutes" anchor.
+  Stale tool counts ("67 tools / 50+") corrected to 110 across
+  every reference.
+- **`docs/launch-content/`** — 8 ready-to-paste submission files
+  covering modelcontextprotocol/servers PR text, PulseMCP / mcp.so /
+  Smithery / Glama form values, 3 awesome-mcp-server PR templates,
+  3 LinkedIn variants with timing tactics, and the GitHub repo
+  About-panel + topics + social-preview spec. ASO discipline
+  applied across every text (first 80 chars carry value prop;
+  three keyword clusters; one concrete number per blurb).
+- **`smithery.yaml`** at repo root — required for the Smithery
+  directory listing. Declares the 4 user-facing config knobs
+  (`MCP_TOOL_TIER`, `MCP_WDA_TEAM_ID`, `MCP_LOG_FORMAT`,
+  `MCP_MAX_IMAGE_DIM`) with proper schemas + descriptions so
+  Smithery's dashboard generates a usable config UX.
+- **Social-preview PNG** generated at `docs/design/social-preview.png`
+  (1280×640, 35 KB) via `scripts/generate_social_preview.py`. Two
+  columns (headline + 4-badge row | "WHAT'S INSIDE" capability
+  list). Pillow-based — already a hard dep for our cap pipeline,
+  so contributors can regenerate when numbers change without
+  installing Figma/Sketch.
+- **GitHub repo About panel** set live via `gh repo edit`:
+  description, homepage URL, 18 topic tags.
+
+### Added — release-cut helper
+
+`scripts/release.sh <version>` automates the mechanical part of a
+new release:
+
+- Validate semver shape.
+- Refuse if the tag already exists or the working tree is dirty.
+- Refuse if `CHANGELOG.md` doesn't have a section for the new
+  version — forces the human-written narrative.
+- Bump `pyproject.toml`, commit, push the release branch.
+- Print the `gh pr create` + `git tag` commands for the user to
+  run after the PR merges.
+
+`--dry-run` mode prints what would happen without modifying files.
+Deliberately does NOT tag main directly or push to PyPI — the
+release workflow handles those on tag push, so the human PR
+review is the release gate.
+
+### Added — PyPI bootstrap helper
+
+`scripts/bootstrap_pypi_publisher.sh` prints the exact field values
+to paste at `pypi.org/manage/account/publishing/` (no typos, no
+field guessing), opens the browser, and — with the `verify` arg —
+pings PyPI to confirm the publisher is active.
+
+### Changed — repo organization
+
+Moved 6 internal docs out of public `docs/` into `docs/internal/`
+so the docs index is launch-presentable:
+
+- Four `code-review-2026-05-*.md` engineering reviews.
+- `LAUNCH-CHECKLIST.md` (superseded by `docs/launch-content/`).
+- `next-session-enhancements.md` planning doc.
+
+Public `docs/` now reads as: architecture, runbook, adding\_\*,
+adr/, design/, teaching/, walkthroughs.
+
+### Stats
+- Tests: 556 (unchanged — no source-code changes in this release).
+- All three CI jobs (`test`, `Security audit`, `Docker build
+  smoke`) green for the first time on the repo.
+- No new tools; no breaking changes.
+
 ## [0.2.1] — 2026-05-19
 
 Field-bug-driven patch release. Five issues surfaced during the first
@@ -248,5 +364,7 @@ quality for weeks; this release formalizes that.
 Initial monorepo restructure and tool catalogue (~100 tools across
 tiers A–F). Pre-public release; no SemVer guarantees.
 
+[0.2.2]: https://github.com/michal-giza/flutter-dev-agents/releases/tag/v0.2.2
+[0.2.1]: https://github.com/michal-giza/flutter-dev-agents/releases/tag/v0.2.1
 [0.2.0]: https://github.com/michal-giza/flutter-dev-agents/releases/tag/v0.2.0
 [0.1.0]: https://github.com/michal-giza/flutter-dev-agents/releases/tag/v0.1.0
