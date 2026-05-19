@@ -27,6 +27,13 @@ FROM python:${PYTHON_VERSION}-slim AS builder
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
         git \
+        # libssl-dev: sslpsk-pmd3 (transitive pymobiledevice3 dep) builds
+        # a C extension against openssl/ssl.h. Without this, the build
+        # fails with "fatal error: openssl/ssl.h: No such file or
+        # directory" even though pymobiledevice3 itself is iOS-only and
+        # unused in the Linux container. Cheaper to install the headers
+        # than to surgically remove pymobiledevice3 from the base deps.
+        libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
@@ -70,9 +77,12 @@ RUN pip install --no-cache-dir --no-index --find-links /wheels mcp-phone-control
 
 USER mcp
 
-# The HTTP adapter expects to bind to 0.0.0.0:8765 by default; the
-# Kubernetes deployment overrides via $PORT.
-ENV PORT=8765 \
+# The HTTP adapter binds to 127.0.0.1 by default (safer for stdio +
+# local dev). Inside a container, that hides the server from
+# `docker run -p`. Override here so the image is usable as-is.
+# Kubernetes still overrides via $PORT.
+ENV MCP_HTTP_HOST=0.0.0.0 \
+    PORT=8765 \
     PYTHONUNBUFFERED=1 \
     MCP_LOG_FORMAT=json
 
