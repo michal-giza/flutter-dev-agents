@@ -11,7 +11,7 @@
 
 110 tools across Android (uiautomator2 + adb), iOS (WebDriverAgent + pymobiledevice3) and Flutter (Patrol + `flutter run --machine`). Works with Claude Desktop, Claude Code, Cursor, or any MCP-aware host. Plays well with local LLMs through the OpenAI-compat HTTP adapter.
 
-→ **[Try it in 5 minutes](#getting-started-developer-machine-macos)** · **[Full integrations guide](INTEGRATIONS.md)** · **[Production runbook](docs/runbook.md)** · **[Architecture](docs/architecture.md)**
+→ **[Try it in 5 minutes](#getting-started-developer-machine-macos)** · **[Operational gotchas (read first)](docs/operational-gotchas.md)** · **[Full integrations guide](INTEGRATIONS.md)** · **[Production runbook](docs/runbook.md)** · **[Architecture](docs/architecture.md)**
 
 ---
 
