@@ -7,6 +7,13 @@ it running.
 This document covers the top failure modes seen in the field plus
 the standard deployment / monitoring / recovery operations.
 
+For pre-flight gotchas that prevent failures (logical-vs-pixel
+coordinates, WDA-mandatory tools, localhost addressing across
+sim/emulator), read [`docs/operational-gotchas.md`](operational-gotchas.md)
+**before** your first automated session — it's a 5-minute read and
+covers issues this runbook can't help with because they happen
+before the agent even starts producing errors.
+
 ## Quick diagnosis
 
 ```
