@@ -37,6 +37,14 @@ BASIC_TOOLS: tuple[str, ...] = (
     "stop_app",
     "take_screenshot",
     "read_logs",
+    # Escape hatch when an agent grabs a screenshot via raw `adb
+    # exec-out screencap` (or any other oversized PNG) — palette-mode
+    # recompressor with hard 1600px cap. Must be in BASIC so agents
+    # never get stuck holding a 2400px PNG with no remediation
+    # available on the basic tier. (May 2026 field incident: a long-
+    # running bot crashed on its 6th raw-adb screenshot exceeding the
+    # 2000px API limit.)
+    "compress_png",
     # Verify-after-action flow discipline (Tier A)
     "tap_and_verify",
     "assert_no_errors_since",
