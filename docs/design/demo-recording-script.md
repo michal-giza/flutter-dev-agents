@@ -156,7 +156,7 @@ If still over 8 MB, knock the width to 960 or fps to 12. Below
 
 ## What to do with the GIF
 
-1. **Drop into the LinkedIn post** (`docs/launch-content/07-linkedin-post.md`).
+1. **Drop into the LinkedIn post** (drafted in the maintainer's private launch playbook).
    LinkedIn re-encodes; this is fine.
 2. **Embed in the README** under a `<details>` tag so it doesn't
    weigh down the rendered page:

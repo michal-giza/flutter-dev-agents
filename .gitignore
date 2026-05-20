@@ -40,3 +40,15 @@ dist/
 
 # OS
 Thumbs.db
+
+# Private launch playbook + case-study journal entries.
+# Lives on the maintainer's laptop only — never push.
+# Contains: humanized post copy, supporter-DM templates, raw journal
+# entries with un-sanitized customer/project names.
+# If you're a collaborator and need access, DM the maintainer.
+private/
+
+# Individual case-study journal entries are personal notes.
+# Ignore dated files (YYYY-MM-DD.md); keep the README + template
+# that document the system itself.
+docs/internal/case-study-journal/[0-9]*.md
