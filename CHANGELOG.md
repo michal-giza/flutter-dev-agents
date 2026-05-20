@@ -57,11 +57,12 @@ a browser session): see `scripts/bootstrap_pypi_publisher.sh`.
   matters" section above-the-fold, "Try in 5 minutes" anchor.
   Stale tool counts ("67 tools / 50+") corrected to 110 across
   every reference.
-- **`docs/launch-content/`** — 8 ready-to-paste submission files
-  covering modelcontextprotocol/servers PR text, PulseMCP / mcp.so /
-  Smithery / Glama form values, 3 awesome-mcp-server PR templates,
-  3 LinkedIn variants with timing tactics, and the GitHub repo
-  About-panel + topics + social-preview spec. ASO discipline
+- **Launch playbook authored locally** (now gitignored under
+  `private/`) — covers directory submissions (PulseMCP, mcp.so,
+  Smithery, Glama, 3 awesome-mcp PRs), social posts (LinkedIn, HN,
+  Reddit r/FlutterDev, dev.to, Twitter), community channels (Patrol
+  Slack, Flutter Discord), and the GitHub repo About-panel / topics
+  / social-preview spec. ASO discipline
   applied across every text (first 80 chars carry value prop;
   three keyword clusters; one concrete number per blurb).
 - **`smithery.yaml`** at repo root — required for the Smithery
@@ -109,7 +110,7 @@ Moved 6 internal docs out of public `docs/` into `docs/internal/`
 so the docs index is launch-presentable:
 
 - Four `code-review-2026-05-*.md` engineering reviews.
-- `LAUNCH-CHECKLIST.md` (superseded by `docs/launch-content/`).
+- `LAUNCH-CHECKLIST.md` (superseded by the private launch playbook).
 - `next-session-enhancements.md` planning doc.
 
 Public `docs/` now reads as: architecture, runbook, adding\_\*,

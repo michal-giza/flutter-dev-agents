@@ -14,11 +14,10 @@ Things in flight right this week. Most have an open issue or PR
 you can comment on or pick up.
 
 - **Distribution wave — week 1 of public launch.** Submissions to
-  `modelcontextprotocol/servers`, PulseMCP, mcp.so, Smithery, Glama,
-  3 awesome-mcp lists, LinkedIn variants A/B/C. Tracked in
-  `docs/launch-content/`. Help wanted: confirm the
-  `claude mcp add` and `pip install` instructions work clean on
-  Linux + on a fresh Windows WSL2 box.
+  PulseMCP, mcp.so, Smithery, Glama, 3 awesome-mcp lists, LinkedIn,
+  Hacker News, dev.to, Twitter, Patrol Slack + Flutter Discord.
+  Help wanted: confirm the `claude mcp add` and `pip install`
+  instructions work clean on Linux + on a fresh Windows WSL2 box.
 - **Week-1 production case study.** Daily journal entries in
   `docs/internal/case-study-journal/` will be extracted into a
   public `docs/case-study-week-1.md` once a week of real-use data
