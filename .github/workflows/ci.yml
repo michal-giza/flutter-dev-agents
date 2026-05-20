@@ -65,6 +65,14 @@ jobs:
       #   transitive of a transitive (`pytest-forked` -> `py`). The
       #   vulnerability is a ReDoS in `py.path.svnurl` which we
       #   don't use. Re-evaluate when `py` is removed from our tree.
+      # - PYSEC-2025-183 (`pyjwt` <=2.12.1) / CVE-2025-45768: this
+      #   is **disputed** by the pyjwt maintainers — the "weakness"
+      #   is short HMAC keys, which is the calling application's
+      #   responsibility, not the library's. We pull pyjwt only as
+      #   a transitive of the `mcp` / `anthropic` SDK chain; we
+      #   don't pass keys to pyjwt ourselves. Tracked in #19 for
+      #   re-evaluation if the upstream dispute resolves with a
+      #   real library-side fix.
       - name: pip-audit (CVE scan)
         run: |
           export PATH="$HOME/.local/bin:$PATH"
@@ -72,7 +80,8 @@ jobs:
           .venv/bin/pip-audit \
             --progress-spinner=off \
             --skip-editable \
-            --ignore-vuln PYSEC-2022-42969
+            --ignore-vuln PYSEC-2022-42969 \
+            --ignore-vuln PYSEC-2025-183
 
       # ----- SBOM generation -----
       # CycloneDX is the standard SBOM format procurement teams expect.
