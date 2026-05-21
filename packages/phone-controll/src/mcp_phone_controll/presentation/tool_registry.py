@@ -27,6 +27,7 @@ from ..domain.usecases.artifacts import (
 )
 from ..domain.usecases.audit_accessibility import AuditAccessibility
 from ..domain.usecases.audit_code_seniority import AuditCodeSeniority
+from ..domain.usecases.audit_security import AuditSecurity
 from ..domain.usecases.build_install import (
     BuildApp,
     InstallApp,
@@ -229,6 +230,7 @@ from .descriptors._param_builders import (
     _params_attach_debug_session,
     _params_audit_accessibility,
     _params_audit_code_seniority,
+    _params_audit_security,
     _params_boot_simulator,
     _params_build_app,
     _params_calibrate_camera,
@@ -492,6 +494,8 @@ class UseCases:
     recommend_test_path: RecommendTestPath
     # v0.3.0 phase 7 — code-seniority audit
     audit_code_seniority: AuditCodeSeniority
+    # v0.3.0 phase 8 — security audit (OWASP MASVS)
+    audit_security: AuditSecurity
     new_session: NewSession
     get_artifacts_dir: GetArtifactsDir
     fetch_artifact: FetchArtifact
@@ -2605,6 +2609,43 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             invoke=_bind(
                 uc.audit_code_seniority, _params_audit_code_seniority
             ),
+        ),
+        # ---- v0.3.0 phase 8 — security audit (OWASP MASVS) ----
+        ToolDescriptor(
+            name="audit_security",
+            description=(
+                "OWASP MASVS scanner. 20 rules across 3 severities "
+                "(critical/high/medium): hardcoded API keys, JWT/PEM "
+                "in source, cleartext HTTP, SharedPreferences for "
+                "tokens, unguarded WebView JS, debug-signed release, "
+                "ATS disabled, exported components, missing cert "
+                "pinning. Returns per-file findings with redacted "
+                "secrets + grade (secure/acceptable/at_risk/critical). "
+                "See docs/security-rubric.md."
+            ),
+            input_schema=_schema(
+                {
+                    "project_path": _string("Project root."),
+                    "paths": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": (
+                            "Optional subset of paths to scan. "
+                            "Default: whole project."
+                        ),
+                    },
+                    "min_severity": _enum(
+                        ["critical", "high", "medium"],
+                        "Minimum severity to report.",
+                    ),
+                    "max_findings": _number(
+                        "Cap on findings returned. Default 200."
+                    ),
+                },
+                ["project_path"],
+            ),
+            build_params=_params_audit_security,
+            invoke=_bind(uc.audit_security, _params_audit_security),
         ),
         ToolDescriptor(
             name="save_golden_image",

@@ -29,6 +29,9 @@ from mcp_phone_controll.domain.usecases.audit_accessibility import (
 from mcp_phone_controll.domain.usecases.audit_code_seniority import (
     AuditCodeSeniority,
 )
+from mcp_phone_controll.domain.usecases.audit_security import (
+    AuditSecurity,
+)
 from mcp_phone_controll.domain.usecases.build_install import (
     BuildApp,
     InstallApp,
@@ -414,6 +417,7 @@ def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:
         # v0.3.0 phase 6 — pure-compute path advisor
         recommend_test_path=RecommendTestPath(),
         audit_code_seniority=AuditCodeSeniority(),
+        audit_security=AuditSecurity(),
         new_session=NewSession(artifacts),
         get_artifacts_dir=GetArtifactsDir(artifacts),
         fetch_artifact=FetchArtifact(),
@@ -653,5 +657,7 @@ async def test_registry_covers_all_use_case_fields(tmp_path: Path):
         "recommend_test_path",
         # v0.3.0 phase 7 (code-seniority audit)
         "audit_code_seniority",
+        # v0.3.0 phase 8 (security audit — OWASP MASVS)
+        "audit_security",
     }
     assert names == expected
