@@ -149,6 +149,10 @@ from mcp_phone_controll.domain.usecases.testing import (
     RunIntegrationTests,
     RunUnitTests,
 )
+from mcp_phone_controll.domain.usecases.ui_automation_pause import (
+    PauseUiAutomation,
+    ResumeUiAutomation,
+)
 from mcp_phone_controll.domain.usecases.ui_graph import ExtractUiGraph
 from mcp_phone_controll.domain.usecases.ui_input import (
     PressKey,
@@ -413,6 +417,8 @@ def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:
         # registry-coverage test passes. Unit tests for the use cases
         # live at tests/unit/test_deep_link.py + test_audit_accessibility.py.
         test_deep_link=TestDeepLink(devices, ui, state, adb_client=None),
+        pause_ui_automation=PauseUiAutomation(state, adb_client=None),
+        resume_ui_automation=ResumeUiAutomation(state, adb_client=None),
         audit_accessibility=AuditAccessibility(devices, ui, state),
         # v0.3.0 phase 6 — pure-compute path advisor
         recommend_test_path=RecommendTestPath(),
@@ -652,6 +658,9 @@ async def test_registry_covers_all_use_case_fields(tmp_path: Path):
         "propose_test_scenarios",
         # v0.3.0 phase 5 (deep link + accessibility audit)
         "test_deep_link",
+        # v0.3.0 phase 8.5 (pause/resume openatx uiautomator2 helper)
+        "pause_ui_automation",
+        "resume_ui_automation",
         "audit_accessibility",
         # v0.3.0 phase 6 (test-path advisor)
         "recommend_test_path",

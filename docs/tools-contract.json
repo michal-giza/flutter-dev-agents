@@ -2045,6 +2045,25 @@
   {
     "annotations": {
       "destructiveHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Disables the openatx uiautomator2 helper APKs (com.github.uiautomator + .test) on Android via `pm disable-user`. Stops the AVD respawn-loop where the helper fights the app under test for foreground. MUST be paired with resume_ui_automation. Safe no-op when the helper isn't installed.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "serial": {
+          "description": "Device serial; defaults to selected device.",
+          "type": "string"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "pause_ui_automation"
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
       "openWorldHint": true,
       "readOnlyHint": false
     },
@@ -2512,6 +2531,29 @@
       "type": "object"
     },
     "name": "restart_debug_session"
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Re-enables the openatx uiautomator2 helper APKs via `pm enable`. Pair this with pause_ui_automation \u2014 every pause MUST be resumed. Waits settle_ms (default 800) after `pm enable` so the next uiautomator2 init can connect cleanly.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "serial": {
+          "description": "Device serial; defaults to selected device.",
+          "type": "string"
+        },
+        "settle_ms": {
+          "description": "Settle wait after pm enable. Default 800ms.",
+          "type": "number"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "resume_ui_automation"
   },
   {
     "annotations": {

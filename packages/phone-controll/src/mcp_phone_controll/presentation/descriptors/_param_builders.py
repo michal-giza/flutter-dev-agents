@@ -147,6 +147,10 @@ from ...domain.usecases.testing import (
     RunIntegrationTestsParams,
     RunUnitTestsParams,
 )
+from ...domain.usecases.ui_automation_pause import (
+    PauseUiAutomationParams,
+    ResumeUiAutomationParams,
+)
 from ...domain.usecases.ui_graph import ExtractUiGraphParams
 from ...domain.usecases.ui_input import (
     PressKeyParams,
@@ -980,6 +984,20 @@ def _params_test_deep_link(args: JsonDict) -> TestDeepLinkParams:
         serial=args.get("serial"),
         cold_start=bool(args.get("cold_start", False)),
         timeout_s=float(args.get("timeout_s", 15.0)),
+    )
+
+
+# ---- v0.3.0 phase 8.5 — pause / resume openatx uiautomator2 helper ----
+
+
+def _params_pause_ui_automation(args: JsonDict) -> PauseUiAutomationParams:
+    return PauseUiAutomationParams(serial=args.get("serial"))
+
+
+def _params_resume_ui_automation(args: JsonDict) -> ResumeUiAutomationParams:
+    return ResumeUiAutomationParams(
+        serial=args.get("serial"),
+        settle_ms=int(args.get("settle_ms", 800)),
     )
 
 
