@@ -128,6 +128,9 @@ from ...domain.usecases.propose_test_scenarios import (
     ProposeTestScenariosParams,
 )
 from ...domain.usecases.recall import IndexProjectParams, RecallParams
+from ...domain.usecases.recommend_test_path import (
+    RecommendTestPathParams,
+)
 from ...domain.usecases.release_screenshot import CaptureReleaseScreenshotParams
 from ...domain.usecases.set_agent_profile import SetAgentProfileParams
 from ...domain.usecases.skill_library import (
@@ -982,6 +985,20 @@ def _params_audit_accessibility(args: JsonDict) -> AuditAccessibilityParams:
             args.get("ignore_class_substrings")
             or ("Divider", "Padding", "SizedBox")
         ),
+    )
+
+
+# ---- v0.3.0 phase 6 — test path advisor --------------------------------
+
+
+def _params_recommend_test_path(args: JsonDict) -> RecommendTestPathParams:
+    baseline = args.get("size_baseline_path")
+    return RecommendTestPathParams(
+        project_path=Path(args["project_path"]).expanduser(),
+        context=args["context"],
+        device_serial=args.get("device_serial"),
+        size_baseline_path=Path(baseline).expanduser() if baseline else None,
+        coverage_fail_under=float(args.get("coverage_fail_under", 0.80)),
     )
 
 

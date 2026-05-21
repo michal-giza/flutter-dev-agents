@@ -134,6 +134,8 @@ def default_annotations(tool_name: str) -> dict[str, bool]:
         "propose_test_scenarios",
         # v0.3.0 phase 5 — audit_accessibility only READS the UI tree
         "audit_accessibility",
+        # v0.3.0 phase 6 — pure compute, no device touch
+        "recommend_test_path",
     )
     # Destructive tools — touch device state, install/launch/stop apps,
     # write files in arbitrary places, modify project source.

@@ -127,6 +127,9 @@ from mcp_phone_controll.domain.usecases.propose_test_scenarios import (
     ProposeTestScenarios,
 )
 from mcp_phone_controll.domain.usecases.recall import IndexProject, Recall
+from mcp_phone_controll.domain.usecases.recommend_test_path import (
+    RecommendTestPath,
+)
 from mcp_phone_controll.domain.usecases.release_screenshot import (
     CaptureReleaseScreenshot,
 )
@@ -405,6 +408,8 @@ def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:
         # live at tests/unit/test_deep_link.py + test_audit_accessibility.py.
         test_deep_link=TestDeepLink(devices, ui, state, adb_client=None),
         audit_accessibility=AuditAccessibility(devices, ui, state),
+        # v0.3.0 phase 6 — pure-compute path advisor
+        recommend_test_path=RecommendTestPath(),
         new_session=NewSession(artifacts),
         get_artifacts_dir=GetArtifactsDir(artifacts),
         fetch_artifact=FetchArtifact(),
@@ -640,5 +645,7 @@ async def test_registry_covers_all_use_case_fields(tmp_path: Path):
         # v0.3.0 phase 5 (deep link + accessibility audit)
         "test_deep_link",
         "audit_accessibility",
+        # v0.3.0 phase 6 (test-path advisor)
+        "recommend_test_path",
     }
     assert names == expected

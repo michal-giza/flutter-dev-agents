@@ -180,6 +180,7 @@ from .domain.usecases.productivity import (
 from .domain.usecases.projects import InspectProject
 from .domain.usecases.propose_test_scenarios import ProposeTestScenarios
 from .domain.usecases.recall import IndexProject, Recall
+from .domain.usecases.recommend_test_path import RecommendTestPath
 from .domain.usecases.release_screenshot import CaptureReleaseScreenshot
 from .domain.usecases.set_agent_profile import SetAgentProfile
 from .domain.usecases.skill_library import (
@@ -646,6 +647,8 @@ def build_runtime(
         # v0.3.0 phase 5 — deep link + accessibility audit
         test_deep_link=TestDeepLink(devices_repo, ui_repo, state_repo, adb),
         audit_accessibility=AuditAccessibility(devices_repo, ui_repo, state_repo),
+        # v0.3.0 phase 6 — test-path advisor
+        recommend_test_path=RecommendTestPath(),
         new_session=NewSession(artifacts_repo),
         get_artifacts_dir=GetArtifactsDir(artifacts_repo),
         fetch_artifact=FetchArtifact(),
