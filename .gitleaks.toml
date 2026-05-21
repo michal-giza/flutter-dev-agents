@@ -1,0 +1,22 @@
+# Gitleaks configuration for flutter-dev-agents.
+#
+# Inherits gitleaks default rules, then allowlists paths that
+# intentionally contain sample secret patterns for the
+# audit_security tool's own test fixtures.
+#
+# Rationale: the security scanner has to recognize what a leaked
+# secret looks like, so its test suite includes known-bad sample
+# values. These are documented fixtures, not real credentials —
+# but they trip entropy-based detection by default.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allowlist test fixtures that must contain sample secret patterns"
+paths = [
+  '''packages/phone-controll/tests/unit/test_audit_security.py''',
+  '''packages/phone-controll/tests/fixtures/.*''',
+  # Sample values cited in the security rubric docs.
+  '''docs/security-rubric\.md''',
+]
