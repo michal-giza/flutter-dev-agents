@@ -1377,16 +1377,18 @@ wheels = [
 
 [[package]]
 name = "mcp-phone-controll"
-version = "0.1.0"
+version = "0.2.2"
 source = { editable = "packages/phone-controll" }
 dependencies = [
     { name = "anyio" },
     { name = "facebook-wda" },
     { name = "mcp" },
+    { name = "pillow" },
     { name = "pydantic" },
     { name = "pymobiledevice3" },
     { name = "pyyaml" },
     { name = "uiautomator2" },
+    { name = "urllib3" },
 ]
 
 [package.optional-dependencies]
@@ -1411,6 +1413,9 @@ http = [
     { name = "httpx" },
     { name = "uvicorn" },
 ]
+ios = [
+    { name = "pymobiledevice3" },
+]
 rag = [
     { name = "fastembed" },
     { name = "qdrant-client" },
@@ -1429,8 +1434,10 @@ requires-dist = [
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.10.0" },
     { name = "numpy", marker = "extra == 'ar'", specifier = ">=1.26" },
     { name = "opencv-python", marker = "extra == 'ar'", specifier = ">=4.9" },
+    { name = "pillow", specifier = ">=10.0.0" },
     { name = "pydantic", specifier = ">=2.7.0" },
     { name = "pymobiledevice3", specifier = ">=4.0.0" },
+    { name = "pymobiledevice3", marker = "extra == 'ios'", specifier = ">=4.0.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0.0" },
@@ -1438,10 +1445,11 @@ requires-dist = [
     { name = "qdrant-client", marker = "extra == 'rag'", specifier = ">=1.9" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.5.0" },
     { name = "uiautomator2", specifier = ">=3.2.0" },
+    { name = "urllib3", specifier = ">=2.7.0" },
     { name = "uvicorn", marker = "extra == 'http'", specifier = ">=0.27" },
     { name = "websockets", marker = "extra == 'debug'", specifier = ">=13.0" },
 ]
-provides-extras = ["dev", "ar", "http", "debug", "rag"]
+provides-extras = ["dev", "ar", "http", "debug", "ios", "rag"]
 
 [[package]]
 name = "mdurl"

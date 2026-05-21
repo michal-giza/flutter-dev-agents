@@ -252,6 +252,52 @@
   },
   {
     "annotations": {
+      "destructiveHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Grades a Flutter codebase against senior-engineer standards. Walks lib/*.dart with 24 rules across 4 tiers (junior / mid / senior / staff): print() leaks, business logic in widgets, missing dispose(), repos throwing instead of returning Either, monolithic Blocs, layering violations, orphan source files, missing super.key, and more. Returns per-file findings + overall grade + top_actions + preview_diffs for autofix-eligible rules. See docs/code-seniority-rubric.md for the full rubric.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "autofix": {
+          "description": "When true, populate preview_diffs with mechanical fixes (e.g. add super.key). Never writes files; just proposes.",
+          "type": "boolean"
+        },
+        "max_findings": {
+          "description": "Cap on findings returned. Default 200.",
+          "type": "number"
+        },
+        "min_level": {
+          "description": "Minimum tier to flag. 'senior' suppresses junior+mid findings \u2014 useful on legacy code.",
+          "enum": [
+            "junior",
+            "mid",
+            "senior",
+            "staff"
+          ],
+          "type": "string"
+        },
+        "paths": {
+          "description": "Optional subset of paths to scan (relative to project root). Default: ['lib'].",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "project_path": {
+          "description": "Flutter project root.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_path"
+      ],
+      "type": "object"
+    },
+    "name": "audit_code_seniority"
+  },
+  {
+    "annotations": {
       "destructiveHint": true,
       "openWorldHint": true,
       "readOnlyHint": false

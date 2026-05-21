@@ -136,6 +136,8 @@ def default_annotations(tool_name: str) -> dict[str, bool]:
         "audit_accessibility",
         # v0.3.0 phase 6 — pure compute, no device touch
         "recommend_test_path",
+        # v0.3.0 phase 7 — read-only source scan
+        "audit_code_seniority",
     )
     # Destructive tools — touch device state, install/launch/stop apps,
     # write files in arbitrary places, modify project source.
