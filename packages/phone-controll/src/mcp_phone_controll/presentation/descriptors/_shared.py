@@ -158,6 +158,8 @@ def default_annotations(tool_name: str) -> dict[str, bool]:
         "start_wda_on_simulator", "setup_webdriveragent",
         "open_project_in_ide", "close_ide_window", "focus_ide_window",
         "write_vscode_launch_config",
+        # v0.3.0 phase 8.5 — `pm disable-user` / `pm enable` mutates device state
+        "pause_ui_automation", "resume_ui_automation",
         "index_project", "promote_sequence", "replay_skill",
         "calibrate_camera", "wait_for_ar_session_ready",
         "assert_pose_stable",  # samples real sensor — affects state if app reacts

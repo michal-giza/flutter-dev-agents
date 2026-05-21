@@ -190,6 +190,10 @@ from .domain.usecases.skill_library import (
     ReplaySkill,
 )
 from .domain.usecases.testing import RunIntegrationTests, RunUnitTests
+from .domain.usecases.ui_automation_pause import (
+    PauseUiAutomation,
+    ResumeUiAutomation,
+)
 from .domain.usecases.ui_graph import ExtractUiGraph
 from .domain.usecases.ui_input import PressKey, Swipe, Tap, TapText, TypeText
 from .domain.usecases.ui_query import AssertVisible, DumpUi, FindElement, WaitForElement
@@ -647,6 +651,9 @@ def build_runtime(
         propose_test_scenarios=ProposeTestScenarios(),
         # v0.3.0 phase 5 — deep link + accessibility audit
         test_deep_link=TestDeepLink(devices_repo, ui_repo, state_repo, adb),
+        # v0.3.0 phase 8.5 — pause/resume openatx uiautomator2 helper
+        pause_ui_automation=PauseUiAutomation(state_repo, adb),
+        resume_ui_automation=ResumeUiAutomation(state_repo, adb),
         audit_accessibility=AuditAccessibility(devices_repo, ui_repo, state_repo),
         # v0.3.0 phase 6 — test-path advisor
         recommend_test_path=RecommendTestPath(),

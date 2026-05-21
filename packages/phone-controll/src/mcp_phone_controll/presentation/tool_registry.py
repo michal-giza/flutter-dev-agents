@@ -165,6 +165,10 @@ from ..domain.usecases.testing import (
     RunIntegrationTests,
     RunUnitTests,
 )
+from ..domain.usecases.ui_automation_pause import (
+    PauseUiAutomation,
+    ResumeUiAutomation,
+)
 from ..domain.usecases.ui_graph import (
     ExtractUiGraph,
 )
@@ -276,6 +280,7 @@ from .descriptors._param_builders import (
     _params_ocr_screenshot,
     _params_open_project_in_ide,
     _params_patch_apply_safe,
+    _params_pause_ui_automation,
     _params_prepare_for_test,
     _params_press_key,
     _params_promote_sequence,
@@ -290,6 +295,7 @@ from .descriptors._param_builders import (
     _params_release_device,
     _params_replay_skill,
     _params_restart_debug_session,
+    _params_resume_ui_automation,
     _params_run_integration,
     _params_run_patrol_suite,
     _params_run_patrol_test,
@@ -487,6 +493,9 @@ class UseCases:
     propose_test_scenarios: ProposeTestScenarios
     # v0.3.0 phase 5 — deep link + accessibility audit
     test_deep_link: TestDeepLink
+    # v0.3.0 phase 8.5 — pause/resume openatx uiautomator2 helper
+    pause_ui_automation: PauseUiAutomation
+    resume_ui_automation: ResumeUiAutomation
     audit_accessibility: AuditAccessibility
     # v0.3.0 phase 6 — test-path advisor
     recommend_test_path: RecommendTestPath
@@ -2480,6 +2489,55 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             ),
             build_params=_params_test_deep_link,
             invoke=_bind(uc.test_deep_link, _params_test_deep_link),
+        ),
+        # ---- v0.3.0 phase 8.5 — pause/resume openatx uiautomator2 ----
+        ToolDescriptor(
+            name="pause_ui_automation",
+            description=(
+                "Disables the openatx uiautomator2 helper APKs "
+                "(com.github.uiautomator + .test) on Android via "
+                "`pm disable-user`. Stops the AVD respawn-loop "
+                "where the helper fights the app under test for "
+                "foreground. MUST be paired with resume_ui_automation. "
+                "Safe no-op when the helper isn't installed."
+            ),
+            input_schema=_schema(
+                {
+                    "serial": _string(
+                        "Device serial; defaults to selected device."
+                    ),
+                },
+                [],
+            ),
+            build_params=_params_pause_ui_automation,
+            invoke=_bind(
+                uc.pause_ui_automation, _params_pause_ui_automation
+            ),
+        ),
+        ToolDescriptor(
+            name="resume_ui_automation",
+            description=(
+                "Re-enables the openatx uiautomator2 helper APKs "
+                "via `pm enable`. Pair this with pause_ui_automation "
+                "— every pause MUST be resumed. Waits settle_ms "
+                "(default 800) after `pm enable` so the next "
+                "uiautomator2 init can connect cleanly."
+            ),
+            input_schema=_schema(
+                {
+                    "serial": _string(
+                        "Device serial; defaults to selected device."
+                    ),
+                    "settle_ms": _number(
+                        "Settle wait after pm enable. Default 800ms."
+                    ),
+                },
+                [],
+            ),
+            build_params=_params_resume_ui_automation,
+            invoke=_bind(
+                uc.resume_ui_automation, _params_resume_ui_automation
+            ),
         ),
         ToolDescriptor(
             name="audit_accessibility",
