@@ -98,3 +98,19 @@ class SimctlClient:
         return await self._runner.stream(
             [self._xcrun, "simctl", "spawn", udid, "log", "stream"]
         )
+
+    async def openurl(
+        self, udid: str, url: str, timeout_s: float = 15.0
+    ) -> ProcessResult:
+        """`xcrun simctl openurl <udid> <url>` — opens a URL on the
+        booted simulator. Used for deep-link testing (custom schemes
+        and Universal Links both work via this entry point).
+
+        Note: simulator-only. Physical iOS device deep links must
+        come from Safari, Notes, mail, etc. — they can't be
+        triggered programmatically.
+        """
+        return await self._runner.run(
+            [self._xcrun, "simctl", "openurl", udid, url],
+            timeout_s=timeout_s,
+        )

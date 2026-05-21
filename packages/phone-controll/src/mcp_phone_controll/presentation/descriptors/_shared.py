@@ -132,6 +132,8 @@ def default_annotations(tool_name: str) -> dict[str, bool]:
         "list_widget_tests",
         # v0.3.0 phase 4 — scenario designer reads manifest/pubspec only
         "propose_test_scenarios",
+        # v0.3.0 phase 5 — audit_accessibility only READS the UI tree
+        "audit_accessibility",
     )
     # Destructive tools — touch device state, install/launch/stop apps,
     # write files in arbitrary places, modify project source.
@@ -168,6 +170,8 @@ def default_annotations(tool_name: str) -> dict[str, bool]:
         "run_widget_test", "update_goldens", "test_coverage_report",
         # v0.3.0 frame profiling — mutates VM Timeline collection state
         "start_frame_profile", "stop_frame_profile",
+        # v0.3.0 deep link — fires an intent / opens a URL
+        "test_deep_link",
     )
     # Open-world: interacts with real devices, real network, real
     # filesystem we don't control.
@@ -212,6 +216,8 @@ def default_annotations(tool_name: str) -> dict[str, bool]:
         "update_goldens", "test_coverage_report",
         # v0.3.0 frame profiling — hits VM service of running app
         "start_frame_profile", "stop_frame_profile",
+        # v0.3.0 phase 5 — both touch a real device
+        "test_deep_link", "audit_accessibility",
     )
     # Idempotent: repeated calls with the same args produce the same
     # result. Hosts MAY auto-retry on transient failure.

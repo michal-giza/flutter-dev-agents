@@ -25,6 +25,7 @@ from ..domain.usecases.artifacts import (
     GetArtifactsDir,
     NewSession,
 )
+from ..domain.usecases.audit_accessibility import AuditAccessibility
 from ..domain.usecases.build_install import (
     BuildApp,
     InstallApp,
@@ -45,6 +46,7 @@ from ..domain.usecases.debug_inspect import (
     VmEvaluate,
     VmListIsolates,
 )
+from ..domain.usecases.deep_link import TestDeepLink
 from ..domain.usecases.dev_session import (
     AttachDebugSession,
     CallServiceExtension,
@@ -223,6 +225,7 @@ from .descriptors._param_builders import (
     _params_assert_pose_stable,
     _params_assert_visible,
     _params_attach_debug_session,
+    _params_audit_accessibility,
     _params_boot_simulator,
     _params_build_app,
     _params_calibrate_camera,
@@ -316,6 +319,7 @@ from .descriptors._param_builders import (
     _params_tap_and_verify,
     _params_tap_text,
     _params_test_coverage_report,
+    _params_test_deep_link,
     _params_toggle_inspector,
     _params_tool_usage_report,
     _params_type_text,
@@ -477,6 +481,9 @@ class UseCases:
     stop_frame_profile: StopFrameProfile
     # v0.3.0 phase 4 — test scenario designer
     propose_test_scenarios: ProposeTestScenarios
+    # v0.3.0 phase 5 — deep link + accessibility audit
+    test_deep_link: TestDeepLink
+    audit_accessibility: AuditAccessibility
     new_session: NewSession
     get_artifacts_dir: GetArtifactsDir
     fetch_artifact: FetchArtifact
@@ -2428,6 +2435,76 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             invoke=_bind(
                 uc.propose_test_scenarios, _params_propose_test_scenarios
             ),
+        ),
+        # ---- v0.3.0 phase 5 — deep link + accessibility audit ----
+        ToolDescriptor(
+            name="test_deep_link",
+            description=(
+                "Fire a deep link at the device + optionally verify the "
+                "right screen rendered. Android: `adb shell am start -W "
+                "-a VIEW -d <uri>`. iOS simulator: `xcrun simctl openurl "
+                "<udid> <uri>`. Physical iOS device deep links must come "
+                "from Safari/Notes — out of scope. Returns launch_status, "
+                "the launched activity (Android), and whether "
+                "expect_screen_text was found."
+            ),
+            input_schema=_schema(
+                {
+                    "uri": _string(
+                        "Custom scheme (myapp://...) or universal link "
+                        "(https://myapp.com/...)."
+                    ),
+                    "expect_screen_text": _string(
+                        "If set, asserts this text is visible after the "
+                        "link fires."
+                    ),
+                    "serial": _string("Device serial / UDID."),
+                    "cold_start": _bool(
+                        "Hint that you've stop_app'd before this call. "
+                        "Doesn't enforce — the agent is responsible for "
+                        "killing the app first if cold-start matters."
+                    ),
+                    "timeout_s": _number(
+                        "Max wait for launch + render. Default 15."
+                    ),
+                },
+                ["uri"],
+            ),
+            build_params=_params_test_deep_link,
+            invoke=_bind(uc.test_deep_link, _params_test_deep_link),
+        ),
+        ToolDescriptor(
+            name="audit_accessibility",
+            description=(
+                "Walks the live UI tree, flags WCAG 2.2 violations. "
+                "Checks tap-target size (SC 2.5.5), missing accessible "
+                "labels (SC 4.1.2), disabled-but-clickable mismatches "
+                "(SC 1.3.1). Returns findings sorted by severity "
+                "(blocker → serious → minor), each citing the WCAG "
+                "criterion + a Flutter-specific fix hint. EU EAA 2025 "
+                "compliance gate for store listings."
+            ),
+            input_schema=_schema(
+                {
+                    "serial": _string("Device serial / UDID."),
+                    "include_log_signals": _bool(
+                        "Also scan last 30s of logs for RenderFlex "
+                        "overflow markers. Default true."
+                    ),
+                    "ignore_class_substrings": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": (
+                            "Class names containing any of these "
+                            "substrings are skipped (e.g. 'Divider' for "
+                            "purely decorative widgets). Defaults to "
+                            "['Divider', 'Padding', 'SizedBox']."
+                        ),
+                    },
+                }
+            ),
+            build_params=_params_audit_accessibility,
+            invoke=_bind(uc.audit_accessibility, _params_audit_accessibility),
         ),
         ToolDescriptor(
             name="save_golden_image",

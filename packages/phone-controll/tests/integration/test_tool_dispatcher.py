@@ -23,6 +23,9 @@ from mcp_phone_controll.domain.usecases.artifacts import (
     GetArtifactsDir,
     NewSession,
 )
+from mcp_phone_controll.domain.usecases.audit_accessibility import (
+    AuditAccessibility,
+)
 from mcp_phone_controll.domain.usecases.build_install import (
     BuildApp,
     InstallApp,
@@ -38,6 +41,7 @@ from mcp_phone_controll.domain.usecases.code_quality import (
 )
 from mcp_phone_controll.domain.usecases.crag import CorrectiveRecall
 from mcp_phone_controll.domain.usecases.debug_inspect import VmEvaluate, VmListIsolates
+from mcp_phone_controll.domain.usecases.deep_link import TestDeepLink
 from mcp_phone_controll.domain.usecases.dev_session import (
     AttachDebugSession,
     CallServiceExtension,
@@ -395,6 +399,12 @@ def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:
         stop_frame_profile=StopFrameProfile(debug_repo),
         # v0.3.0 phase 4 — scenario designer
         propose_test_scenarios=ProposeTestScenarios(),
+        # v0.3.0 phase 5 — deep link + accessibility audit. The fakes
+        # don't fire real device calls; these are wired so the
+        # registry-coverage test passes. Unit tests for the use cases
+        # live at tests/unit/test_deep_link.py + test_audit_accessibility.py.
+        test_deep_link=TestDeepLink(devices, ui, state, adb_client=None),
+        audit_accessibility=AuditAccessibility(devices, ui, state),
         new_session=NewSession(artifacts),
         get_artifacts_dir=GetArtifactsDir(artifacts),
         fetch_artifact=FetchArtifact(),
@@ -627,5 +637,8 @@ async def test_registry_covers_all_use_case_fields(tmp_path: Path):
         "stop_frame_profile",
         # v0.3.0 phase 4 (scenario designer)
         "propose_test_scenarios",
+        # v0.3.0 phase 5 (deep link + accessibility audit)
+        "test_deep_link",
+        "audit_accessibility",
     }
     assert names == expected
