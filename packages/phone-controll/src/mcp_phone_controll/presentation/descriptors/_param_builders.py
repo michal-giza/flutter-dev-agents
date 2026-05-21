@@ -21,6 +21,7 @@ from pathlib import Path
 from ...domain.entities import AnalyzerSeverity as _AnalyzerSeverity
 from ...domain.entities import BuildMode, LogLevel, Platform
 from ...domain.entities import IdeKind as _IdeKind
+from ...domain.usecases.app_size import AnalyzeAppSizeParams
 from ...domain.usecases.artifact_retention import (
     CompressPngParams,
     PruneOriginalsParams,
@@ -79,6 +80,13 @@ from ...domain.usecases.lifecycle import (
     GrantPermissionParams,
     LaunchAppParams,
     StopAppParams,
+)
+from ...domain.usecases.memory_inspect import (
+    AllocationProfileParams,
+    DetectUndisposedControllersParams,
+    FindRetainingPathParams,
+    MemorySummaryParams,
+    TakeHeapSnapshotParams,
 )
 from ...domain.usecases.narrate import NarrateParams
 from ...domain.usecases.notify_webhook import NotifyWebhookParams
@@ -802,6 +810,68 @@ def _params_vm_evaluate(args: JsonDict) -> VmEvaluateParams:
         isolate_id=args.get("isolate_id"),
         frame_index=int(args.get("frame_index", 0)),
         session_id=args.get("session_id"),
+    )
+
+
+# ---- v0.3.0 memory introspection ---------------------------------------
+
+
+def _params_memory_summary(args: JsonDict) -> MemorySummaryParams:
+    return MemorySummaryParams(session_id=args.get("session_id"))
+
+
+def _params_allocation_profile(args: JsonDict) -> AllocationProfileParams:
+    return AllocationProfileParams(
+        isolate_id=args.get("isolate_id"),
+        session_id=args.get("session_id"),
+        reset_accumulator=bool(args.get("reset_accumulator", False)),
+        top_n=int(args.get("top_n", 20)),
+    )
+
+
+def _params_detect_undisposed_controllers(
+    args: JsonDict,
+) -> DetectUndisposedControllersParams:
+    return DetectUndisposedControllersParams(
+        isolate_id=args.get("isolate_id"),
+        session_id=args.get("session_id"),
+        extra_classes=tuple(args.get("extra_classes") or ()),
+    )
+
+
+def _params_find_retaining_path(
+    args: JsonDict,
+) -> FindRetainingPathParams:
+    return FindRetainingPathParams(
+        class_name=args["class_name"],
+        isolate_id=args.get("isolate_id"),
+        session_id=args.get("session_id"),
+        max_depth=int(args.get("max_depth", 30)),
+    )
+
+
+def _params_take_heap_snapshot(
+    args: JsonDict,
+) -> TakeHeapSnapshotParams:
+    return TakeHeapSnapshotParams(
+        isolate_id=args.get("isolate_id"),
+        session_id=args.get("session_id"),
+        label=args.get("label"),
+    )
+
+
+# ---- v0.3.0 app size analyzer ------------------------------------------
+
+
+def _params_analyze_app_size(args: JsonDict) -> AnalyzeAppSizeParams:
+    baseline = args.get("baseline_json_path")
+    return AnalyzeAppSizeParams(
+        project_path=Path(args["project_path"]).expanduser(),
+        platform=args.get("platform", "apk"),
+        mode=args.get("mode", "release"),
+        flavor=args.get("flavor"),
+        top_n=int(args.get("top_n", 15)),
+        baseline_json_path=Path(baseline).expanduser() if baseline else None,
     )
 
 
