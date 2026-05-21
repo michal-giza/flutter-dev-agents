@@ -169,6 +169,12 @@ from ...domain.usecases.wda_setup import (
     SetupWebDriverAgentParams,
     StartWdaOnSimulatorParams,
 )
+from ...domain.usecases.widget_testing import (
+    ListWidgetTestsParams,
+    RunWidgetTestParams,
+    TestCoverageReportParams,
+    UpdateGoldensParams,
+)
 from ._shared import JsonDict, _path
 
 # ---- devices ------------------------------------------------------------
@@ -872,6 +878,48 @@ def _params_analyze_app_size(args: JsonDict) -> AnalyzeAppSizeParams:
         flavor=args.get("flavor"),
         top_n=int(args.get("top_n", 15)),
         baseline_json_path=Path(baseline).expanduser() if baseline else None,
+    )
+
+
+# ---- v0.3.0 widget testing ---------------------------------------------
+
+
+def _params_run_widget_test(args: JsonDict) -> RunWidgetTestParams:
+    return RunWidgetTestParams(
+        project_path=Path(args["project_path"]).expanduser(),
+        test_path=args.get("test_path"),
+        name_pattern=args.get("name_pattern"),
+        plain_name=bool(args.get("plain_name", False)),
+        tags=args.get("tags"),
+        coverage=bool(args.get("coverage", False)),
+        update_goldens=bool(args.get("update_goldens", False)),
+    )
+
+
+def _params_list_widget_tests(args: JsonDict) -> ListWidgetTestsParams:
+    return ListWidgetTestsParams(
+        project_path=Path(args["project_path"]).expanduser(),
+        test_root=args.get("test_root", "test"),
+    )
+
+
+def _params_update_goldens(args: JsonDict) -> UpdateGoldensParams:
+    return UpdateGoldensParams(
+        project_path=Path(args["project_path"]).expanduser(),
+        test_path=args.get("test_path"),
+        name_pattern=args.get("name_pattern"),
+        plain_name=bool(args.get("plain_name", False)),
+        tags=args.get("tags"),
+    )
+
+
+def _params_test_coverage_report(args: JsonDict) -> TestCoverageReportParams:
+    fail_under = args.get("fail_under")
+    return TestCoverageReportParams(
+        project_path=Path(args["project_path"]).expanduser(),
+        test_path=args.get("test_path"),
+        coverage_filter_prefix=args.get("coverage_filter_prefix"),
+        fail_under=float(fail_under) if fail_under is not None else None,
     )
 
 

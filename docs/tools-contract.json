@@ -1618,6 +1618,33 @@
     "annotations": {
       "destructiveHint": false,
       "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Discover testWidgets() blocks under `test/` (or a custom root) without running them. Returns file + line + test name + golden flag. Use to plan which subset to run with run_widget_test.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "project_path": {
+          "description": "Flutter project root.",
+          "type": "string"
+        },
+        "test_root": {
+          "description": "Subdirectory to scan. Default 'test'.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_path"
+      ],
+      "type": "object"
+    },
+    "name": "list_widget_tests"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
       "readOnlyHint": true
     },
     "description": "Identify the running MCP: version, git sha, uptime, image backends, tool count. Call first if a feature seems missing \u2014 a stale subprocess is usually the cause.",
@@ -2476,6 +2503,52 @@
       "openWorldHint": true,
       "readOnlyHint": false
     },
+    "description": "Targeted `flutter test` runner for widget tests. Filter by test_path (file or dir), name_pattern (regex or literal with plain_name=true), or tags. Same TestRun envelope as run_unit_tests. Pair coverage=true with test_coverage_report for the full coverage flow.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "coverage": {
+          "description": "Add --coverage so coverage/lcov.info is written.",
+          "type": "boolean"
+        },
+        "name_pattern": {
+          "description": "Pattern over the testWidgets() description. Regex by default; pass plain_name=true for literal substring matching.",
+          "type": "string"
+        },
+        "plain_name": {
+          "description": "If true, name_pattern is a literal substring (--plain-name) instead of a regex.",
+          "type": "boolean"
+        },
+        "project_path": {
+          "description": "Flutter project root.",
+          "type": "string"
+        },
+        "tags": {
+          "description": "Filter by tag (e.g. 'golden' or 'smoke').",
+          "type": "string"
+        },
+        "test_path": {
+          "description": "Single file or subdirectory (e.g. 'test/widgets/login_test.dart'). Omit to run all.",
+          "type": "string"
+        },
+        "update_goldens": {
+          "description": "DANGEROUS \u2014 overwrites golden images on mismatch. Use update_goldens tool instead for clarity.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "project_path"
+      ],
+      "type": "object"
+    },
+    "name": "run_widget_test"
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
     "description": "Capture a screenshot and save it under <project>/tests/fixtures/golden/<label>.png (or under the session artifacts if no project_path). Bootstraps goldens for compare_screenshot regression tests.",
     "inputSchema": {
       "additionalProperties": false,
@@ -3225,6 +3298,40 @@
       "openWorldHint": true,
       "readOnlyHint": false
     },
+    "description": "Runs `flutter test --coverage`, parses coverage/lcov.info, returns per-file + overall line coverage. Pair coverage_filter_prefix='lib/features/<x>/' to gate a single feature. Set fail_under to make the result.ok flag reflect a threshold check.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "coverage_filter_prefix": {
+          "description": "Only files under this path (e.g. 'lib/features/auth/') are reported.",
+          "type": "string"
+        },
+        "fail_under": {
+          "description": "Threshold 0.0-1.0. When set, passed_threshold=false if coverage falls below.",
+          "type": "number"
+        },
+        "project_path": {
+          "description": "",
+          "type": "string"
+        },
+        "test_path": {
+          "description": "Optional test subset to run.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_path"
+      ],
+      "type": "object"
+    },
+    "name": "test_coverage_report"
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
     "description": "Toggle the Flutter widget inspector overlay (ext.flutter.inspector.show).",
     "inputSchema": {
       "additionalProperties": false,
@@ -3320,6 +3427,44 @@
       "type": "object"
     },
     "name": "uninstall_app"
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "\u26a0\ufe0f Regenerate golden images for targeted widget tests. Use ONLY when you deliberately changed the visible output and want the new rendering accepted as the new baseline. Running unfiltered silently erases regression detection.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "name_pattern": {
+          "description": "",
+          "type": "string"
+        },
+        "plain_name": {
+          "description": "",
+          "type": "boolean"
+        },
+        "project_path": {
+          "description": "",
+          "type": "string"
+        },
+        "tags": {
+          "description": "e.g. 'golden'",
+          "type": "string"
+        },
+        "test_path": {
+          "description": "Strongly recommend targeting a specific file.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_path"
+      ],
+      "type": "object"
+    },
+    "name": "update_goldens"
   },
   {
     "annotations": {

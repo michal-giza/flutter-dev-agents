@@ -170,6 +170,12 @@ from mcp_phone_controll.domain.usecases.wda_setup import (
     SetupWebDriverAgent,
     StartWdaOnSimulator,
 )
+from mcp_phone_controll.domain.usecases.widget_testing import (
+    ListWidgetTests,
+    RunWidgetTest,
+    TestCoverageReport,
+    UpdateGoldens,
+)
 from mcp_phone_controll.presentation.tool_registry import (
     ToolDispatcher,
     UseCases,
@@ -371,6 +377,12 @@ def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:
         # v0.3.0 app size — reuses the existing fake flutter CLI (None here;
         # the test does not exercise this tool. Real wiring uses FlutterCli.)
         analyze_app_size=AnalyzeAppSize(None),
+        # v0.3.0 widget testing — None for the fake (tests don't exercise these here;
+        # they have dedicated test files at tests/unit/test_widget_testing.py)
+        run_widget_test=RunWidgetTest(None),
+        list_widget_tests=ListWidgetTests(),
+        update_goldens=UpdateGoldens(None),
+        test_coverage_report=TestCoverageReport(None),
         new_session=NewSession(artifacts),
         get_artifacts_dir=GetArtifactsDir(artifacts),
         fetch_artifact=FetchArtifact(),
@@ -586,12 +598,17 @@ async def test_registry_covers_all_use_case_fields(tmp_path: Path):
         "get_artifacts_dir",
         "fetch_artifact",
         "inspect_image_safety",
-        # v0.3.0
+        # v0.3.0 phase 1 (memory + size)
         "memory_summary",
         "allocation_profile",
         "detect_undisposed_controllers",
         "find_retaining_path",
         "take_heap_snapshot",
         "analyze_app_size",
+        # v0.3.0 phase 2 (widget testing)
+        "run_widget_test",
+        "list_widget_tests",
+        "update_goldens",
+        "test_coverage_report",
     }
     assert names == expected
