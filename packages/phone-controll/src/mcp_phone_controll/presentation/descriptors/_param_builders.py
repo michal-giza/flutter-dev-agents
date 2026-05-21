@@ -28,6 +28,9 @@ from ...domain.usecases.artifact_retention import (
 )
 from ...domain.usecases.artifacts import FetchArtifactParams, NewSessionParams
 from ...domain.usecases.audit_accessibility import AuditAccessibilityParams
+from ...domain.usecases.audit_code_seniority import (
+    AuditCodeSeniorityParams,
+)
 from ...domain.usecases.build_install import (
     BuildAppParams,
     InstallAppParams,
@@ -999,6 +1002,20 @@ def _params_recommend_test_path(args: JsonDict) -> RecommendTestPathParams:
         device_serial=args.get("device_serial"),
         size_baseline_path=Path(baseline).expanduser() if baseline else None,
         coverage_fail_under=float(args.get("coverage_fail_under", 0.80)),
+    )
+
+
+# ---- v0.3.0 phase 7 — code-seniority audit -----------------------------
+
+
+def _params_audit_code_seniority(args: JsonDict) -> AuditCodeSeniorityParams:
+    paths = args.get("paths") or ()
+    return AuditCodeSeniorityParams(
+        project_path=Path(args["project_path"]).expanduser(),
+        paths=tuple(str(p) for p in paths),
+        min_level=str(args.get("min_level", "junior")),
+        autofix=bool(args.get("autofix", False)),
+        max_findings=int(args.get("max_findings", 200)),
     )
 
 

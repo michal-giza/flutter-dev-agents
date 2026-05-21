@@ -84,6 +84,7 @@ from .domain.usecases.artifact_retention import (
 )
 from .domain.usecases.artifacts import FetchArtifact, GetArtifactsDir, NewSession
 from .domain.usecases.audit_accessibility import AuditAccessibility
+from .domain.usecases.audit_code_seniority import AuditCodeSeniority
 from .domain.usecases.build_install import BuildApp, InstallApp, UninstallApp
 from .domain.usecases.code_quality import (
     DartAnalyze,
@@ -649,6 +650,8 @@ def build_runtime(
         audit_accessibility=AuditAccessibility(devices_repo, ui_repo, state_repo),
         # v0.3.0 phase 6 — test-path advisor
         recommend_test_path=RecommendTestPath(),
+        # v0.3.0 phase 7 — code-seniority audit
+        audit_code_seniority=AuditCodeSeniority(),
         new_session=NewSession(artifacts_repo),
         get_artifacts_dir=GetArtifactsDir(artifacts_repo),
         fetch_artifact=FetchArtifact(),

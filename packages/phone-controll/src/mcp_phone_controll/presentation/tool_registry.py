@@ -26,6 +26,7 @@ from ..domain.usecases.artifacts import (
     NewSession,
 )
 from ..domain.usecases.audit_accessibility import AuditAccessibility
+from ..domain.usecases.audit_code_seniority import AuditCodeSeniority
 from ..domain.usecases.build_install import (
     BuildApp,
     InstallApp,
@@ -227,6 +228,7 @@ from .descriptors._param_builders import (
     _params_assert_visible,
     _params_attach_debug_session,
     _params_audit_accessibility,
+    _params_audit_code_seniority,
     _params_boot_simulator,
     _params_build_app,
     _params_calibrate_camera,
@@ -488,6 +490,8 @@ class UseCases:
     audit_accessibility: AuditAccessibility
     # v0.3.0 phase 6 — test-path advisor
     recommend_test_path: RecommendTestPath
+    # v0.3.0 phase 7 — code-seniority audit
+    audit_code_seniority: AuditCodeSeniority
     new_session: NewSession
     get_artifacts_dir: GetArtifactsDir
     fetch_artifact: FetchArtifact
@@ -2554,6 +2558,53 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             ),
             build_params=_params_recommend_test_path,
             invoke=_bind(uc.recommend_test_path, _params_recommend_test_path),
+        ),
+        # ---- v0.3.0 phase 7 — code-seniority audit ----
+        ToolDescriptor(
+            name="audit_code_seniority",
+            description=(
+                "Grades a Flutter codebase against senior-engineer "
+                "standards. Walks lib/*.dart with 24 rules across 4 "
+                "tiers (junior / mid / senior / staff): print() leaks, "
+                "business logic in widgets, missing dispose(), repos "
+                "throwing instead of returning Either, monolithic "
+                "Blocs, layering violations, orphan source files, "
+                "missing super.key, and more. Returns per-file "
+                "findings + overall grade + top_actions + preview_diffs "
+                "for autofix-eligible rules. See "
+                "docs/code-seniority-rubric.md for the full rubric."
+            ),
+            input_schema=_schema(
+                {
+                    "project_path": _string("Flutter project root."),
+                    "paths": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": (
+                            "Optional subset of paths to scan (relative "
+                            "to project root). Default: ['lib']."
+                        ),
+                    },
+                    "min_level": _enum(
+                        ["junior", "mid", "senior", "staff"],
+                        "Minimum tier to flag. 'senior' suppresses "
+                        "junior+mid findings — useful on legacy code.",
+                    ),
+                    "autofix": _bool(
+                        "When true, populate preview_diffs with "
+                        "mechanical fixes (e.g. add super.key). "
+                        "Never writes files; just proposes."
+                    ),
+                    "max_findings": _number(
+                        "Cap on findings returned. Default 200."
+                    ),
+                },
+                ["project_path"],
+            ),
+            build_params=_params_audit_code_seniority,
+            invoke=_bind(
+                uc.audit_code_seniority, _params_audit_code_seniority
+            ),
         ),
         ToolDescriptor(
             name="save_golden_image",
