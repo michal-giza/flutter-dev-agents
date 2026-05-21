@@ -164,6 +164,8 @@ def default_annotations(tool_name: str) -> dict[str, bool]:
         "take_heap_snapshot", "analyze_app_size",
         # v0.3.0 widget testing — run tests / regenerate goldens
         "run_widget_test", "update_goldens", "test_coverage_report",
+        # v0.3.0 frame profiling — mutates VM Timeline collection state
+        "start_frame_profile", "stop_frame_profile",
     )
     # Open-world: interacts with real devices, real network, real
     # filesystem we don't control.
@@ -206,6 +208,8 @@ def default_annotations(tool_name: str) -> dict[str, bool]:
         # v0.3.0 widget testing — runs flutter test (real toolchain)
         "run_widget_test", "list_widget_tests",
         "update_goldens", "test_coverage_report",
+        # v0.3.0 frame profiling — hits VM service of running app
+        "start_frame_profile", "stop_frame_profile",
     )
     # Idempotent: repeated calls with the same args produce the same
     # result. Hosts MAY auto-retry on transient failure.

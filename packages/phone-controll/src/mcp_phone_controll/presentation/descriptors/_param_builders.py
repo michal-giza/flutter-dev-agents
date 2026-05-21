@@ -67,6 +67,10 @@ from ...domain.usecases.discovery import (
     SessionSummaryParams,
     ToolUsageReportParams,
 )
+from ...domain.usecases.frame_profile import (
+    StartFrameProfileParams,
+    StopFrameProfileParams,
+)
 from ...domain.usecases.ide import (
     CloseIdeWindowParams,
     FocusIdeWindowParams,
@@ -920,6 +924,21 @@ def _params_test_coverage_report(args: JsonDict) -> TestCoverageReportParams:
         test_path=args.get("test_path"),
         coverage_filter_prefix=args.get("coverage_filter_prefix"),
         fail_under=float(fail_under) if fail_under is not None else None,
+    )
+
+
+# ---- v0.3.0 phase 3 — frame profiling ---------------------------------
+
+
+def _params_start_frame_profile(args: JsonDict) -> StartFrameProfileParams:
+    return StartFrameProfileParams(session_id=args.get("session_id"))
+
+
+def _params_stop_frame_profile(args: JsonDict) -> StopFrameProfileParams:
+    return StopFrameProfileParams(
+        session_id=args.get("session_id"),
+        target_fps=int(args.get("target_fps", 60)),
+        tolerance_pct=float(args.get("tolerance_pct", 0.10)),
     )
 
 

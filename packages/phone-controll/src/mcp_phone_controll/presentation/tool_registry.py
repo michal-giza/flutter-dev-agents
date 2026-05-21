@@ -73,6 +73,10 @@ from ..domain.usecases.discovery import (
     ToolUsageReportUseCase,
 )
 from ..domain.usecases.doctor import CheckEnvironment
+from ..domain.usecases.frame_profile import (
+    StartFrameProfile,
+    StopFrameProfile,
+)
 from ..domain.usecases.ide import (
     CloseIdeWindow,
     FocusIdeWindow,
@@ -293,10 +297,12 @@ from .descriptors._param_builders import (
     _params_setup_wda,
     _params_start_debug_session,
     _params_start_emulator,
+    _params_start_frame_profile,
     _params_start_recording,
     _params_start_wda_on_simulator,
     _params_stop,
     _params_stop_debug_session,
+    _params_stop_frame_profile,
     _params_stop_recording,
     _params_stop_virtual_device,
     _params_summarize_session,
@@ -464,6 +470,9 @@ class UseCases:
     list_widget_tests: ListWidgetTests
     update_goldens: UpdateGoldens
     test_coverage_report: TestCoverageReport
+    # v0.3.0 phase 3 — frame jank detection
+    start_frame_profile: StartFrameProfile
+    stop_frame_profile: StopFrameProfile
     new_session: NewSession
     get_artifacts_dir: GetArtifactsDir
     fetch_artifact: FetchArtifact
@@ -2331,6 +2340,46 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             ),
             build_params=_params_test_coverage_report,
             invoke=_bind(uc.test_coverage_report, _params_test_coverage_report),
+        ),
+        # ---- v0.3.0 phase 3 — frame jank detection ----
+        ToolDescriptor(
+            name="start_frame_profile",
+            description=(
+                "Begin VM Timeline collection for frame-rendering "
+                "analysis. Pair with stop_frame_profile to bracket a "
+                "specific user interaction (tap, scroll, animation). "
+                "Returns the baseline timestamp + which streams are "
+                "now enabled."
+            ),
+            input_schema=_schema({"session_id": _string("")}),
+            build_params=_params_start_frame_profile,
+            invoke=_bind(uc.start_frame_profile, _params_start_frame_profile),
+        ),
+        ToolDescriptor(
+            name="stop_frame_profile",
+            description=(
+                "Close the frame-profile bracket: disable Timeline, "
+                "fetch captured events, analyze. Returns total + "
+                "janked frame counts, P50/P90/P99/max frame times, "
+                "worst-3 individual frames with build/raster split, "
+                "and a paste-ready advice line. Always disables "
+                "streams on exit (overhead ~5-10% CPU per stream)."
+            ),
+            input_schema=_schema(
+                {
+                    "session_id": _string(""),
+                    "target_fps": _int(
+                        "60 (default) or 120 for high-refresh devices."
+                    ),
+                    "tolerance_pct": _number(
+                        "Frames within this % of budget are NOT "
+                        "counted as jank. Default 0.10 (matches "
+                        "DevTools convention)."
+                    ),
+                }
+            ),
+            build_params=_params_stop_frame_profile,
+            invoke=_bind(uc.stop_frame_profile, _params_stop_frame_profile),
         ),
         ToolDescriptor(
             name="save_golden_image",

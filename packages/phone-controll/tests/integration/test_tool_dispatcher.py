@@ -66,6 +66,10 @@ from mcp_phone_controll.domain.usecases.discovery import (
     ToolUsageReportUseCase,
 )
 from mcp_phone_controll.domain.usecases.doctor import CheckEnvironment
+from mcp_phone_controll.domain.usecases.frame_profile import (
+    StartFrameProfile,
+    StopFrameProfile,
+)
 from mcp_phone_controll.domain.usecases.ide import (
     CloseIdeWindow,
     FocusIdeWindow,
@@ -383,6 +387,9 @@ def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:
         list_widget_tests=ListWidgetTests(),
         update_goldens=UpdateGoldens(None),
         test_coverage_report=TestCoverageReport(None),
+        # v0.3.0 phase 3 — frame profiling, same fake debug_repo
+        start_frame_profile=StartFrameProfile(debug_repo),
+        stop_frame_profile=StopFrameProfile(debug_repo),
         new_session=NewSession(artifacts),
         get_artifacts_dir=GetArtifactsDir(artifacts),
         fetch_artifact=FetchArtifact(),
@@ -610,5 +617,8 @@ async def test_registry_covers_all_use_case_fields(tmp_path: Path):
         "list_widget_tests",
         "update_goldens",
         "test_coverage_report",
+        # v0.3.0 phase 3 (frame profiling)
+        "start_frame_profile",
+        "stop_frame_profile",
     }
     assert names == expected
