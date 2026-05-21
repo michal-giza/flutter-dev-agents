@@ -60,6 +60,33 @@ class FlutterCli:
             argv += ["--flavor", flavor]
         return await self._runner.run(argv, cwd=project_path, timeout_s=timeout_s)
 
+    async def build_with_size_analysis(
+        self,
+        project_path: Path,
+        platform: str = "apk",       # "apk" or "ios"
+        mode: str = "release",       # size analysis only meaningful on release
+        flavor: str | None = None,
+        timeout_s: float = 1800.0,
+    ) -> ProcessResult:
+        """Build with --analyze-size — emits a per-package size report.
+
+        Flutter writes the report to
+        `build/<platform>/<mode>/<flavor>/<arch>-code-size-analysis_<timestamp>.json`
+        AND prints a path-to-JSON line to stdout we can scrape. The
+        report is a tree of (path, type, size, children) — used by
+        the AnalyzeAppSize use case to surface "what's making your
+        app big."
+
+        Only meaningful in release mode. Debug builds skip tree
+        shaking + obfuscation, so the numbers are misleading. The
+        use case layer defaults mode="release" and warns on
+        non-release values.
+        """
+        argv = [self._flutter, "build", platform, f"--{mode}", "--analyze-size"]
+        if flavor:
+            argv += ["--flavor", flavor]
+        return await self._runner.run(argv, cwd=project_path, timeout_s=timeout_s)
+
     async def test_unit(
         self, project_path: Path, timeout_s: float = 600.0
     ) -> ProcessResult:

@@ -12,6 +12,7 @@ from mcp_phone_controll.data.repositories.in_memory_device_lock_repository impor
 from mcp_phone_controll.data.repositories.sqlite_skill_library_repository import (
     SqliteSkillLibraryRepository,
 )
+from mcp_phone_controll.domain.usecases.app_size import AnalyzeAppSize
 from mcp_phone_controll.domain.usecases.artifact_retention import (
     CompressPng,
     DiskUsage,
@@ -81,6 +82,13 @@ from mcp_phone_controll.domain.usecases.lifecycle import (
     StopApp,
 )
 from mcp_phone_controll.domain.usecases.mcp_ping import McpPing
+from mcp_phone_controll.domain.usecases.memory_inspect import (
+    AllocationProfile,
+    DetectUndisposedControllers,
+    FindRetainingPath,
+    MemorySummary,
+    TakeHeapSnapshot,
+)
 from mcp_phone_controll.domain.usecases.narrate import Narrate
 from mcp_phone_controll.domain.usecases.notify_webhook import NotifyWebhook
 from mcp_phone_controll.domain.usecases.observation import (
@@ -354,6 +362,15 @@ def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:
         # DAP-lite — point at fake debug repo (no VM service connection in tests)
         vm_list_isolates=VmListIsolates(debug_repo),
         vm_evaluate=VmEvaluate(debug_repo),
+        # v0.3.0 memory introspection — same fake debug_repo
+        memory_summary=MemorySummary(debug_repo),
+        allocation_profile=AllocationProfile(debug_repo),
+        detect_undisposed_controllers=DetectUndisposedControllers(debug_repo),
+        find_retaining_path=FindRetainingPath(debug_repo),
+        take_heap_snapshot=TakeHeapSnapshot(debug_repo, artifacts),
+        # v0.3.0 app size — reuses the existing fake flutter CLI (None here;
+        # the test does not exercise this tool. Real wiring uses FlutterCli.)
+        analyze_app_size=AnalyzeAppSize(None),
         new_session=NewSession(artifacts),
         get_artifacts_dir=GetArtifactsDir(artifacts),
         fetch_artifact=FetchArtifact(),
@@ -569,5 +586,12 @@ async def test_registry_covers_all_use_case_fields(tmp_path: Path):
         "get_artifacts_dir",
         "fetch_artifact",
         "inspect_image_safety",
+        # v0.3.0
+        "memory_summary",
+        "allocation_profile",
+        "detect_undisposed_controllers",
+        "find_retaining_path",
+        "take_heap_snapshot",
+        "analyze_app_size",
     }
     assert names == expected

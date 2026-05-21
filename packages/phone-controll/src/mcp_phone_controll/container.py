@@ -76,6 +76,7 @@ from .data.repositories.vscode_ide_repository import VsCodeIdeRepository
 from .data.repositories.wda_ui_repository import WdaUiRepository
 from .data.repositories.yaml_plan_executor import YamlPlanExecutor
 from .domain.entities import TestFramework
+from .domain.usecases.app_size import AnalyzeAppSize
 from .domain.usecases.artifact_retention import (
     CompressPng,
     DiskUsage,
@@ -137,6 +138,13 @@ from .domain.usecases.lifecycle import (
     StopApp,
 )
 from .domain.usecases.mcp_ping import McpPing
+from .domain.usecases.memory_inspect import (
+    AllocationProfile,
+    DetectUndisposedControllers,
+    FindRetainingPath,
+    MemorySummary,
+    TakeHeapSnapshot,
+)
 from .domain.usecases.narrate import Narrate
 from .domain.usecases.notify_webhook import NotifyWebhook
 from .domain.usecases.observation import (
@@ -604,6 +612,14 @@ def build_runtime(
         # DAP-lite
         vm_list_isolates=VmListIsolates(debug_repo),
         vm_evaluate=VmEvaluate(debug_repo),
+        # v0.3.0 — memory introspection (production-quality gates)
+        memory_summary=MemorySummary(debug_repo),
+        allocation_profile=AllocationProfile(debug_repo),
+        detect_undisposed_controllers=DetectUndisposedControllers(debug_repo),
+        find_retaining_path=FindRetainingPath(debug_repo),
+        take_heap_snapshot=TakeHeapSnapshot(debug_repo, artifacts_repo),
+        # v0.3.0 — app size analyzer
+        analyze_app_size=AnalyzeAppSize(flutter),
         new_session=NewSession(artifacts_repo),
         get_artifacts_dir=GetArtifactsDir(artifacts_repo),
         fetch_artifact=FetchArtifact(),

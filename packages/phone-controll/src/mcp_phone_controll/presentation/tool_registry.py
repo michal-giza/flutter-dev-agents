@@ -14,6 +14,7 @@ from ..domain.entities import (
     SessionTrace,
 )
 from ..domain.result import Err, Result
+from ..domain.usecases.app_size import AnalyzeAppSize
 from ..domain.usecases.artifact_retention import (
     CompressPng,
     DiskUsage,
@@ -90,6 +91,13 @@ from ..domain.usecases.lifecycle import (
     StopApp,
 )
 from ..domain.usecases.mcp_ping import McpPing, McpPingResult
+from ..domain.usecases.memory_inspect import (
+    AllocationProfile,
+    DetectUndisposedControllers,
+    FindRetainingPath,
+    MemorySummary,
+    TakeHeapSnapshot,
+)
 from ..domain.usecases.narrate import Narrate
 from ..domain.usecases.notify_webhook import (
     NotifyWebhook,
@@ -198,6 +206,8 @@ from ..domain.usecases.wda_setup import (
 # re-exported here for backward compatibility — many tests + other modules
 # import them from `tool_registry`.
 from .descriptors._param_builders import (
+    _params_allocation_profile,
+    _params_analyze_app_size,
     _params_assert_no_errors,
     _params_assert_pose_stable,
     _params_assert_visible,
@@ -217,12 +227,14 @@ from .descriptors._param_builders import (
     _params_describe_capabilities,
     _params_describe_tool,
     _params_detect_markers,
+    _params_detect_undisposed_controllers,
     _params_dump_ui,
     _params_dump_widget_tree,
     _params_extract_ui_graph,
     _params_fetch_artifact,
     _params_find,
     _params_find_flutter_widget,
+    _params_find_retaining_path,
     _params_flutter_pub_get,
     _params_flutter_pub_outdated,
     _params_focus_ide_window,
@@ -239,6 +251,7 @@ from .descriptors._param_builders import (
     _params_list_missing_widget_keys,
     _params_list_patrol,
     _params_list_simulators,
+    _params_memory_summary,
     _params_narrate,
     _params_new_session,
     _params_notify_webhook,
@@ -282,6 +295,7 @@ from .descriptors._param_builders import (
     _params_swipe,
     _params_tail_debug_log,
     _params_tail_logs,
+    _params_take_heap_snapshot,
     _params_tap,
     _params_tap_and_verify,
     _params_tap_text,
@@ -427,6 +441,14 @@ class UseCases:
     # DAP-lite
     vm_list_isolates: VmListIsolates
     vm_evaluate: VmEvaluate
+    # v0.3.0 — memory introspection
+    memory_summary: MemorySummary
+    allocation_profile: AllocationProfile
+    detect_undisposed_controllers: DetectUndisposedControllers
+    find_retaining_path: FindRetainingPath
+    take_heap_snapshot: TakeHeapSnapshot
+    # v0.3.0 — app size analyzer
+    analyze_app_size: AnalyzeAppSize
     new_session: NewSession
     get_artifacts_dir: GetArtifactsDir
     fetch_artifact: FetchArtifact
@@ -2049,6 +2071,137 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             ),
             build_params=_params_vm_evaluate,
             invoke=_bind(uc.vm_evaluate, _params_vm_evaluate),
+        ),
+        # ---- v0.3.0 memory introspection ----
+        ToolDescriptor(
+            name="memory_summary",
+            description=(
+                "Per-isolate memory usage on the running app: heap "
+                "capacity, heap used, external (off-heap) bytes. Cheap "
+                "checkpoint to call at start + end of a test loop."
+            ),
+            input_schema=_schema({"session_id": _string("")}),
+            build_params=_params_memory_summary,
+            invoke=_bind(uc.memory_summary, _params_memory_summary),
+        ),
+        ToolDescriptor(
+            name="allocation_profile",
+            description=(
+                "Per-class allocation breakdown. Pair with "
+                "reset_accumulator=true at the start of a flow to detect "
+                "leaks — classes that grew across the flow appear at the "
+                "top of top_by_count."
+            ),
+            input_schema=_schema(
+                {
+                    "isolate_id": _string("Default first runnable."),
+                    "session_id": _string(""),
+                    "reset_accumulator": _bool(
+                        "Reset accumulator after snapshot — next call "
+                        "returns deltas since this checkpoint."
+                    ),
+                    "top_n": _int("Top N by count + bytes. Default 20."),
+                }
+            ),
+            build_params=_params_allocation_profile,
+            invoke=_bind(uc.allocation_profile, _params_allocation_profile),
+        ),
+        ToolDescriptor(
+            name="detect_undisposed_controllers",
+            description=(
+                "Counts live instances of leak-prone Flutter classes "
+                "(TextEditingController, ScrollController, "
+                "AnimationController, StreamSubscription, Timer, …). "
+                "Returns plain-English advice on whether counts look "
+                "healthy."
+            ),
+            input_schema=_schema(
+                {
+                    "isolate_id": _string(""),
+                    "session_id": _string(""),
+                    "extra_classes": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Additional class names to count.",
+                    },
+                }
+            ),
+            build_params=_params_detect_undisposed_controllers,
+            invoke=_bind(
+                uc.detect_undisposed_controllers,
+                _params_detect_undisposed_controllers,
+            ),
+        ),
+        ToolDescriptor(
+            name="find_retaining_path",
+            description=(
+                "Why is class X still in memory? Walks GC roots → "
+                "first live instance, returns the retainer chain "
+                "(field-by-field path). Slow on large heaps (5-15s); "
+                "use after detect_undisposed_controllers flags a class."
+            ),
+            input_schema=_schema(
+                {
+                    "class_name": _string("e.g. 'TextEditingController'"),
+                    "isolate_id": _string(""),
+                    "session_id": _string(""),
+                    "max_depth": _int("Walk depth limit. Default 30."),
+                },
+                ["class_name"],
+            ),
+            build_params=_params_find_retaining_path,
+            invoke=_bind(uc.find_retaining_path, _params_find_retaining_path),
+        ),
+        ToolDescriptor(
+            name="take_heap_snapshot",
+            description=(
+                "Save the full heap-graph snapshot to the session "
+                "artifacts dir for later DevTools analysis. Use when "
+                "allocation_profile shows growth but the cause isn't "
+                "clear from the class names alone."
+            ),
+            input_schema=_schema(
+                {
+                    "isolate_id": _string(""),
+                    "session_id": _string(""),
+                    "label": _string("Filename suffix for the snapshot."),
+                }
+            ),
+            build_params=_params_take_heap_snapshot,
+            invoke=_bind(uc.take_heap_snapshot, _params_take_heap_snapshot),
+        ),
+        # ---- v0.3.0 app size analyzer ----
+        ToolDescriptor(
+            name="analyze_app_size",
+            description=(
+                "`flutter build … --analyze-size` wrapper: surfaces the "
+                "top-N largest packages + assets in the release build, "
+                "plus optional delta vs a baseline run. Pre-release "
+                "store-listing gate."
+            ),
+            input_schema=_schema(
+                {
+                    "project_path": _string(""),
+                    "platform": _enum(
+                        ["apk", "appbundle", "ios"],
+                        "Default apk.",
+                    ),
+                    "mode": _enum(
+                        ["release", "profile", "debug"],
+                        "Default release. Non-release modes skip tree "
+                        "shaking — sizes are misleading.",
+                    ),
+                    "flavor": _string("Optional Flutter flavor."),
+                    "top_n": _int("Top N packages/assets. Default 15."),
+                    "baseline_json_path": _string(
+                        "Optional path to a previous --analyze-size "
+                        "JSON. When set, deltas_vs_baseline is populated."
+                    ),
+                },
+                ["project_path"],
+            ),
+            build_params=_params_analyze_app_size,
+            invoke=_bind(uc.analyze_app_size, _params_analyze_app_size),
         ),
         ToolDescriptor(
             name="save_golden_image",

@@ -125,6 +125,9 @@ def default_annotations(tool_name: str) -> dict[str, bool]:
         "list_simulators", "list_avds", "list_locks", "list_devices",
         "list_debug_sessions", "list_ide_windows", "list_skills",
         "is_ide_available",
+        # v0.3.0 memory introspection — all read-only
+        "memory_summary", "allocation_profile",
+        "detect_undisposed_controllers", "find_retaining_path",
     )
     # Destructive tools — touch device state, install/launch/stop apps,
     # write files in arbitrary places, modify project source.
@@ -155,6 +158,8 @@ def default_annotations(tool_name: str) -> dict[str, bool]:
         "take_screenshot",  # writes to disk; idempotent in effect though
         "new_session", "fetch_artifact",  # writes session metadata / reads disk
         "wait_for_marker",  # polling — open-world
+        # v0.3.0 destructive — writes to disk / runs builds
+        "take_heap_snapshot", "analyze_app_size",
     )
     # Open-world: interacts with real devices, real network, real
     # filesystem we don't control.
@@ -190,6 +195,10 @@ def default_annotations(tool_name: str) -> dict[str, bool]:
         "infer_camera_pose",
         "prepare_for_test", "release_device", "select_device",
         "force_release_lock",
+        # v0.3.0 — all hit the VM service / build pipeline (real world)
+        "memory_summary", "allocation_profile",
+        "detect_undisposed_controllers", "find_retaining_path",
+        "take_heap_snapshot", "analyze_app_size",
     )
     # Idempotent: repeated calls with the same args produce the same
     # result. Hosts MAY auto-retry on transient failure.
