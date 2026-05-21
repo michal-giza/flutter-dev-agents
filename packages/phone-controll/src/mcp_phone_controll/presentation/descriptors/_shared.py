@@ -130,6 +130,8 @@ def default_annotations(tool_name: str) -> dict[str, bool]:
         "detect_undisposed_controllers", "find_retaining_path",
         # v0.3.0 widget testing — list_widget_tests reads files
         "list_widget_tests",
+        # v0.3.0 phase 4 — scenario designer reads manifest/pubspec only
+        "propose_test_scenarios",
     )
     # Destructive tools — touch device state, install/launch/stop apps,
     # write files in arbitrary places, modify project source.
