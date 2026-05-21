@@ -145,6 +145,7 @@ from ..domain.usecases.recall import (
     IndexProject,
     Recall,
 )
+from ..domain.usecases.recommend_test_path import RecommendTestPath
 from ..domain.usecases.release_screenshot import (
     CaptureReleaseScreenshot,
 )
@@ -283,6 +284,7 @@ from .descriptors._param_builders import (
     _params_read_logs,
     _params_recall,
     _params_recall_corrective,
+    _params_recommend_test_path,
     _params_release_device,
     _params_replay_skill,
     _params_restart_debug_session,
@@ -484,6 +486,8 @@ class UseCases:
     # v0.3.0 phase 5 — deep link + accessibility audit
     test_deep_link: TestDeepLink
     audit_accessibility: AuditAccessibility
+    # v0.3.0 phase 6 — test-path advisor
+    recommend_test_path: RecommendTestPath
     new_session: NewSession
     get_artifacts_dir: GetArtifactsDir
     fetch_artifact: FetchArtifact
@@ -2505,6 +2509,51 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             ),
             build_params=_params_audit_accessibility,
             invoke=_bind(uc.audit_accessibility, _params_audit_accessibility),
+        ),
+        # ---- v0.3.0 phase 6 — test-path advisor ----
+        ToolDescriptor(
+            name="recommend_test_path",
+            description=(
+                "Returns the canonical testing path for the given "
+                "context. Picks from 7 strategies: pre_commit / pre_pr / "
+                "daily_dev / nightly / pre_release / hotfix / postmortem. "
+                "Each path returns a sequenced list of MCP tool calls "
+                "with estimated timings, isolation guarantees, pass "
+                "criteria, and skip conditions. See "
+                "docs/testing-paths.md for the full taxonomy."
+            ),
+            input_schema=_schema(
+                {
+                    "project_path": _string("Flutter project root."),
+                    "context": _enum(
+                        [
+                            "pre_commit",
+                            "pre_pr",
+                            "daily_dev",
+                            "nightly",
+                            "pre_release",
+                            "hotfix",
+                            "postmortem",
+                        ],
+                        "When in the dev cycle this runs.",
+                    ),
+                    "device_serial": _string(
+                        "Optional explicit device. Else paths plan for "
+                        "'first available' and let select_device pick."
+                    ),
+                    "size_baseline_path": _string(
+                        "Optional path to a previous --analyze-size JSON. "
+                        "Used by nightly + pre_release for delta reports."
+                    ),
+                    "coverage_fail_under": _number(
+                        "Coverage threshold for pre_pr / pre_release. "
+                        "Default 0.80."
+                    ),
+                },
+                ["project_path", "context"],
+            ),
+            build_params=_params_recommend_test_path,
+            invoke=_bind(uc.recommend_test_path, _params_recommend_test_path),
         ),
         ToolDescriptor(
             name="save_golden_image",

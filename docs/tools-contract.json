@@ -2312,6 +2312,53 @@
   },
   {
     "annotations": {
+      "destructiveHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Returns the canonical testing path for the given context. Picks from 7 strategies: pre_commit / pre_pr / daily_dev / nightly / pre_release / hotfix / postmortem. Each path returns a sequenced list of MCP tool calls with estimated timings, isolation guarantees, pass criteria, and skip conditions. See docs/testing-paths.md for the full taxonomy.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "description": "When in the dev cycle this runs.",
+          "enum": [
+            "pre_commit",
+            "pre_pr",
+            "daily_dev",
+            "nightly",
+            "pre_release",
+            "hotfix",
+            "postmortem"
+          ],
+          "type": "string"
+        },
+        "coverage_fail_under": {
+          "description": "Coverage threshold for pre_pr / pre_release. Default 0.80.",
+          "type": "number"
+        },
+        "device_serial": {
+          "description": "Optional explicit device. Else paths plan for 'first available' and let select_device pick.",
+          "type": "string"
+        },
+        "project_path": {
+          "description": "Flutter project root.",
+          "type": "string"
+        },
+        "size_baseline_path": {
+          "description": "Optional path to a previous --analyze-size JSON. Used by nightly + pre_release for delta reports.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_path",
+        "context"
+      ],
+      "type": "object"
+    },
+    "name": "recommend_test_path"
+  },
+  {
+    "annotations": {
       "destructiveHint": true,
       "openWorldHint": true,
       "readOnlyHint": false
