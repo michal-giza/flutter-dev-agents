@@ -199,6 +199,12 @@ from ..domain.usecases.wda_setup import (
     SetupWebDriverAgent,
     StartWdaOnSimulator,
 )
+from ..domain.usecases.widget_testing import (
+    ListWidgetTests,
+    RunWidgetTest,
+    TestCoverageReport,
+    UpdateGoldens,
+)
 
 # ToolDescriptor + schema helpers + all param-builders were extracted to
 # `presentation/descriptors/` so this file is the registration logic, not a
@@ -251,6 +257,7 @@ from .descriptors._param_builders import (
     _params_list_missing_widget_keys,
     _params_list_patrol,
     _params_list_simulators,
+    _params_list_widget_tests,
     _params_memory_summary,
     _params_narrate,
     _params_new_session,
@@ -276,6 +283,7 @@ from .descriptors._param_builders import (
     _params_run_quick_check,
     _params_run_test_plan,
     _params_run_unit,
+    _params_run_widget_test,
     _params_save_golden_image,
     _params_scaffold_feature,
     _params_screenshot,
@@ -299,10 +307,12 @@ from .descriptors._param_builders import (
     _params_tap,
     _params_tap_and_verify,
     _params_tap_text,
+    _params_test_coverage_report,
     _params_toggle_inspector,
     _params_tool_usage_report,
     _params_type_text,
     _params_uninstall,
+    _params_update_goldens,
     _params_validate_test_plan,
     _params_vm_evaluate,
     _params_vm_list_isolates,
@@ -449,6 +459,11 @@ class UseCases:
     take_heap_snapshot: TakeHeapSnapshot
     # v0.3.0 — app size analyzer
     analyze_app_size: AnalyzeAppSize
+    # v0.3.0 — widget testing
+    run_widget_test: RunWidgetTest
+    list_widget_tests: ListWidgetTests
+    update_goldens: UpdateGoldens
+    test_coverage_report: TestCoverageReport
     new_session: NewSession
     get_artifacts_dir: GetArtifactsDir
     fetch_artifact: FetchArtifact
@@ -2202,6 +2217,120 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             ),
             build_params=_params_analyze_app_size,
             invoke=_bind(uc.analyze_app_size, _params_analyze_app_size),
+        ),
+        # ---- v0.3.0 widget testing ----
+        ToolDescriptor(
+            name="run_widget_test",
+            description=(
+                "Targeted `flutter test` runner for widget tests. "
+                "Filter by test_path (file or dir), name_pattern (regex "
+                "or literal with plain_name=true), or tags. Same "
+                "TestRun envelope as run_unit_tests. Pair coverage=true "
+                "with test_coverage_report for the full coverage flow."
+            ),
+            input_schema=_schema(
+                {
+                    "project_path": _string("Flutter project root."),
+                    "test_path": _string(
+                        "Single file or subdirectory (e.g. "
+                        "'test/widgets/login_test.dart'). Omit to run all."
+                    ),
+                    "name_pattern": _string(
+                        "Pattern over the testWidgets() description. "
+                        "Regex by default; pass plain_name=true for "
+                        "literal substring matching."
+                    ),
+                    "plain_name": _bool(
+                        "If true, name_pattern is a literal substring "
+                        "(--plain-name) instead of a regex."
+                    ),
+                    "tags": _string(
+                        "Filter by tag (e.g. 'golden' or 'smoke')."
+                    ),
+                    "coverage": _bool(
+                        "Add --coverage so coverage/lcov.info is written."
+                    ),
+                    "update_goldens": _bool(
+                        "DANGEROUS — overwrites golden images on "
+                        "mismatch. Use update_goldens tool instead "
+                        "for clarity."
+                    ),
+                },
+                ["project_path"],
+            ),
+            build_params=_params_run_widget_test,
+            invoke=_bind(uc.run_widget_test, _params_run_widget_test),
+        ),
+        ToolDescriptor(
+            name="list_widget_tests",
+            description=(
+                "Discover testWidgets() blocks under `test/` (or a "
+                "custom root) without running them. Returns file + "
+                "line + test name + golden flag. Use to plan which "
+                "subset to run with run_widget_test."
+            ),
+            input_schema=_schema(
+                {
+                    "project_path": _string("Flutter project root."),
+                    "test_root": _string(
+                        "Subdirectory to scan. Default 'test'."
+                    ),
+                },
+                ["project_path"],
+            ),
+            build_params=_params_list_widget_tests,
+            invoke=_bind(uc.list_widget_tests, _params_list_widget_tests),
+        ),
+        ToolDescriptor(
+            name="update_goldens",
+            description=(
+                "⚠️ Regenerate golden images for targeted widget "
+                "tests. Use ONLY when you deliberately changed the "
+                "visible output and want the new rendering accepted "
+                "as the new baseline. Running unfiltered silently "
+                "erases regression detection."
+            ),
+            input_schema=_schema(
+                {
+                    "project_path": _string(""),
+                    "test_path": _string(
+                        "Strongly recommend targeting a specific file."
+                    ),
+                    "name_pattern": _string(""),
+                    "plain_name": _bool(""),
+                    "tags": _string("e.g. 'golden'"),
+                },
+                ["project_path"],
+            ),
+            build_params=_params_update_goldens,
+            invoke=_bind(uc.update_goldens, _params_update_goldens),
+        ),
+        ToolDescriptor(
+            name="test_coverage_report",
+            description=(
+                "Runs `flutter test --coverage`, parses coverage/"
+                "lcov.info, returns per-file + overall line "
+                "coverage. Pair coverage_filter_prefix='lib/features/"
+                "<x>/' to gate a single feature. Set fail_under to "
+                "make the result.ok flag reflect a threshold check."
+            ),
+            input_schema=_schema(
+                {
+                    "project_path": _string(""),
+                    "test_path": _string("Optional test subset to run."),
+                    "coverage_filter_prefix": _string(
+                        "Only files under this path (e.g. "
+                        "'lib/features/auth/') are reported."
+                    ),
+                    "fail_under": _number(
+                        "Threshold 0.0-1.0. When set, "
+                        "passed_threshold=false if coverage falls below."
+                    ),
+                },
+                ["project_path"],
+            ),
+            build_params=_params_test_coverage_report,
+            invoke=_bind(uc.test_coverage_report, _params_test_coverage_report),
         ),
         ToolDescriptor(
             name="save_golden_image",

@@ -115,3 +115,53 @@ class FlutterCli:
             cwd=project_path,
             timeout_s=timeout_s,
         )
+
+    async def test_widget(
+        self,
+        project_path: Path,
+        test_path: str | None = None,
+        name_pattern: str | None = None,
+        tags: str | None = None,
+        plain_name: bool = False,
+        coverage: bool = False,
+        update_goldens: bool = False,
+        timeout_s: float = 600.0,
+    ) -> ProcessResult:
+        """`flutter test` with the targeting flags widget testing needs.
+
+        Use cases this covers that the existing `test_unit()` doesn't:
+
+        - `test_path` — point at one file (`test/widgets/foo_test.dart`)
+          or a subdirectory (`test/features/auth/`). Lets agents
+          re-run only the widget tests they just touched, not the
+          whole suite.
+        - `name_pattern` — `--name` regex over the testWidgets()
+          description string. Combined with `plain_name=True`, this
+          becomes `--plain-name` (literal substring, not regex).
+        - `tags` — `--tags` filter for tests grouped with
+          `tags: ['golden']` or similar conventions. Useful when
+          a portfolio of apps tags golden-image tests separately
+          so they're easy to opt in/out.
+        - `coverage` — adds `--coverage` so the lcov.info file is
+          generated; the use case layer then parses it.
+        - `update_goldens` — adds `--update-goldens` so golden
+          mismatches REGENERATE the saved images instead of
+          failing. Use deliberately — running this against a
+          regressed UI silently wipes the regression detection.
+
+        All flags compose. `--reporter=json` stays on so the
+        existing parser still works.
+        """
+        argv = [self._flutter, "test", "--reporter=json"]
+        if coverage:
+            argv.append("--coverage")
+        if update_goldens:
+            argv.append("--update-goldens")
+        if name_pattern:
+            argv.append("--plain-name" if plain_name else "--name")
+            argv.append(name_pattern)
+        if tags:
+            argv += ["--tags", tags]
+        if test_path:
+            argv.append(test_path)
+        return await self._runner.run(argv, cwd=project_path, timeout_s=timeout_s)

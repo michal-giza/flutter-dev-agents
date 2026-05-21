@@ -128,6 +128,8 @@ def default_annotations(tool_name: str) -> dict[str, bool]:
         # v0.3.0 memory introspection — all read-only
         "memory_summary", "allocation_profile",
         "detect_undisposed_controllers", "find_retaining_path",
+        # v0.3.0 widget testing — list_widget_tests reads files
+        "list_widget_tests",
     )
     # Destructive tools — touch device state, install/launch/stop apps,
     # write files in arbitrary places, modify project source.
@@ -160,6 +162,8 @@ def default_annotations(tool_name: str) -> dict[str, bool]:
         "wait_for_marker",  # polling — open-world
         # v0.3.0 destructive — writes to disk / runs builds
         "take_heap_snapshot", "analyze_app_size",
+        # v0.3.0 widget testing — run tests / regenerate goldens
+        "run_widget_test", "update_goldens", "test_coverage_report",
     )
     # Open-world: interacts with real devices, real network, real
     # filesystem we don't control.
@@ -199,6 +203,9 @@ def default_annotations(tool_name: str) -> dict[str, bool]:
         "memory_summary", "allocation_profile",
         "detect_undisposed_controllers", "find_retaining_path",
         "take_heap_snapshot", "analyze_app_size",
+        # v0.3.0 widget testing — runs flutter test (real toolchain)
+        "run_widget_test", "list_widget_tests",
+        "update_goldens", "test_coverage_report",
     )
     # Idempotent: repeated calls with the same args produce the same
     # result. Hosts MAY auto-retry on transient failure.

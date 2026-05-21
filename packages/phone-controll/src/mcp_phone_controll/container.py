@@ -205,6 +205,12 @@ from .domain.usecases.vision_advanced import (
     WaitForArSessionReady,
 )
 from .domain.usecases.wda_setup import SetupWebDriverAgent, StartWdaOnSimulator
+from .domain.usecases.widget_testing import (
+    ListWidgetTests,
+    RunWidgetTest,
+    TestCoverageReport,
+    UpdateGoldens,
+)
 from .infrastructure.adb_client import AdbClient
 from .infrastructure.android_emulator_cli import AndroidEmulatorCli
 from .infrastructure.dart_cli import DartCli, FlutterPubCli
@@ -620,6 +626,11 @@ def build_runtime(
         take_heap_snapshot=TakeHeapSnapshot(debug_repo, artifacts_repo),
         # v0.3.0 — app size analyzer
         analyze_app_size=AnalyzeAppSize(flutter),
+        # v0.3.0 — widget testing surface
+        run_widget_test=RunWidgetTest(flutter),
+        list_widget_tests=ListWidgetTests(),
+        update_goldens=UpdateGoldens(flutter),
+        test_coverage_report=TestCoverageReport(flutter),
         new_session=NewSession(artifacts_repo),
         get_artifacts_dir=GetArtifactsDir(artifacts_repo),
         fetch_artifact=FetchArtifact(),
