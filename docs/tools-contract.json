@@ -2858,6 +2858,26 @@
       "openWorldHint": true,
       "readOnlyHint": false
     },
+    "description": "Begin VM Timeline collection for frame-rendering analysis. Pair with stop_frame_profile to bracket a specific user interaction (tap, scroll, animation). Returns the baseline timestamp + which streams are now enabled.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "session_id": {
+          "description": "",
+          "type": "string"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "start_frame_profile"
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
     "description": "Start a screen recording. Stop with stop_recording.",
     "inputSchema": {
       "additionalProperties": false,
@@ -2959,6 +2979,34 @@
       "type": "object"
     },
     "name": "stop_debug_session"
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Close the frame-profile bracket: disable Timeline, fetch captured events, analyze. Returns total + janked frame counts, P50/P90/P99/max frame times, worst-3 individual frames with build/raster split, and a paste-ready advice line. Always disables streams on exit (overhead ~5-10% CPU per stream).",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "session_id": {
+          "description": "",
+          "type": "string"
+        },
+        "target_fps": {
+          "description": "60 (default) or 120 for high-refresh devices.",
+          "type": "integer"
+        },
+        "tolerance_pct": {
+          "description": "Frames within this % of budget are NOT counted as jank. Default 0.10 (matches DevTools convention).",
+          "type": "number"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "stop_frame_profile"
   },
   {
     "annotations": {

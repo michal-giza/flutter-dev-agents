@@ -122,6 +122,10 @@ from .domain.usecases.discovery import (
     ToolUsageReportUseCase,
 )
 from .domain.usecases.doctor import CheckEnvironment
+from .domain.usecases.frame_profile import (
+    StartFrameProfile,
+    StopFrameProfile,
+)
 from .domain.usecases.ide import (
     CloseIdeWindow,
     FocusIdeWindow,
@@ -631,6 +635,9 @@ def build_runtime(
         list_widget_tests=ListWidgetTests(),
         update_goldens=UpdateGoldens(flutter),
         test_coverage_report=TestCoverageReport(flutter),
+        # v0.3.0 phase 3 — frame jank detection
+        start_frame_profile=StartFrameProfile(debug_repo),
+        stop_frame_profile=StopFrameProfile(debug_repo),
         new_session=NewSession(artifacts_repo),
         get_artifacts_dir=GetArtifactsDir(artifacts_repo),
         fetch_artifact=FetchArtifact(),
