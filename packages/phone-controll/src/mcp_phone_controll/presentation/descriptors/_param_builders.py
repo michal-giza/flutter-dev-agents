@@ -122,6 +122,9 @@ from ...domain.usecases.productivity import (
     SummarizeSessionParams,
 )
 from ...domain.usecases.projects import InspectProjectParams
+from ...domain.usecases.propose_test_scenarios import (
+    ProposeTestScenariosParams,
+)
 from ...domain.usecases.recall import IndexProjectParams, RecallParams
 from ...domain.usecases.release_screenshot import CaptureReleaseScreenshotParams
 from ...domain.usecases.set_agent_profile import SetAgentProfileParams
@@ -939,6 +942,20 @@ def _params_stop_frame_profile(args: JsonDict) -> StopFrameProfileParams:
         session_id=args.get("session_id"),
         target_fps=int(args.get("target_fps", 60)),
         tolerance_pct=float(args.get("tolerance_pct", 0.10)),
+    )
+
+
+# ---- v0.3.0 phase 4 — test scenario designer ---------------------------
+
+
+def _params_propose_test_scenarios(
+    args: JsonDict,
+) -> ProposeTestScenariosParams:
+    return ProposeTestScenariosParams(
+        project_path=Path(args["project_path"]).expanduser(),
+        app_description=args.get("app_description"),
+        focus_areas=tuple(args.get("focus_areas") or ()),
+        top_n=int(args.get("top_n", 25)),
     )
 
 

@@ -176,6 +176,7 @@ from .domain.usecases.productivity import (
     SummarizeSession,
 )
 from .domain.usecases.projects import InspectProject
+from .domain.usecases.propose_test_scenarios import ProposeTestScenarios
 from .domain.usecases.recall import IndexProject, Recall
 from .domain.usecases.release_screenshot import CaptureReleaseScreenshot
 from .domain.usecases.set_agent_profile import SetAgentProfile
@@ -638,6 +639,8 @@ def build_runtime(
         # v0.3.0 phase 3 — frame jank detection
         start_frame_profile=StartFrameProfile(debug_repo),
         stop_frame_profile=StopFrameProfile(debug_repo),
+        # v0.3.0 phase 4 — test scenario designer
+        propose_test_scenarios=ProposeTestScenarios(),
         new_session=NewSession(artifacts_repo),
         get_artifacts_dir=GetArtifactsDir(artifacts_repo),
         fetch_artifact=FetchArtifact(),

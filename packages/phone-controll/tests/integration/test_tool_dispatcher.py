@@ -119,6 +119,9 @@ from mcp_phone_controll.domain.usecases.productivity import (
     SummarizeSession,
 )
 from mcp_phone_controll.domain.usecases.projects import InspectProject
+from mcp_phone_controll.domain.usecases.propose_test_scenarios import (
+    ProposeTestScenarios,
+)
 from mcp_phone_controll.domain.usecases.recall import IndexProject, Recall
 from mcp_phone_controll.domain.usecases.release_screenshot import (
     CaptureReleaseScreenshot,
@@ -390,6 +393,8 @@ def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:
         # v0.3.0 phase 3 — frame profiling, same fake debug_repo
         start_frame_profile=StartFrameProfile(debug_repo),
         stop_frame_profile=StopFrameProfile(debug_repo),
+        # v0.3.0 phase 4 — scenario designer
+        propose_test_scenarios=ProposeTestScenarios(),
         new_session=NewSession(artifacts),
         get_artifacts_dir=GetArtifactsDir(artifacts),
         fetch_artifact=FetchArtifact(),
@@ -620,5 +625,7 @@ async def test_registry_covers_all_use_case_fields(tmp_path: Path):
         # v0.3.0 phase 3 (frame profiling)
         "start_frame_profile",
         "stop_frame_profile",
+        # v0.3.0 phase 4 (scenario designer)
+        "propose_test_scenarios",
     }
     assert names == expected

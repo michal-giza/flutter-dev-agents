@@ -2024,6 +2024,42 @@
   },
   {
     "annotations": {
+      "destructiveHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Returns a research-grounded test-scenario checklist for the project. Categorized (happy path / permission / network / accessibility / lifecycle / etc.), tagged with priority (P0/P1/P2) and the industry standard that motivates each. Inspects AndroidManifest, Info.plist, pubspec.yaml to add project-specific scenarios for detected features. See docs/testing-scenario-design.md for the full taxonomy + references.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "app_description": {
+          "description": "Optional: 1-sentence description of what the app does. Used for keyword-matched ranking when supplied.",
+          "type": "string"
+        },
+        "focus_areas": {
+          "description": "Narrow to specific categories. Values: happy_path, permission, network, input, interruption, lifecycle, accessibility, localization, device_matrix, performance, security, data.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "project_path": {
+          "description": "Flutter project root.",
+          "type": "string"
+        },
+        "top_n": {
+          "description": "Max scenarios returned. Default 25 \u2014 enough to be thorough, few enough to actually do.",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "project_path"
+      ],
+      "type": "object"
+    },
+    "name": "propose_test_scenarios"
+  },
+  {
+    "annotations": {
       "destructiveHint": true,
       "idempotentHint": true,
       "readOnlyHint": false

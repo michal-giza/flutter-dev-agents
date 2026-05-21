@@ -138,6 +138,7 @@ from ..domain.usecases.productivity import (
     SummarizeSession,
 )
 from ..domain.usecases.projects import InspectProject
+from ..domain.usecases.propose_test_scenarios import ProposeTestScenarios
 from ..domain.usecases.recall import (
     IndexProject,
     Recall,
@@ -272,6 +273,7 @@ from .descriptors._param_builders import (
     _params_prepare_for_test,
     _params_press_key,
     _params_promote_sequence,
+    _params_propose_test_scenarios,
     _params_prune_originals,
     _params_quality_gate,
     _params_read_debug_log,
@@ -473,6 +475,8 @@ class UseCases:
     # v0.3.0 phase 3 — frame jank detection
     start_frame_profile: StartFrameProfile
     stop_frame_profile: StopFrameProfile
+    # v0.3.0 phase 4 — test scenario designer
+    propose_test_scenarios: ProposeTestScenarios
     new_session: NewSession
     get_artifacts_dir: GetArtifactsDir
     fetch_artifact: FetchArtifact
@@ -2380,6 +2384,50 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             ),
             build_params=_params_stop_frame_profile,
             invoke=_bind(uc.stop_frame_profile, _params_stop_frame_profile),
+        ),
+        # ---- v0.3.0 phase 4 — test scenario designer ----
+        ToolDescriptor(
+            name="propose_test_scenarios",
+            description=(
+                "Returns a research-grounded test-scenario checklist for "
+                "the project. Categorized (happy path / permission / "
+                "network / accessibility / lifecycle / etc.), tagged with "
+                "priority (P0/P1/P2) and the industry standard that "
+                "motivates each. Inspects AndroidManifest, Info.plist, "
+                "pubspec.yaml to add project-specific scenarios for "
+                "detected features. See docs/testing-scenario-design.md "
+                "for the full taxonomy + references."
+            ),
+            input_schema=_schema(
+                {
+                    "project_path": _string("Flutter project root."),
+                    "app_description": _string(
+                        "Optional: 1-sentence description of what the app "
+                        "does. Used for keyword-matched ranking when "
+                        "supplied."
+                    ),
+                    "focus_areas": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": (
+                            "Narrow to specific categories. Values: "
+                            "happy_path, permission, network, input, "
+                            "interruption, lifecycle, accessibility, "
+                            "localization, device_matrix, performance, "
+                            "security, data."
+                        ),
+                    },
+                    "top_n": _int(
+                        "Max scenarios returned. Default 25 — enough to "
+                        "be thorough, few enough to actually do."
+                    ),
+                },
+                ["project_path"],
+            ),
+            build_params=_params_propose_test_scenarios,
+            invoke=_bind(
+                uc.propose_test_scenarios, _params_propose_test_scenarios
+            ),
         ),
         ToolDescriptor(
             name="save_golden_image",
