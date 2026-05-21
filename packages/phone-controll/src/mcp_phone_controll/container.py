@@ -83,6 +83,7 @@ from .domain.usecases.artifact_retention import (
     PruneOriginals,
 )
 from .domain.usecases.artifacts import FetchArtifact, GetArtifactsDir, NewSession
+from .domain.usecases.audit_accessibility import AuditAccessibility
 from .domain.usecases.build_install import BuildApp, InstallApp, UninstallApp
 from .domain.usecases.code_quality import (
     DartAnalyze,
@@ -94,6 +95,7 @@ from .domain.usecases.code_quality import (
 )
 from .domain.usecases.crag import CorrectiveRecall
 from .domain.usecases.debug_inspect import VmEvaluate, VmListIsolates
+from .domain.usecases.deep_link import TestDeepLink
 from .domain.usecases.dev_session import (
     AttachDebugSession,
     CallServiceExtension,
@@ -641,6 +643,9 @@ def build_runtime(
         stop_frame_profile=StopFrameProfile(debug_repo),
         # v0.3.0 phase 4 — test scenario designer
         propose_test_scenarios=ProposeTestScenarios(),
+        # v0.3.0 phase 5 — deep link + accessibility audit
+        test_deep_link=TestDeepLink(devices_repo, ui_repo, state_repo, adb),
+        audit_accessibility=AuditAccessibility(devices_repo, ui_repo, state_repo),
         new_session=NewSession(artifacts_repo),
         get_artifacts_dir=GetArtifactsDir(artifacts_repo),
         fetch_artifact=FetchArtifact(),

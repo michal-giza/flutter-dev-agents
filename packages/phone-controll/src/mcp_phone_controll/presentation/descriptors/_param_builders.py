@@ -27,6 +27,7 @@ from ...domain.usecases.artifact_retention import (
     PruneOriginalsParams,
 )
 from ...domain.usecases.artifacts import FetchArtifactParams, NewSessionParams
+from ...domain.usecases.audit_accessibility import AuditAccessibilityParams
 from ...domain.usecases.build_install import (
     BuildAppParams,
     InstallAppParams,
@@ -45,6 +46,7 @@ from ...domain.usecases.debug_inspect import (
     VmEvaluateParams,
     VmListIsolatesParams,
 )
+from ...domain.usecases.deep_link import TestDeepLinkParams
 from ...domain.usecases.dev_session import (
     AttachDebugSessionParams,
     CallServiceExtensionParams,
@@ -956,6 +958,30 @@ def _params_propose_test_scenarios(
         app_description=args.get("app_description"),
         focus_areas=tuple(args.get("focus_areas") or ()),
         top_n=int(args.get("top_n", 25)),
+    )
+
+
+# ---- v0.3.0 phase 5 — deep link + accessibility audit ------------------
+
+
+def _params_test_deep_link(args: JsonDict) -> TestDeepLinkParams:
+    return TestDeepLinkParams(
+        uri=args["uri"],
+        expect_screen_text=args.get("expect_screen_text"),
+        serial=args.get("serial"),
+        cold_start=bool(args.get("cold_start", False)),
+        timeout_s=float(args.get("timeout_s", 15.0)),
+    )
+
+
+def _params_audit_accessibility(args: JsonDict) -> AuditAccessibilityParams:
+    return AuditAccessibilityParams(
+        serial=args.get("serial"),
+        include_log_signals=bool(args.get("include_log_signals", True)),
+        ignore_class_substrings=tuple(
+            args.get("ignore_class_substrings")
+            or ("Divider", "Padding", "SizedBox")
+        ),
     )
 
 
