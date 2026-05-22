@@ -41,6 +41,9 @@ from mcp_phone_controll.domain.usecases.audit_release_readiness import (
 from mcp_phone_controll.domain.usecases.audit_security import (
     AuditSecurity,
 )
+from mcp_phone_controll.domain.usecases.audit_test_quality import (
+    AuditTestQuality,
+)
 from mcp_phone_controll.domain.usecases.build_install import (
     BuildApp,
     InstallApp,
@@ -440,6 +443,7 @@ def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:
         audit_dependencies=AuditDependencies(),
         audit_release_readiness=AuditReleaseReadiness(),
         design_test_plan=DesignTestPlan(),
+        audit_test_quality=AuditTestQuality(),
         new_session=NewSession(artifacts),
         get_artifacts_dir=GetArtifactsDir(artifacts),
         fetch_artifact=FetchArtifact(),
@@ -692,5 +696,7 @@ async def test_registry_covers_all_use_case_fields(tmp_path: Path):
         "audit_release_readiness",
         # v0.3.0 phase 11.5 (senior-tester pre-write discipline)
         "design_test_plan",
+        # v0.3.0 phase 12 (test-suite quality audit)
+        "audit_test_quality",
     }
     assert names == expected

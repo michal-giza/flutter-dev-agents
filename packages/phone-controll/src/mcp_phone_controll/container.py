@@ -89,6 +89,7 @@ from .domain.usecases.audit_dependencies import AuditDependencies
 from .domain.usecases.audit_localization import AuditLocalization
 from .domain.usecases.audit_release_readiness import AuditReleaseReadiness
 from .domain.usecases.audit_security import AuditSecurity
+from .domain.usecases.audit_test_quality import AuditTestQuality
 from .domain.usecases.build_install import BuildApp, InstallApp, UninstallApp
 from .domain.usecases.code_quality import (
     DartAnalyze,
@@ -674,6 +675,8 @@ def build_runtime(
         audit_release_readiness=AuditReleaseReadiness(),
         # v0.3.0 phase 11.5 — senior-tester pre-write discipline
         design_test_plan=DesignTestPlan(),
+        # v0.3.0 phase 12 — test-suite quality audit (post-write)
+        audit_test_quality=AuditTestQuality(),
         new_session=NewSession(artifacts_repo),
         get_artifacts_dir=GetArtifactsDir(artifacts_repo),
         fetch_artifact=FetchArtifact(),
