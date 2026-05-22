@@ -35,34 +35,10 @@ from mcp_phone_controll.infrastructure.process_runner import ProcessResult
 # ============================================================
 # Test doubles
 # ============================================================
-
-
-class _FakeAdb:
-    """AdbClient stub.
-
-    Configure responses keyed by command pattern. The fake
-    matches the *suffix* of the shell call (e.g. ('pm', 'list',
-    'packages', 'com.github.uiautomator') for the list call).
-
-    By default, returns ok=True with empty stdout. Override with
-    `responses` dict for command-specific outputs.
-    """
-
-    def __init__(
-        self,
-        responses: dict[tuple[str, ...], ProcessResult] | None = None,
-        default: ProcessResult | None = None,
-    ):
-        self.responses = responses or {}
-        self.default = default or ProcessResult(
-            stdout="", stderr="", returncode=0
-        )
-        self.calls: list[tuple[str, ...]] = []
-
-    async def shell(self, serial: str, *args: str, timeout_s: float = 30.0):
-        self.calls.append((serial, *args))
-        # Try to match by the full args tuple (without serial)
-        return self.responses.get(args, self.default)
+#
+# _FakeAdb is now a re-export of the shared FakeAdbClient. See
+# tests/fakes/fake_adb.py for the implementation.
+from tests.fakes.fake_adb import FakeAdbClient as _FakeAdb
 
 
 class _FakeState:
