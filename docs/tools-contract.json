@@ -386,6 +386,77 @@
       "destructiveHint": false,
       "readOnlyHint": true
     },
+    "description": "Release-readiness gate. Composes the 4 v0.3.0 audit verticals (seniority, security, localization, dependencies) concurrently into one ship/hold/block verdict. Returns composite letter grade A-F, per-domain breakdown, cross-domain top_actions, and a paste-ready release-PR summary. Pure compute. Sub-second. See docs/release-readiness-rubric.md.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "include_dependencies": {
+          "description": "Default true.",
+          "type": "boolean"
+        },
+        "include_localization": {
+          "description": "Default true.",
+          "type": "boolean"
+        },
+        "include_security": {
+          "description": "Default true.",
+          "type": "boolean"
+        },
+        "include_seniority": {
+          "description": "Default true.",
+          "type": "boolean"
+        },
+        "is_published": {
+          "description": "Passed to audit_dependencies. Default true.",
+          "type": "boolean"
+        },
+        "max_top_actions": {
+          "description": "Cap on cross-domain actions. Default 10.",
+          "type": "number"
+        },
+        "min_level": {
+          "description": "Min tier across all sub-audits.",
+          "enum": [
+            "junior",
+            "mid",
+            "senior",
+            "staff"
+          ],
+          "type": "string"
+        },
+        "project_path": {
+          "description": "Flutter project root.",
+          "type": "string"
+        },
+        "weight_dependencies": {
+          "description": "Default 1.5.",
+          "type": "number"
+        },
+        "weight_localization": {
+          "description": "Default 1.0.",
+          "type": "number"
+        },
+        "weight_security": {
+          "description": "Default 2.0.",
+          "type": "number"
+        },
+        "weight_seniority": {
+          "description": "Default 1.0.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "project_path"
+      ],
+      "type": "object"
+    },
+    "name": "audit_release_readiness"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "readOnlyHint": true
+    },
     "description": "OWASP MASVS scanner. 20 rules across 3 severities (critical/high/medium): hardcoded API keys, JWT/PEM in source, cleartext HTTP, SharedPreferences for tokens, unguarded WebView JS, debug-signed release, ATS disabled, exported components, missing cert pinning. Returns per-file findings with redacted secrets + grade (secure/acceptable/at_risk/critical). See docs/security-rubric.md.",
     "inputSchema": {
       "additionalProperties": false,

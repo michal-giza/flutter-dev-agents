@@ -87,6 +87,7 @@ from .domain.usecases.audit_accessibility import AuditAccessibility
 from .domain.usecases.audit_code_seniority import AuditCodeSeniority
 from .domain.usecases.audit_dependencies import AuditDependencies
 from .domain.usecases.audit_localization import AuditLocalization
+from .domain.usecases.audit_release_readiness import AuditReleaseReadiness
 from .domain.usecases.audit_security import AuditSecurity
 from .domain.usecases.build_install import BuildApp, InstallApp, UninstallApp
 from .domain.usecases.code_quality import (
@@ -668,6 +669,8 @@ def build_runtime(
         audit_localization=AuditLocalization(),
         # v0.3.0 phase 10 — dependency / supply chain audit
         audit_dependencies=AuditDependencies(),
+        # v0.3.0 phase 11 — release-readiness composite (the ship/hold/block gate)
+        audit_release_readiness=AuditReleaseReadiness(),
         new_session=NewSession(artifacts_repo),
         get_artifacts_dir=GetArtifactsDir(artifacts_repo),
         fetch_artifact=FetchArtifact(),
