@@ -5,6 +5,175 @@ All notable changes to `flutter-dev-agents` / `mcp-phone-controll`.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — 2026-05-22
+
+The audit release. Adds **seven opinionated audit verticals** plus
+a composite release-readiness gate plus a senior-tester loop —
+turning the MCP into a real-Flutter-judgment surface, not just a
+device-control toolbox.
+
+**Headline**: the agent can call `audit_release_readiness` as the
+last step of every PR and get a single decisive ship / hold / block
+verdict that composes five sub-audits in parallel.
+
+### Tooling delta
+
+- Tools: **110 → 135** (+25)
+- Tests: **556 → 844** (+288)
+- New external dependencies: **0**
+
+### Added — the audit suite (PRs #27, #28, #30, #31, #32, #34, #35)
+
+Seven pure-compute auditors, each with its own rubric doc:
+
+- **`audit_code_seniority`** — 24 rules across 4 tiers
+  (junior/mid/senior/staff). Grades architecture: print() in lib,
+  business logic in widgets, missing dispose(), repos throwing
+  instead of returning Either, missing super.key, monolithic
+  Blocs, presentation→data layering violations, and more.
+  Companion: `docs/code-seniority-rubric.md`.
+
+- **`audit_security`** — 20 OWASP MASVS-aligned rules across 3
+  severities (critical/high/medium). Hardcoded API keys
+  (AWS/GCP/Stripe/SendGrid/Slack), JWT/PEM in source, Firebase
+  keys not via FirebaseOptions, cleartext HTTP, SharedPreferences
+  for tokens, WebView JS unguarded, ATS disabled, exported
+  Android components, debug-signed release builds, missing cert
+  pinning, biometric without fallback, PII leak via print(),
+  Clipboard with secrets. Redacts secrets before reporting.
+  Companion: `docs/security-rubric.md`.
+
+- **`audit_localization`** — 16 i18n rules. Hardcoded
+  user-facing strings (`Text('Sign in')`), missing l10n keys
+  (code references key not in arb), missing translations across
+  locales, supportedLocales ↔ arb mismatch (both directions),
+  missing localizationsDelegates, pluralization-via-ternary
+  (broken for Polish/Arabic plurals), RTL declared without
+  Directionality plumbing, string concatenation with variables.
+  Grade: `well_localized / acceptable / single_locale /
+  missing_l10n`. Companion: `docs/localization-rubric.md`.
+
+- **`audit_dependencies`** — 14 supply-chain rules.
+  Floating-pin on security-sensitive packages (firebase_auth,
+  dio, etc.), git/path overrides in published apps, dev tools
+  (build_runner, mockito, freezed) landed in `dependencies`,
+  unused declarations, transitive-as-direct imports, duplicate
+  cross-section declarations, deprecated packages (package_info,
+  connectivity → `_plus` variants), wide version ranges, loose
+  Flutter SDK constraints, copyleft license hints. Hand-parsed
+  pubspec.yaml + pubspec.lock; no network. Companion:
+  `docs/dependencies-rubric.md`.
+
+- **`audit_test_quality`** — 28 rules across 4 tiers. Catches
+  what `dart test` won't: `bare_pump` (no await/Duration),
+  `await_missing_on_pump`, `hardcoded_locale_string` (the
+  Polish-locale lesson), `vacuous_expect` (`isNotNull` as the
+  only assertion), `sleep_in_test`, `mocked_sut` (testing the
+  mock), `network_call_unmocked`, `firestore_instance_unmocked`,
+  `golden_no_verified_comment`, `missing_failure_path`,
+  `widget_test_no_provider`, `e2e_doing_unit_work`,
+  `nondeterministic_random_seed`, `integration_test_count_dominates`,
+  `no_test_helpers_dir`. L10n-aware (silent on files importing
+  `AppLocalizations`); fake-aware (silent on `*fake*`/`*mock*`
+  paths).
+
+- **`audit_release_readiness`** — composite ship/hold/block gate.
+  Runs `audit_code_seniority` + `audit_security` +
+  `audit_localization` + `audit_dependencies` +
+  `audit_test_quality` concurrently via `asyncio.gather`. Returns
+  composite letter grade (A–F), verdict (ship/hold/block),
+  per-domain breakdown, cross-domain `top_actions` sorted by
+  severity weight. Robust to partial sub-audit failure — always
+  returns a verdict. Weights are tunable per-team (security
+  weighted 2.0 by default; test_quality and dependencies 1.5;
+  seniority and localization 1.0). Companion:
+  `docs/release-readiness-rubric.md`.
+
+### Added — the senior-tester loop (PRs #33, #34)
+
+Two paired tools encoding 8 principles a senior test engineer
+applies BEFORE and AFTER writing tests:
+
+- **`design_test_plan`** (pre-write) — given a user story / ACs /
+  source paths / feature_kind / team_style, returns a structured
+  plan: per-AC happy/negative/boundary cases (Equivalence
+  Partitioning + Boundary Value Analysis) with `should_X_when_Y`
+  names, cross-cutting requirements (a11y/l10n/lifecycle as
+  first-class, never afterthought), test layer recommendations,
+  test data factory shapes, exploratory charter with time-box.
+  **Gap protocol**: when ACs are missing, the tool proceeds with
+  synthesised ACs from feature-kind heuristics AND surfaces a
+  `notes_for_afterwork` entry instructing the caller to
+  reverse-engineer ACs from the merged implementation and re-run.
+  Never silently fakes the discipline. Companion:
+  `docs/senior-tester-discipline.md`.
+
+- **`audit_test_quality`** (post-write) — see above. Sister tool.
+  Closes the loop: design → write → audit.
+
+### Added — operational tooling (PR #29)
+
+- **`pause_ui_automation`** + **`resume_ui_automation`** (paired
+  bracket). Disables the openatx uiautomator2 helper packages
+  (`com.github.uiautomator` + `.test`) via `pm disable-user`,
+  letting screenshot / dump_ui / OCR passes run on AVDs without
+  the helper periodically grabbing foreground and re-launching
+  the app under test. Operational fix surfaced by real-device
+  dogfooding session — documented at
+  `docs/exploratory-sessions/2026-05-22-avd-uiautomator-respawn.md`.
+
+### Added — documentation surface
+
+- `docs/code-seniority-rubric.md` — 24 rules with severity,
+  rationale, citations
+- `docs/security-rubric.md` — OWASP MASVS mapping
+- `docs/localization-rubric.md` — Polish-locale tap_text story +
+  16 i18n rules
+- `docs/dependencies-rubric.md` — supply-chain rules + curated
+  deprecated-packages list
+- `docs/test-quality-rubric.md` (referenced from
+  `audit_test_quality`)
+- `docs/release-readiness-rubric.md` — composite weighting +
+  verdict logic
+- `docs/senior-tester-discipline.md` — the 8 principles
+- `docs/flutter-mcp-comparison.md` — comparison vs official
+  Dart/Flutter MCP (~90% unique surface)
+- `docs/internal-senior-tester-audit.md` — dogfooded our own
+  Python test suite (B+ / SHIP)
+- `docs/exploratory-sessions/` — charter format + 2 backfilled
+  sessions (Polish locale, AVD respawn)
+- `scripts/internal_senior_tester_audit.py` — re-runnable
+  Python-suite analyser
+
+### Changed
+
+- `audit_release_readiness` (phase 11.5) now includes
+  `test_quality` as the 5th domain. Default weight 1.5; blockers
+  propagate to composite verdict.
+- `tests/fakes/fake_adb.py` consolidates the 2 duplicated
+  `_FakeAdb` test doubles from previous PRs (test refactor;
+  surfaced by the internal senior-tester audit).
+
+### Strategic posture
+
+`docs/flutter-mcp-comparison.md` documents the diff against the
+official Dart/Flutter MCP. **~10% commodity overlap, ~90% unique
+surface.** Strategic move: lead on opinionated audit-grade
+tooling, defer to Google on SDK plumbing. The audit rubrics are
+the moat — they encode hard-won Flutter taste, and the official
+MCP is unlikely to ship opinionated rules.
+
+### Known-unknown
+
+Tools have been internally dogfooded (`audit_*` against our own
+Python test suite via a Python-equivalent analyser, scoring B+).
+**Not yet externally dogfooded against a real Flutter app's
+`lib/`.** False positives on team-specific patterns (custom
+`Strings` classes instead of `AppLocalizations`, etc.) may
+surface in 0.3.x patch releases as adopters report findings.
+Soft-launch posture: PyPI publish + GitHub release, no
+announcement post. Adopter feedback drives the 0.3.x calibration.
+
 ## [0.2.2] — 2026-05-19
 
 Launch-readiness release. No behavior changes for end users — every
