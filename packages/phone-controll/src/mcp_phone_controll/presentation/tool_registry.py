@@ -27,6 +27,7 @@ from ..domain.usecases.artifacts import (
 )
 from ..domain.usecases.audit_accessibility import AuditAccessibility
 from ..domain.usecases.audit_code_seniority import AuditCodeSeniority
+from ..domain.usecases.audit_dependencies import AuditDependencies
 from ..domain.usecases.audit_localization import AuditLocalization
 from ..domain.usecases.audit_security import AuditSecurity
 from ..domain.usecases.build_install import (
@@ -235,6 +236,7 @@ from .descriptors._param_builders import (
     _params_attach_debug_session,
     _params_audit_accessibility,
     _params_audit_code_seniority,
+    _params_audit_dependencies,
     _params_audit_localization,
     _params_audit_security,
     _params_boot_simulator,
@@ -509,6 +511,8 @@ class UseCases:
     audit_security: AuditSecurity
     # v0.3.0 phase 9 — localization audit (i18n hygiene)
     audit_localization: AuditLocalization
+    # v0.3.0 phase 10 — dependencies / supply chain audit
+    audit_dependencies: AuditDependencies
     new_session: NewSession
     get_artifacts_dir: GetArtifactsDir
     fetch_artifact: FetchArtifact
@@ -2754,6 +2758,44 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             build_params=_params_audit_localization,
             invoke=_bind(
                 uc.audit_localization, _params_audit_localization
+            ),
+        ),
+        # ---- v0.3.0 phase 10 — dependencies / supply chain audit ----
+        ToolDescriptor(
+            name="audit_dependencies",
+            description=(
+                "Supply-chain audit. Walks pubspec.yaml + "
+                "pubspec.lock + lib imports. 14 rules across 4 "
+                "tiers: floating pins on security-sensitive "
+                "packages, git/path overrides, dev tools in "
+                "dependencies, unused declarations, "
+                "transitive-as-direct, duplicates, deprecated "
+                "packages, wide ranges, loose Flutter SDK, "
+                "copyleft hints. Returns grade (clean/acceptable/"
+                "at_risk/blocked). No network. See "
+                "docs/dependencies-rubric.md."
+            ),
+            input_schema=_schema(
+                {
+                    "project_path": _string("Flutter project root."),
+                    "min_level": _enum(
+                        ["junior", "mid", "senior", "staff"],
+                        "Minimum tier to flag.",
+                    ),
+                    "is_published": _bool(
+                        "When true (default), git:/path: overrides "
+                        "are flagged as serious. Set false for "
+                        "internal-only tools."
+                    ),
+                    "max_findings": _number(
+                        "Cap on findings returned. Default 200."
+                    ),
+                },
+                ["project_path"],
+            ),
+            build_params=_params_audit_dependencies,
+            invoke=_bind(
+                uc.audit_dependencies, _params_audit_dependencies
             ),
         ),
         ToolDescriptor(

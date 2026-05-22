@@ -142,6 +142,8 @@ def default_annotations(tool_name: str) -> dict[str, bool]:
         "audit_security",
         # v0.3.0 phase 9 — read-only i18n source + arb scan
         "audit_localization",
+        # v0.3.0 phase 10 — read-only pubspec + lock scan
+        "audit_dependencies",
     )
     # Destructive tools — touch device state, install/launch/stop apps,
     # write files in arbitrary places, modify project source.

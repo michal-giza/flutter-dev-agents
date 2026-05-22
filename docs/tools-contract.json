@@ -301,6 +301,45 @@
       "destructiveHint": false,
       "readOnlyHint": true
     },
+    "description": "Supply-chain audit. Walks pubspec.yaml + pubspec.lock + lib imports. 14 rules across 4 tiers: floating pins on security-sensitive packages, git/path overrides, dev tools in dependencies, unused declarations, transitive-as-direct, duplicates, deprecated packages, wide ranges, loose Flutter SDK, copyleft hints. Returns grade (clean/acceptable/at_risk/blocked). No network. See docs/dependencies-rubric.md.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "is_published": {
+          "description": "When true (default), git:/path: overrides are flagged as serious. Set false for internal-only tools.",
+          "type": "boolean"
+        },
+        "max_findings": {
+          "description": "Cap on findings returned. Default 200.",
+          "type": "number"
+        },
+        "min_level": {
+          "description": "Minimum tier to flag.",
+          "enum": [
+            "junior",
+            "mid",
+            "senior",
+            "staff"
+          ],
+          "type": "string"
+        },
+        "project_path": {
+          "description": "Flutter project root.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_path"
+      ],
+      "type": "object"
+    },
+    "name": "audit_dependencies"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "readOnlyHint": true
+    },
     "description": "i18n hygiene scanner. Walks lib/*.dart for hardcoded user-facing strings (Text, AppBar title, Tooltip, Button child, SnackBar, AlertDialog, hintText/labelText), parses lib/l10n/*.arb files, cross-references key usage, and checks MaterialApp's supportedLocales + localizationsDelegates + RTL plumbing. 16 rules across 4 tiers (junior/mid/senior/staff). Returns per-finding details + locales_detected + keys_total/used/unused + hardcoded_strings count + grade (well_localized / acceptable / single_locale / missing_l10n). See docs/localization-rubric.md.",
     "inputSchema": {
       "additionalProperties": false,

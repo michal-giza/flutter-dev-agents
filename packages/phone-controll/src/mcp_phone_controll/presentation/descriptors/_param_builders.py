@@ -31,6 +31,9 @@ from ...domain.usecases.audit_accessibility import AuditAccessibilityParams
 from ...domain.usecases.audit_code_seniority import (
     AuditCodeSeniorityParams,
 )
+from ...domain.usecases.audit_dependencies import (
+    AuditDependenciesParams,
+)
 from ...domain.usecases.audit_localization import (
     AuditLocalizationParams,
 )
@@ -1039,6 +1042,18 @@ def _params_audit_code_seniority(args: JsonDict) -> AuditCodeSeniorityParams:
         paths=tuple(str(p) for p in paths),
         min_level=str(args.get("min_level", "junior")),
         autofix=bool(args.get("autofix", False)),
+        max_findings=int(args.get("max_findings", 200)),
+    )
+
+
+# ---- v0.3.0 phase 10 — dependencies / supply chain audit ---------------
+
+
+def _params_audit_dependencies(args: JsonDict) -> AuditDependenciesParams:
+    return AuditDependenciesParams(
+        project_path=Path(args["project_path"]).expanduser(),
+        min_level=str(args.get("min_level", "junior")),
+        is_published=bool(args.get("is_published", True)),
         max_findings=int(args.get("max_findings", 200)),
     )
 
