@@ -85,6 +85,7 @@ from .domain.usecases.artifact_retention import (
 from .domain.usecases.artifacts import FetchArtifact, GetArtifactsDir, NewSession
 from .domain.usecases.audit_accessibility import AuditAccessibility
 from .domain.usecases.audit_code_seniority import AuditCodeSeniority
+from .domain.usecases.audit_dependencies import AuditDependencies
 from .domain.usecases.audit_localization import AuditLocalization
 from .domain.usecases.audit_security import AuditSecurity
 from .domain.usecases.build_install import BuildApp, InstallApp, UninstallApp
@@ -665,6 +666,8 @@ def build_runtime(
         audit_security=AuditSecurity(),
         # v0.3.0 phase 9 — localization / i18n hygiene audit
         audit_localization=AuditLocalization(),
+        # v0.3.0 phase 10 — dependency / supply chain audit
+        audit_dependencies=AuditDependencies(),
         new_session=NewSession(artifacts_repo),
         get_artifacts_dir=GetArtifactsDir(artifacts_repo),
         fetch_artifact=FetchArtifact(),

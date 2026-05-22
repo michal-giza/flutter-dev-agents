@@ -29,6 +29,9 @@ from mcp_phone_controll.domain.usecases.audit_accessibility import (
 from mcp_phone_controll.domain.usecases.audit_code_seniority import (
     AuditCodeSeniority,
 )
+from mcp_phone_controll.domain.usecases.audit_dependencies import (
+    AuditDependencies,
+)
 from mcp_phone_controll.domain.usecases.audit_localization import (
     AuditLocalization,
 )
@@ -428,6 +431,7 @@ def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:
         audit_code_seniority=AuditCodeSeniority(),
         audit_security=AuditSecurity(),
         audit_localization=AuditLocalization(),
+        audit_dependencies=AuditDependencies(),
         new_session=NewSession(artifacts),
         get_artifacts_dir=GetArtifactsDir(artifacts),
         fetch_artifact=FetchArtifact(),
@@ -674,5 +678,7 @@ async def test_registry_covers_all_use_case_fields(tmp_path: Path):
         "audit_security",
         # v0.3.0 phase 9 (localization / i18n hygiene audit)
         "audit_localization",
+        # v0.3.0 phase 10 (dependencies / supply chain audit)
+        "audit_dependencies",
     }
     assert names == expected
