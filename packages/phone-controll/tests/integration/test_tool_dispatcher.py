@@ -57,6 +57,9 @@ from mcp_phone_controll.domain.usecases.code_quality import (
 from mcp_phone_controll.domain.usecases.crag import CorrectiveRecall
 from mcp_phone_controll.domain.usecases.debug_inspect import VmEvaluate, VmListIsolates
 from mcp_phone_controll.domain.usecases.deep_link import TestDeepLink
+from mcp_phone_controll.domain.usecases.design_test_plan import (
+    DesignTestPlan,
+)
 from mcp_phone_controll.domain.usecases.dev_session import (
     AttachDebugSession,
     CallServiceExtension,
@@ -436,6 +439,7 @@ def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:
         audit_localization=AuditLocalization(),
         audit_dependencies=AuditDependencies(),
         audit_release_readiness=AuditReleaseReadiness(),
+        design_test_plan=DesignTestPlan(),
         new_session=NewSession(artifacts),
         get_artifacts_dir=GetArtifactsDir(artifacts),
         fetch_artifact=FetchArtifact(),
@@ -686,5 +690,7 @@ async def test_registry_covers_all_use_case_fields(tmp_path: Path):
         "audit_dependencies",
         # v0.3.0 phase 11 (release-readiness composite)
         "audit_release_readiness",
+        # v0.3.0 phase 11.5 (senior-tester pre-write discipline)
+        "design_test_plan",
     }
     assert names == expected

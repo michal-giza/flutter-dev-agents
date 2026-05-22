@@ -146,6 +146,8 @@ def default_annotations(tool_name: str) -> dict[str, bool]:
         "audit_dependencies",
         # v0.3.0 phase 11 — composite over read-only audits
         "audit_release_readiness",
+        # v0.3.0 phase 11.5 — pure-compute test plan generator
+        "design_test_plan",
     )
     # Destructive tools — touch device state, install/launch/stop apps,
     # write files in arbitrary places, modify project source.

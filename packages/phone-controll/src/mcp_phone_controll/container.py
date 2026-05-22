@@ -101,6 +101,7 @@ from .domain.usecases.code_quality import (
 from .domain.usecases.crag import CorrectiveRecall
 from .domain.usecases.debug_inspect import VmEvaluate, VmListIsolates
 from .domain.usecases.deep_link import TestDeepLink
+from .domain.usecases.design_test_plan import DesignTestPlan
 from .domain.usecases.dev_session import (
     AttachDebugSession,
     CallServiceExtension,
@@ -671,6 +672,8 @@ def build_runtime(
         audit_dependencies=AuditDependencies(),
         # v0.3.0 phase 11 — release-readiness composite (the ship/hold/block gate)
         audit_release_readiness=AuditReleaseReadiness(),
+        # v0.3.0 phase 11.5 — senior-tester pre-write discipline
+        design_test_plan=DesignTestPlan(),
         new_session=NewSession(artifacts_repo),
         get_artifacts_dir=GetArtifactsDir(artifacts_repo),
         fetch_artifact=FetchArtifact(),

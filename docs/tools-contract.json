@@ -957,6 +957,70 @@
   {
     "annotations": {
       "destructiveHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Senior-tester pre-write discipline. Given a user story / ACs / source paths, returns a structured plan: per-AC happy/negative/boundary cases (EP + BVA) with should_X_when_Y names, cross-cutting requirements (a11y, l10n, lifecycle), test layer recommendations, test data factory shapes, exploratory charter. Engages gap protocol when ACs missing \u2014 proceeds with synthesised ACs and logs notes_for_afterwork. Pure compute. See docs/senior-tester-discipline.md.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "acceptance_criteria": {
+          "description": "Acceptance criteria as a list of strings. Optional but recommended.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "feature_kind": {
+          "description": "Drives cross-cutting defaults.",
+          "enum": [
+            "auth",
+            "form",
+            "list",
+            "detail",
+            "payment",
+            "settings",
+            "onboarding",
+            "navigation",
+            "generic"
+          ],
+          "type": "string"
+        },
+        "project_path": {
+          "description": "Project root (validated if provided).",
+          "type": "string"
+        },
+        "source_paths": {
+          "description": "Source paths if reverse-engineering ACs from implementation.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "team_style": {
+          "description": "Determines whether Gherkin E2E is recommended.",
+          "enum": [
+            "developer_heavy",
+            "mixed_with_business"
+          ],
+          "type": "string"
+        },
+        "time_box_min": {
+          "description": "Exploratory charter time-box. Default 60.",
+          "type": "number"
+        },
+        "user_story": {
+          "description": "Free-text story.",
+          "type": "string"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "design_test_plan"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
       "idempotentHint": true,
       "openWorldHint": true,
       "readOnlyHint": true
