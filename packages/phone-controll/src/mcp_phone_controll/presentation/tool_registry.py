@@ -27,6 +27,7 @@ from ..domain.usecases.artifacts import (
 )
 from ..domain.usecases.audit_accessibility import AuditAccessibility
 from ..domain.usecases.audit_code_seniority import AuditCodeSeniority
+from ..domain.usecases.audit_localization import AuditLocalization
 from ..domain.usecases.audit_security import AuditSecurity
 from ..domain.usecases.build_install import (
     BuildApp,
@@ -234,6 +235,7 @@ from .descriptors._param_builders import (
     _params_attach_debug_session,
     _params_audit_accessibility,
     _params_audit_code_seniority,
+    _params_audit_localization,
     _params_audit_security,
     _params_boot_simulator,
     _params_build_app,
@@ -505,6 +507,8 @@ class UseCases:
     audit_code_seniority: AuditCodeSeniority
     # v0.3.0 phase 8 — security audit (OWASP MASVS)
     audit_security: AuditSecurity
+    # v0.3.0 phase 9 — localization audit (i18n hygiene)
+    audit_localization: AuditLocalization
     new_session: NewSession
     get_artifacts_dir: GetArtifactsDir
     fetch_artifact: FetchArtifact
@@ -2704,6 +2708,53 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             ),
             build_params=_params_audit_security,
             invoke=_bind(uc.audit_security, _params_audit_security),
+        ),
+        # ---- v0.3.0 phase 9 — localization (i18n) audit ----
+        ToolDescriptor(
+            name="audit_localization",
+            description=(
+                "i18n hygiene scanner. Walks lib/*.dart for "
+                "hardcoded user-facing strings (Text, AppBar title, "
+                "Tooltip, Button child, SnackBar, AlertDialog, "
+                "hintText/labelText), parses lib/l10n/*.arb files, "
+                "cross-references key usage, and checks MaterialApp's "
+                "supportedLocales + localizationsDelegates + RTL "
+                "plumbing. 16 rules across 4 tiers (junior/mid/"
+                "senior/staff). Returns per-finding details + "
+                "locales_detected + keys_total/used/unused + "
+                "hardcoded_strings count + grade (well_localized / "
+                "acceptable / single_locale / missing_l10n). See "
+                "docs/localization-rubric.md."
+            ),
+            input_schema=_schema(
+                {
+                    "project_path": _string("Flutter project root."),
+                    "paths": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": (
+                            "Optional subset of paths to scan. "
+                            "Default: ['lib']."
+                        ),
+                    },
+                    "arb_dir": _string(
+                        "Override arb-file directory. Default tries "
+                        "lib/l10n then l10n."
+                    ),
+                    "min_level": _enum(
+                        ["junior", "mid", "senior", "staff"],
+                        "Minimum tier to flag.",
+                    ),
+                    "max_findings": _number(
+                        "Cap on findings returned. Default 200."
+                    ),
+                },
+                ["project_path"],
+            ),
+            build_params=_params_audit_localization,
+            invoke=_bind(
+                uc.audit_localization, _params_audit_localization
+            ),
         ),
         ToolDescriptor(
             name="save_golden_image",
