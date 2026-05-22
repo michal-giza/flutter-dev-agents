@@ -85,6 +85,7 @@ from .domain.usecases.artifact_retention import (
 from .domain.usecases.artifacts import FetchArtifact, GetArtifactsDir, NewSession
 from .domain.usecases.audit_accessibility import AuditAccessibility
 from .domain.usecases.audit_code_seniority import AuditCodeSeniority
+from .domain.usecases.audit_localization import AuditLocalization
 from .domain.usecases.audit_security import AuditSecurity
 from .domain.usecases.build_install import BuildApp, InstallApp, UninstallApp
 from .domain.usecases.code_quality import (
@@ -662,6 +663,8 @@ def build_runtime(
         audit_code_seniority=AuditCodeSeniority(),
         # v0.3.0 phase 8 — security audit (OWASP MASVS)
         audit_security=AuditSecurity(),
+        # v0.3.0 phase 9 — localization / i18n hygiene audit
+        audit_localization=AuditLocalization(),
         new_session=NewSession(artifacts_repo),
         get_artifacts_dir=GetArtifactsDir(artifacts_repo),
         fetch_artifact=FetchArtifact(),

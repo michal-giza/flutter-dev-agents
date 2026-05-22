@@ -31,6 +31,9 @@ from ...domain.usecases.audit_accessibility import AuditAccessibilityParams
 from ...domain.usecases.audit_code_seniority import (
     AuditCodeSeniorityParams,
 )
+from ...domain.usecases.audit_localization import (
+    AuditLocalizationParams,
+)
 from ...domain.usecases.audit_security import (
     AuditSecurityParams,
 )
@@ -1036,6 +1039,20 @@ def _params_audit_code_seniority(args: JsonDict) -> AuditCodeSeniorityParams:
         paths=tuple(str(p) for p in paths),
         min_level=str(args.get("min_level", "junior")),
         autofix=bool(args.get("autofix", False)),
+        max_findings=int(args.get("max_findings", 200)),
+    )
+
+
+# ---- v0.3.0 phase 9 — localization audit -------------------------------
+
+
+def _params_audit_localization(args: JsonDict) -> AuditLocalizationParams:
+    paths = args.get("paths") or ()
+    return AuditLocalizationParams(
+        project_path=Path(args["project_path"]).expanduser(),
+        paths=tuple(str(p) for p in paths),
+        arb_dir=args.get("arb_dir"),
+        min_level=str(args.get("min_level", "junior")),
         max_findings=int(args.get("max_findings", 200)),
     )
 
