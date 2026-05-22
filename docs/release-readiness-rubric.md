@@ -17,6 +17,7 @@ audit_code_seniority   →  architecture quality
 audit_security         →  OWASP MASVS
 audit_localization     →  i18n hygiene
 audit_dependencies     →  supply chain
+audit_test_quality     →  test-suite quality (phase 12.5+)
               ↓ concurrent asyncio.gather
        composite verdict + grade + top_actions
 ```
