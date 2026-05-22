@@ -495,6 +495,48 @@
   },
   {
     "annotations": {
+      "destructiveHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Post-write test-suite audit. Walks test/ + integration_test/ for 28 rules across 4 tiers: bare_pump, await_missing_on_pump, vacuous_expect, sleep_in_test, mocked_sut, network_call_unmocked, firestore_instance_unmocked, golden_no_verified, missing_failure_path, e2e_doing_unit_work, widget_test_no_provider, nondeterministic_random_seed, and more. Returns grade (excellent/acceptable/fragile/unreliable). Pure compute. Sister to design_test_plan. See docs/test-quality-rubric.md.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "max_findings": {
+          "description": "Cap on findings returned. Default 200.",
+          "type": "number"
+        },
+        "min_level": {
+          "description": "Minimum tier to flag.",
+          "enum": [
+            "junior",
+            "mid",
+            "senior",
+            "staff"
+          ],
+          "type": "string"
+        },
+        "paths": {
+          "description": "Optional subset of test paths to scan. Default: ['test', 'integration_test'].",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "project_path": {
+          "description": "Flutter project root.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_path"
+      ],
+      "type": "object"
+    },
+    "name": "audit_test_quality"
+  },
+  {
+    "annotations": {
       "destructiveHint": true,
       "openWorldHint": true,
       "readOnlyHint": false

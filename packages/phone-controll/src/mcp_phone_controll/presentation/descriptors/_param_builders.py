@@ -43,6 +43,9 @@ from ...domain.usecases.audit_release_readiness import (
 from ...domain.usecases.audit_security import (
     AuditSecurityParams,
 )
+from ...domain.usecases.audit_test_quality import (
+    AuditTestQualityParams,
+)
 from ...domain.usecases.build_install import (
     BuildAppParams,
     InstallAppParams,
@@ -1060,6 +1063,19 @@ def _params_audit_dependencies(args: JsonDict) -> AuditDependenciesParams:
         project_path=Path(args["project_path"]).expanduser(),
         min_level=str(args.get("min_level", "junior")),
         is_published=bool(args.get("is_published", True)),
+        max_findings=int(args.get("max_findings", 200)),
+    )
+
+
+# ---- v0.3.0 phase 12 — test-suite quality audit (post-write) -----------
+
+
+def _params_audit_test_quality(args: JsonDict) -> AuditTestQualityParams:
+    paths = args.get("paths") or ()
+    return AuditTestQualityParams(
+        project_path=Path(args["project_path"]).expanduser(),
+        paths=tuple(str(p) for p in paths),
+        min_level=str(args.get("min_level", "junior")),
         max_findings=int(args.get("max_findings", 200)),
     )
 

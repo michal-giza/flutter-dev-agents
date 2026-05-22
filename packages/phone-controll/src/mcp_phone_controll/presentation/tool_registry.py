@@ -31,6 +31,7 @@ from ..domain.usecases.audit_dependencies import AuditDependencies
 from ..domain.usecases.audit_localization import AuditLocalization
 from ..domain.usecases.audit_release_readiness import AuditReleaseReadiness
 from ..domain.usecases.audit_security import AuditSecurity
+from ..domain.usecases.audit_test_quality import AuditTestQuality
 from ..domain.usecases.build_install import (
     BuildApp,
     InstallApp,
@@ -242,6 +243,7 @@ from .descriptors._param_builders import (
     _params_audit_localization,
     _params_audit_release_readiness,
     _params_audit_security,
+    _params_audit_test_quality,
     _params_boot_simulator,
     _params_build_app,
     _params_calibrate_camera,
@@ -521,6 +523,8 @@ class UseCases:
     audit_release_readiness: AuditReleaseReadiness
     # v0.3.0 phase 11.5 — senior-tester pre-write discipline
     design_test_plan: DesignTestPlan
+    # v0.3.0 phase 12 — test-suite quality audit (post-write)
+    audit_test_quality: AuditTestQuality
     new_session: NewSession
     get_artifacts_dir: GetArtifactsDir
     fetch_artifact: FetchArtifact
@@ -2907,6 +2911,47 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             build_params=_params_design_test_plan,
             invoke=_bind(
                 uc.design_test_plan, _params_design_test_plan,
+            ),
+        ),
+        # ---- v0.3.0 phase 12 — test-suite quality audit ----
+        ToolDescriptor(
+            name="audit_test_quality",
+            description=(
+                "Post-write test-suite audit. Walks test/ + "
+                "integration_test/ for 28 rules across 4 tiers: "
+                "bare_pump, await_missing_on_pump, vacuous_expect, "
+                "sleep_in_test, mocked_sut, network_call_unmocked, "
+                "firestore_instance_unmocked, golden_no_verified, "
+                "missing_failure_path, e2e_doing_unit_work, "
+                "widget_test_no_provider, nondeterministic_random_seed, "
+                "and more. Returns grade (excellent/acceptable/"
+                "fragile/unreliable). Pure compute. Sister to "
+                "design_test_plan. See docs/test-quality-rubric.md."
+            ),
+            input_schema=_schema(
+                {
+                    "project_path": _string("Flutter project root."),
+                    "paths": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": (
+                            "Optional subset of test paths to scan. "
+                            "Default: ['test', 'integration_test']."
+                        ),
+                    },
+                    "min_level": _enum(
+                        ["junior", "mid", "senior", "staff"],
+                        "Minimum tier to flag.",
+                    ),
+                    "max_findings": _number(
+                        "Cap on findings returned. Default 200."
+                    ),
+                },
+                ["project_path"],
+            ),
+            build_params=_params_audit_test_quality,
+            invoke=_bind(
+                uc.audit_test_quality, _params_audit_test_quality,
             ),
         ),
         ToolDescriptor(
