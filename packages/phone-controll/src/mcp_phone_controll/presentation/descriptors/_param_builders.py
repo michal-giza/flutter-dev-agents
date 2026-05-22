@@ -62,6 +62,9 @@ from ...domain.usecases.debug_inspect import (
     VmListIsolatesParams,
 )
 from ...domain.usecases.deep_link import TestDeepLinkParams
+from ...domain.usecases.design_test_plan import (
+    DesignTestPlanParams,
+)
 from ...domain.usecases.dev_session import (
     AttachDebugSessionParams,
     CallServiceExtensionParams,
@@ -1058,6 +1061,29 @@ def _params_audit_dependencies(args: JsonDict) -> AuditDependenciesParams:
         min_level=str(args.get("min_level", "junior")),
         is_published=bool(args.get("is_published", True)),
         max_findings=int(args.get("max_findings", 200)),
+    )
+
+
+# ---- v0.3.0 phase 11.5 — senior-tester pre-write discipline ------------
+
+
+def _params_design_test_plan(args: JsonDict) -> DesignTestPlanParams:
+    project_path_arg = args.get("project_path")
+    return DesignTestPlanParams(
+        user_story=str(args.get("user_story", "")),
+        acceptance_criteria=tuple(
+            str(a) for a in (args.get("acceptance_criteria") or [])
+        ),
+        source_paths=tuple(
+            str(p) for p in (args.get("source_paths") or [])
+        ),
+        project_path=(
+            Path(project_path_arg).expanduser()
+            if project_path_arg else None
+        ),
+        feature_kind=str(args.get("feature_kind", "generic")),
+        team_style=str(args.get("team_style", "developer_heavy")),
+        time_box_min=int(args.get("time_box_min", 60)),
     )
 
 

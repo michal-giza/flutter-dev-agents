@@ -52,6 +52,7 @@ from ..domain.usecases.debug_inspect import (
     VmListIsolates,
 )
 from ..domain.usecases.deep_link import TestDeepLink
+from ..domain.usecases.design_test_plan import DesignTestPlan
 from ..domain.usecases.dev_session import (
     AttachDebugSession,
     CallServiceExtension,
@@ -255,6 +256,7 @@ from .descriptors._param_builders import (
     _params_dart_format,
     _params_describe_capabilities,
     _params_describe_tool,
+    _params_design_test_plan,
     _params_detect_markers,
     _params_detect_undisposed_controllers,
     _params_dump_ui,
@@ -517,6 +519,8 @@ class UseCases:
     audit_dependencies: AuditDependencies
     # v0.3.0 phase 11 — release-readiness composite (ship/hold/block gate)
     audit_release_readiness: AuditReleaseReadiness
+    # v0.3.0 phase 11.5 — senior-tester pre-write discipline
+    design_test_plan: DesignTestPlan
     new_session: NewSession
     get_artifacts_dir: GetArtifactsDir
     fetch_artifact: FetchArtifact
@@ -2843,6 +2847,66 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             invoke=_bind(
                 uc.audit_release_readiness,
                 _params_audit_release_readiness,
+            ),
+        ),
+        # ---- v0.3.0 phase 11.5 — senior-tester pre-write discipline ----
+        ToolDescriptor(
+            name="design_test_plan",
+            description=(
+                "Senior-tester pre-write discipline. Given a user "
+                "story / ACs / source paths, returns a structured "
+                "plan: per-AC happy/negative/boundary cases (EP + "
+                "BVA) with should_X_when_Y names, cross-cutting "
+                "requirements (a11y, l10n, lifecycle), test layer "
+                "recommendations, test data factory shapes, "
+                "exploratory charter. Engages gap protocol when "
+                "ACs missing — proceeds with synthesised ACs and "
+                "logs notes_for_afterwork. Pure compute. See "
+                "docs/senior-tester-discipline.md."
+            ),
+            input_schema=_schema(
+                {
+                    "user_story": _string("Free-text story."),
+                    "acceptance_criteria": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": (
+                            "Acceptance criteria as a list of "
+                            "strings. Optional but recommended."
+                        ),
+                    },
+                    "source_paths": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": (
+                            "Source paths if reverse-engineering "
+                            "ACs from implementation."
+                        ),
+                    },
+                    "project_path": _string(
+                        "Project root (validated if provided)."
+                    ),
+                    "feature_kind": _enum(
+                        [
+                            "auth", "form", "list", "detail",
+                            "payment", "settings", "onboarding",
+                            "navigation", "generic",
+                        ],
+                        "Drives cross-cutting defaults.",
+                    ),
+                    "team_style": _enum(
+                        ["developer_heavy", "mixed_with_business"],
+                        "Determines whether Gherkin E2E is recommended.",
+                    ),
+                    "time_box_min": _number(
+                        "Exploratory charter time-box. Default 60."
+                    ),
+                },
+                [],
+            ),
+            build_params=_params_design_test_plan,
+            invoke=_bind(
+                uc.design_test_plan, _params_design_test_plan,
             ),
         ),
         ToolDescriptor(
