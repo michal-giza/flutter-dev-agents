@@ -35,6 +35,9 @@ from mcp_phone_controll.domain.usecases.audit_dependencies import (
 from mcp_phone_controll.domain.usecases.audit_localization import (
     AuditLocalization,
 )
+from mcp_phone_controll.domain.usecases.audit_release_readiness import (
+    AuditReleaseReadiness,
+)
 from mcp_phone_controll.domain.usecases.audit_security import (
     AuditSecurity,
 )
@@ -432,6 +435,7 @@ def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:
         audit_security=AuditSecurity(),
         audit_localization=AuditLocalization(),
         audit_dependencies=AuditDependencies(),
+        audit_release_readiness=AuditReleaseReadiness(),
         new_session=NewSession(artifacts),
         get_artifacts_dir=GetArtifactsDir(artifacts),
         fetch_artifact=FetchArtifact(),
@@ -680,5 +684,7 @@ async def test_registry_covers_all_use_case_fields(tmp_path: Path):
         "audit_localization",
         # v0.3.0 phase 10 (dependencies / supply chain audit)
         "audit_dependencies",
+        # v0.3.0 phase 11 (release-readiness composite)
+        "audit_release_readiness",
     }
     assert names == expected

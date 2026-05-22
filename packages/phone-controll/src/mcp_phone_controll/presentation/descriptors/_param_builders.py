@@ -37,6 +37,9 @@ from ...domain.usecases.audit_dependencies import (
 from ...domain.usecases.audit_localization import (
     AuditLocalizationParams,
 )
+from ...domain.usecases.audit_release_readiness import (
+    AuditReleaseReadinessParams,
+)
 from ...domain.usecases.audit_security import (
     AuditSecurityParams,
 )
@@ -1055,6 +1058,28 @@ def _params_audit_dependencies(args: JsonDict) -> AuditDependenciesParams:
         min_level=str(args.get("min_level", "junior")),
         is_published=bool(args.get("is_published", True)),
         max_findings=int(args.get("max_findings", 200)),
+    )
+
+
+# ---- v0.3.0 phase 11 — release-readiness composite ---------------------
+
+
+def _params_audit_release_readiness(
+    args: JsonDict,
+) -> AuditReleaseReadinessParams:
+    return AuditReleaseReadinessParams(
+        project_path=Path(args["project_path"]).expanduser(),
+        min_level=str(args.get("min_level", "junior")),
+        include_seniority=bool(args.get("include_seniority", True)),
+        include_security=bool(args.get("include_security", True)),
+        include_localization=bool(args.get("include_localization", True)),
+        include_dependencies=bool(args.get("include_dependencies", True)),
+        is_published=bool(args.get("is_published", True)),
+        weight_seniority=float(args.get("weight_seniority", 1.0)),
+        weight_security=float(args.get("weight_security", 2.0)),
+        weight_localization=float(args.get("weight_localization", 1.0)),
+        weight_dependencies=float(args.get("weight_dependencies", 1.5)),
+        max_top_actions=int(args.get("max_top_actions", 10)),
     )
 
 

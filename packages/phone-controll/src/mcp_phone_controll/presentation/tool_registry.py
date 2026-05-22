@@ -29,6 +29,7 @@ from ..domain.usecases.audit_accessibility import AuditAccessibility
 from ..domain.usecases.audit_code_seniority import AuditCodeSeniority
 from ..domain.usecases.audit_dependencies import AuditDependencies
 from ..domain.usecases.audit_localization import AuditLocalization
+from ..domain.usecases.audit_release_readiness import AuditReleaseReadiness
 from ..domain.usecases.audit_security import AuditSecurity
 from ..domain.usecases.build_install import (
     BuildApp,
@@ -238,6 +239,7 @@ from .descriptors._param_builders import (
     _params_audit_code_seniority,
     _params_audit_dependencies,
     _params_audit_localization,
+    _params_audit_release_readiness,
     _params_audit_security,
     _params_boot_simulator,
     _params_build_app,
@@ -513,6 +515,8 @@ class UseCases:
     audit_localization: AuditLocalization
     # v0.3.0 phase 10 — dependencies / supply chain audit
     audit_dependencies: AuditDependencies
+    # v0.3.0 phase 11 — release-readiness composite (ship/hold/block gate)
+    audit_release_readiness: AuditReleaseReadiness
     new_session: NewSession
     get_artifacts_dir: GetArtifactsDir
     fetch_artifact: FetchArtifact
@@ -2796,6 +2800,49 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             build_params=_params_audit_dependencies,
             invoke=_bind(
                 uc.audit_dependencies, _params_audit_dependencies
+            ),
+        ),
+        # ---- v0.3.0 phase 11 — release-readiness composite ----
+        ToolDescriptor(
+            name="audit_release_readiness",
+            description=(
+                "Release-readiness gate. Composes the 4 v0.3.0 "
+                "audit verticals (seniority, security, "
+                "localization, dependencies) concurrently into one "
+                "ship/hold/block verdict. Returns composite letter "
+                "grade A-F, per-domain breakdown, cross-domain "
+                "top_actions, and a paste-ready release-PR summary. "
+                "Pure compute. Sub-second. See "
+                "docs/release-readiness-rubric.md."
+            ),
+            input_schema=_schema(
+                {
+                    "project_path": _string("Flutter project root."),
+                    "min_level": _enum(
+                        ["junior", "mid", "senior", "staff"],
+                        "Min tier across all sub-audits.",
+                    ),
+                    "include_seniority": _bool("Default true."),
+                    "include_security": _bool("Default true."),
+                    "include_localization": _bool("Default true."),
+                    "include_dependencies": _bool("Default true."),
+                    "is_published": _bool(
+                        "Passed to audit_dependencies. Default true."
+                    ),
+                    "weight_seniority": _number("Default 1.0."),
+                    "weight_security": _number("Default 2.0."),
+                    "weight_localization": _number("Default 1.0."),
+                    "weight_dependencies": _number("Default 1.5."),
+                    "max_top_actions": _number(
+                        "Cap on cross-domain actions. Default 10."
+                    ),
+                },
+                ["project_path"],
+            ),
+            build_params=_params_audit_release_readiness,
+            invoke=_bind(
+                uc.audit_release_readiness,
+                _params_audit_release_readiness,
             ),
         ),
         ToolDescriptor(
