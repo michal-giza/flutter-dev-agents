@@ -31,28 +31,11 @@ from mcp_phone_controll.domain.usecases.deep_link import (
     _extract_field,
     _looks_like_ios_udid,
 )
-from mcp_phone_controll.infrastructure.process_runner import ProcessResult
+from tests.fakes.fake_adb import FakeAdbClient as _FakeAdbClient
 
 # ---- fakes ------------------------------------------------------------
-
-
-class _FakeAdbClient:
-    """Records shell calls + returns scripted output."""
-
-    def __init__(self, stdout: str = "", stderr: str = "", returncode: int = 0):
-        self.stdout = stdout
-        self.stderr = stderr
-        self.returncode = returncode
-        self.calls: list[tuple[str, ...]] = []
-        # The deep_link use case touches `._runner` when wiring up
-        # the iOS path; provide a placeholder so it doesn't AttributeError.
-        self._runner = object()
-
-    async def shell(self, serial: str, *args: str, timeout_s: float = 30.0):
-        self.calls.append((serial, *args))
-        return ProcessResult(
-            stdout=self.stdout, stderr=self.stderr, returncode=self.returncode
-        )
+# _FakeAdbClient is now a re-export of the shared FakeAdbClient. See
+# tests/fakes/fake_adb.py for the implementation.
 
 
 class _FakeUiRepo:
