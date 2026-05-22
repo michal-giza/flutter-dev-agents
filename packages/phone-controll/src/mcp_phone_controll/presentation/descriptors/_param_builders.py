@@ -1116,11 +1116,13 @@ def _params_audit_release_readiness(
         include_security=bool(args.get("include_security", True)),
         include_localization=bool(args.get("include_localization", True)),
         include_dependencies=bool(args.get("include_dependencies", True)),
+        include_test_quality=bool(args.get("include_test_quality", True)),
         is_published=bool(args.get("is_published", True)),
         weight_seniority=float(args.get("weight_seniority", 1.0)),
         weight_security=float(args.get("weight_security", 2.0)),
         weight_localization=float(args.get("weight_localization", 1.0)),
         weight_dependencies=float(args.get("weight_dependencies", 1.5)),
+        weight_test_quality=float(args.get("weight_test_quality", 1.5)),
         max_top_actions=int(args.get("max_top_actions", 10)),
     )
 

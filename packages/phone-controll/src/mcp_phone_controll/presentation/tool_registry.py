@@ -2834,6 +2834,7 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
                     "include_security": _bool("Default true."),
                     "include_localization": _bool("Default true."),
                     "include_dependencies": _bool("Default true."),
+                    "include_test_quality": _bool("Default true."),
                     "is_published": _bool(
                         "Passed to audit_dependencies. Default true."
                     ),
@@ -2841,6 +2842,7 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
                     "weight_security": _number("Default 2.0."),
                     "weight_localization": _number("Default 1.0."),
                     "weight_dependencies": _number("Default 1.5."),
+                    "weight_test_quality": _number("Default 1.5."),
                     "max_top_actions": _number(
                         "Cap on cross-domain actions. Default 10."
                     ),

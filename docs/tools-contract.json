@@ -406,6 +406,10 @@
           "description": "Default true.",
           "type": "boolean"
         },
+        "include_test_quality": {
+          "description": "Default true.",
+          "type": "boolean"
+        },
         "is_published": {
           "description": "Passed to audit_dependencies. Default true.",
           "type": "boolean"
@@ -442,6 +446,10 @@
         },
         "weight_seniority": {
           "description": "Default 1.0.",
+          "type": "number"
+        },
+        "weight_test_quality": {
+          "description": "Default 1.5.",
           "type": "number"
         }
       },

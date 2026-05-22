@@ -67,6 +67,10 @@ from .audit_security import (
     AuditSecurity,
     AuditSecurityParams,
 )
+from .audit_test_quality import (
+    AuditTestQuality,
+    AuditTestQualityParams,
+)
 from .base import BaseUseCase
 
 
@@ -99,16 +103,18 @@ class AuditReleaseReadinessParams:
     include_security: bool = True
     include_localization: bool = True
     include_dependencies: bool = True
+    include_test_quality: bool = True
     # Whether your app ships to production (passed to
     # audit_dependencies' is_published toggle).
     is_published: bool = True
     # Per-domain weights for composite score. Must sum > 0.
     # Defaults weight security highest, then dependencies, then
-    # seniority, then localization.
+    # test_quality, then seniority, then localization.
     weight_seniority: float = 1.0
     weight_security: float = 2.0
     weight_localization: float = 1.0
     weight_dependencies: float = 1.5
+    weight_test_quality: float = 1.5
     # Cap on findings preserved in `top_actions`.
     max_top_actions: int = 10
 
@@ -145,6 +151,10 @@ _LOCALIZATION_GRADE_SCORES = {
 }
 _DEPENDENCIES_GRADE_SCORES = {
     "clean": 100, "acceptable": 75, "at_risk": 40, "blocked": 0,
+}
+_TEST_QUALITY_GRADE_SCORES = {
+    "excellent": 100, "acceptable": 75, "fragile": 40,
+    "unreliable": 0,
 }
 
 
@@ -231,6 +241,20 @@ class AuditReleaseReadiness(
                 ),
             ))
             weights["dependencies"] = params.weight_dependencies
+
+        if params.include_test_quality:
+            domain_tasks.append((
+                "test_quality",
+                asyncio.create_task(
+                    AuditTestQuality()(
+                        AuditTestQualityParams(
+                            project_path=params.project_path,
+                            min_level=params.min_level,
+                        )
+                    )
+                ),
+            ))
+            weights["test_quality"] = params.weight_test_quality
 
         if not domain_tasks:
             return err(
@@ -388,6 +412,7 @@ def _score_for_domain(domain: str, grade: str | None) -> float:
         "security": _SECURITY_GRADE_SCORES,
         "localization": _LOCALIZATION_GRADE_SCORES,
         "dependencies": _DEPENDENCIES_GRADE_SCORES,
+        "test_quality": _TEST_QUALITY_GRADE_SCORES,
     }.get(domain, {})
     return float(table.get(grade, 50))  # unknown grade → 50
 

@@ -91,6 +91,7 @@ async def test_all_domains_disabled_returns_failure(tmp_path: Path):
         include_security=False,
         include_localization=False,
         include_dependencies=False,
+        include_test_quality=False,
     )
     assert isinstance(res, Err)
     assert res.failure.next_action == "fix_arguments"
@@ -120,7 +121,8 @@ async def test_per_domain_breakdown_populated(tmp_path: Path):
     assert isinstance(res, Ok)
     domains = {d.domain for d in res.value.domains}
     assert domains == {
-        "seniority", "security", "localization", "dependencies",
+        "seniority", "security", "localization",
+        "dependencies", "test_quality",
     }
     # All four domains ran successfully
     assert all(d.ran for d in res.value.domains)
@@ -252,6 +254,7 @@ async def test_single_domain_run(tmp_path: Path):
         include_security=False,
         include_localization=False,
         include_dependencies=True,  # only deps
+        include_test_quality=False,
     )
     assert isinstance(res, Ok)
     assert len(res.value.domains) == 1
@@ -337,6 +340,40 @@ async def test_clean_project_returns_no_findings_action(tmp_path: Path):
 
 
 # ---- advice ------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_test_quality_domain_runs_by_default(tmp_path: Path):
+    """Phase 12.5: audit_test_quality is included by default."""
+    proj = _minimal_clean_project(tmp_path)
+    res = await _run(proj)
+    assert isinstance(res, Ok)
+    domains = {d.domain for d in res.value.domains}
+    assert "test_quality" in domains
+    tq = next(d for d in res.value.domains if d.domain == "test_quality")
+    # Empty project has no tests → grade=excellent
+    assert tq.grade == "excellent"
+
+
+@pytest.mark.asyncio
+async def test_test_quality_blocker_propagates_to_composite(tmp_path: Path):
+    """A blocker in the test_quality domain (e.g. real Dio in test)
+    should force `block` verdict regardless of other domains."""
+    proj = _minimal_clean_project(tmp_path)
+    (proj / "test").mkdir(exist_ok=True)
+    _write(
+        proj / "test" / "bad_test.dart",
+        "void main() {\n"
+        "  test('x', () async {\n"
+        "    final dio = Dio();\n"  # BLOCKER: real network in test
+        "  });\n"
+        "}\n",
+    )
+    res = await _run(proj)
+    assert isinstance(res, Ok)
+    assert res.value.verdict == "block"
+    tq = next(d for d in res.value.domains if d.domain == "test_quality")
+    assert tq.blockers_count >= 1
 
 
 @pytest.mark.asyncio
