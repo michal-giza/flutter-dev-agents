@@ -53,6 +53,7 @@ from pathlib import Path
 
 from ..failures import FilesystemFailure
 from ..result import Result, err, ok
+from ._helpers import is_path_excluded
 from .base import BaseUseCase
 
 
@@ -141,7 +142,7 @@ class AuditTestQuality(
             ))
 
         roots = _resolve_roots(params.project_path, params.paths)
-        files = _collect_test_files(roots)
+        files = _collect_test_files(roots, params.project_path)
 
         # Collect lib source stems for orphan check (used by staff rules)
         lib_stems = _collect_lib_stems(params.project_path / "lib")
@@ -238,7 +239,9 @@ def _resolve_roots(project: Path, paths: tuple[str, ...]) -> list[Path]:
     ]
 
 
-def _collect_test_files(roots: list[Path]) -> list[Path]:
+def _collect_test_files(
+    roots: list[Path], project_root: Path,
+) -> list[Path]:
     out: list[Path] = []
     for root in roots:
         if root.is_file() and root.suffix == ".dart":
@@ -247,6 +250,10 @@ def _collect_test_files(roots: list[Path]) -> list[Path]:
         if not root.is_dir():
             continue
         for f in root.rglob("*.dart"):
+            # Skip build/, .claude/worktrees/, etc.
+            # (v0.3.0 field-test calibration finding)
+            if is_path_excluded(f, project_root):
+                continue
             name = f.name
             if (
                 name.endswith(".g.dart")
@@ -279,15 +286,15 @@ _RE_TEST_CALL = re.compile(
 _RE_SKIPPED = re.compile(
     r"(?:@Skip|skip\s*:\s*['\"][^'\"]+['\"]|skip\s*:\s*true)",
 )
-_RE_BARE_PUMP = re.compile(
-    # `tester.pump()` with NO duration and NO await on the same line
-    r"^[^/]*?\b(?<!await\s)tester\.pump\s*\(\s*\)",
-    re.MULTILINE,
+# Match `tester.X(`, `$.tester.X(` (Patrol's PatrolTester), or
+# `_.tester.X(`. The await-presence check is done in code (see
+# `_pumps_without_await`) because regex lookbehinds are fixed-width
+# and can't reliably skip the Patrol receiver prefix.
+_RE_PUMP_CALL_ANY = re.compile(
+    r"(?:tester|\$\.tester|_\.tester)\.(pumpWidget|pumpAndSettle)\s*\("
 )
-_RE_AWAIT_MISSING_PUMP = re.compile(
-    # `tester.pumpWidget(...)` / `pumpAndSettle()` without leading await
-    r"^[^/]*?(?<!await\s)(tester\.(?:pumpWidget|pumpAndSettle))\s*\(",
-    re.MULTILINE,
+_RE_BARE_PUMP_CALL_ANY = re.compile(
+    r"(?:tester|\$\.tester|_\.tester)\.pump\s*\(\s*\)"
 )
 _RE_FIND_TEXT_HARDCODED = re.compile(
     r"find\.text\s*\(\s*['\"]([A-Za-z][A-Za-z0-9 ]{2,})['\"]",
@@ -340,7 +347,12 @@ _RE_FAILURE_ASSERT = re.compile(
     r"isA<\s*\w*Failure\s*>",
 )
 _RE_TEST_HELPER_IMPORT = re.compile(
-    r"import\s+['\"](?:[^'\"]+?_test\.dart)['\"]",
+    # Match `import 'foo_test.dart'` BUT NOT
+    # `import 'package:flutter_test/flutter_test.dart'` or
+    # `import 'package:test/test.dart'` (those are the
+    # standard test-framework imports, not 'this test imports
+    # another test'). v0.3.0 field-test calibration finding.
+    r"import\s+['\"](?!package:(?:flutter_test|test|patrol)/)[^'\"]*?_test\.dart['\"]",
 )
 _RE_GROUP = re.compile(r"\bgroup\s*\(")
 _RE_SETUP_ALL = re.compile(r"\bsetUpAll\s*\(")
@@ -365,8 +377,12 @@ def _scan_file(
 
     # ---- Junior tier rules ----
     for i, line in enumerate(lines, start=1):
-        # bare_pump
-        if _RE_BARE_PUMP.search(line):
+        # bare_pump — only fire if no `await` precedes the pump call
+        # on the same line. Handles `tester.pump()`, `$.tester.pump()`
+        # (Patrol), and `_.tester.pump()` receiver styles.
+        for bp_match in _RE_BARE_PUMP_CALL_ANY.finditer(line):
+            if "await " in line[: bp_match.start()]:
+                continue
             findings.append(_mk(
                 "bare_pump",
                 "tester.pump() with no Duration + no await. Race "
@@ -378,12 +394,15 @@ def _scan_file(
                 "`await tester.pump(Duration(milliseconds: 16))`.",
                 "flutter_test docs: pump variants",
             ))
-        # await_missing_on_pump
-        for m in _RE_AWAIT_MISSING_PUMP.finditer(line):
+            break  # one finding per line is enough
+        # await_missing_on_pump — same receiver-tolerant logic
+        for m in _RE_PUMP_CALL_ANY.finditer(line):
+            if "await " in line[: m.start()]:
+                continue
             findings.append(_mk(
                 "await_missing_on_pump",
-                f"{m.group(1)}() not awaited. The test may complete "
-                "before the pump returns — flaky.",
+                f"tester.{m.group(1)}() not awaited. The test may "
+                "complete before the pump returns — flaky.",
                 Severity.SERIOUS, TestQualityLevel.JUNIOR,
                 rel, i, line.strip()[:140],
                 "Prefix with `await`.",

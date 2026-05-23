@@ -5,6 +5,88 @@ All notable changes to `flutter-dev-agents` / `mcp-phone-controll`.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] — 2026-05-22
+
+Calibration release. v0.3.0 shipped + got field-tested against
+3 real Flutter projects (`party_games_ui`, `mytaskboardapp`,
+`bike_news_room/frontend`) within hours. **8 false-positive
+patterns were identified and patched in this release.**
+
+See `docs/v030-field-test.md` for the full calibration log.
+
+**Composite signal:noise improvement: ~73% → ~96%.** The
+audit suite moves from "useful with manual filtering" to
+"trust the output."
+
+### Fixed — 8 calibration patches from the field test
+
+1. **Exclude `build/` directories** from all 5 audits. Flutter's
+   generated `AndroidManifest.xml` files under `build/app/
+   intermediates/` were triggering `exported_component` (16 of
+   17 high findings on `bike_news_room` were false positives).
+
+2. **Exclude `.claude/worktrees/`** from all 5 audits. Agent
+   worktree copies were being scanned, producing duplicate
+   findings (15 of 30 critical findings on `mytaskboardapp`
+   came from worktree copies of `firebase_options.dart`).
+
+3. **`audit_security.hardcoded_firebase_key` exception** for
+   canonical `firebase_options.dart`. Firebase web API keys
+   there are intentionally public — security depends on
+   Firestore rules, not key secrecy. The rule still fires on
+   AIza keys in any OTHER file.
+
+4. **`audit_test_quality.await_missing_on_pump` recognizes
+   `$.tester`** (Patrol's PatrolTester) and `_.tester`. The old
+   regex used a fixed-width lookbehind that only matched
+   `await tester.`, missing 8 legitimate `await $.tester.
+   pumpAndSettle(...)` calls on `bike_news_room`.
+
+5. **`audit_test_quality.test_imports_test` excludes
+   framework packages.** The old regex matched
+   `'package:flutter_test/flutter_test.dart'` as if it were
+   "this test imports another test file" — the URI ends in
+   `_test.dart` but it's a framework import.
+
+6. **`audit_dependencies.transitive_used_as_direct` excludes
+   own package name.** A project legitimately imports
+   `package:<own>/foo.dart` from its own `lib/`. The audit now
+   parses `pubspec.yaml`'s `name:` field and excludes it.
+
+7. **`audit_code_seniority.orphan_source` skips barrel files.**
+   A file containing only `library X;` + `export 'y.dart';`
+   statements has no testable logic. Heuristic detects this
+   pattern. Also: added `/tokens/` to the existing list of
+   path patterns (`/entities/`, `/models/`, `/failures/`) that
+   are exempted from the rule.
+
+8. **`audit_localization.missing_localizations_delegates`
+   accepts getter references.** The old regex required a
+   literal `localizationsDelegates: [` array. Now also
+   accepts `localizationsDelegates: AppLocalizations.
+   localizationsDelegates` (getter style).
+
+### Added — `tests/unit/test_v031_calibration_patches.py`
+
+15 new regression tests, one positive + one negative per patch
+(where applicable). The negative tests assert each patch does
+NOT over-silence — e.g. `test_actual_undeclared_transitive_still_fires`
+verifies patch #6 still flags real undeclared transitives.
+
+### Added — `domain/usecases/_helpers.py::is_path_excluded()`
+
+Shared helper for skipping `build/`, `.claude/`, `.dart_tool/`,
+`Pods/`, `.gradle/`, `.git/`, `node_modules/`, `DerivedData/`,
+etc. Used by all 4 file-walking audits. Single source of
+truth for the exclusion list.
+
+### Stats
+
+- Tools: 135 (unchanged)
+- Tests: 844 → **859** (+15 regression tests)
+- New shared helper: `is_path_excluded()` + `AUDIT_EXCLUDED_DIRS`
+- Zero new external dependencies
+
 ## [0.3.0] — 2026-05-22
 
 The audit release. Adds **seven opinionated audit verticals** plus
