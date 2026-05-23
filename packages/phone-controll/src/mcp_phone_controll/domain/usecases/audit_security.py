@@ -91,6 +91,7 @@ from pathlib import Path
 
 from ..failures import FilesystemFailure
 from ..result import Result, err, ok
+from ._helpers import is_path_excluded
 from .base import BaseUseCase
 
 
@@ -263,6 +264,10 @@ def _collect_files(
             continue
         for f in root.rglob("*"):
             if not f.is_file():
+                continue
+            # Skip build/, .claude/worktrees/, .dart_tool/, etc.
+            # (v0.3.0 field-test calibration finding)
+            if is_path_excluded(f, project):
                 continue
             kind = _kind_for(f)
             if not kind:
@@ -437,16 +442,30 @@ def _scan_dart(
                 "OWASP MASVS-CRYPTO-1 / MSTG-CRYPTO-1",
             ))
         if m := _RE_GOOGLE_KEY.search(line):
-            # Firebase web API keys are sometimes legitimately
-            # public, but the bare string in source is still a
-            # smell — they should come from FirebaseOptions.
-            findings.append(_mk(
-                "hardcoded_firebase_key",
-                "Google/Firebase API key literal. Use FirebaseOptions.currentPlatform from firebase_options.dart.",
-                Severity.CRITICAL, rel, i, _redact(stripped, m.group(0)),
-                "flutterfire configure → generate firebase_options.dart; remove the inline key.",
-                "Firebase docs: prefer firebase_options over hardcoded keys",
-            ))
+            # Firebase web API keys are designed to be public
+            # (security depends on Firestore rules, not key
+            # secrecy). The flutterfire-generated
+            # `firebase_options.dart` file is the canonical
+            # place for them — flagging inside that file is a
+            # false positive (we'd just be telling the user to
+            # do what they already did). Skip when the host
+            # file IS firebase_options.dart AND the surrounding
+            # context is a FirebaseOptions(...) constructor.
+            #
+            # Surfaced by v0.3.0 field test on mytaskboardapp —
+            # see docs/v030-field-test.md.
+            is_firebase_options = rel.endswith("firebase_options.dart")
+            uses_firebase_options_ctor = "FirebaseOptions(" in content
+            if not (is_firebase_options and uses_firebase_options_ctor):
+                findings.append(_mk(
+                    "hardcoded_firebase_key",
+                    "Google/Firebase API key literal outside "
+                    "firebase_options.dart. Use FirebaseOptions."
+                    "currentPlatform from firebase_options.dart.",
+                    Severity.CRITICAL, rel, i, _redact(stripped, m.group(0)),
+                    "flutterfire configure → generate firebase_options.dart; remove the inline key.",
+                    "Firebase docs: prefer firebase_options over hardcoded keys",
+                ))
         for pat in (_RE_STRIPE, _RE_SENDGRID, _RE_SLACK):
             m = pat.search(line)
             if m:

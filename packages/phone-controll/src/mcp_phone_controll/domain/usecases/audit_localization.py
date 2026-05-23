@@ -58,6 +58,7 @@ from pathlib import Path
 
 from ..failures import FilesystemFailure
 from ..result import Result, err, ok
+from ._helpers import is_path_excluded
 from .base import BaseUseCase
 
 
@@ -169,7 +170,7 @@ class AuditLocalization(
 
         # --- step 2: walk dart files ---
         roots = _resolve_roots(params.project_path, params.paths)
-        files = _collect_dart_files(roots)
+        files = _collect_dart_files(roots, params.project_path)
         all_findings: list[LocalizationFinding] = []
         used_keys: set[str] = set()
         hardcoded_strings: set[str] = set()
@@ -344,7 +345,9 @@ def _resolve_roots(
     ]
 
 
-def _collect_dart_files(roots: list[Path]) -> list[Path]:
+def _collect_dart_files(
+    roots: list[Path], project_root: Path,
+) -> list[Path]:
     out: list[Path] = []
     for root in roots:
         if root.is_file() and root.suffix == ".dart":
@@ -353,6 +356,10 @@ def _collect_dart_files(roots: list[Path]) -> list[Path]:
         if not root.is_dir():
             continue
         for f in root.rglob("*.dart"):
+            # Skip build/, .claude/worktrees/, etc.
+            # (v0.3.0 field-test calibration finding)
+            if is_path_excluded(f, project_root):
+                continue
             name = f.name
             if (
                 name.endswith(".g.dart")
@@ -404,7 +411,11 @@ _RE_SUPPORTED_LOCALES = re.compile(
 )
 _RE_LOCALE_LITERAL = re.compile(r"Locale\s*\(\s*['\"]([a-z]{2,3})['\"]")
 _RE_LOCALIZATIONS_DELEGATES = re.compile(
-    r"localizationsDelegates\s*:\s*(?:const\s+)?\["
+    # Accept BOTH a literal list (`localizationsDelegates: [..]`)
+    # AND a getter reference (`localizationsDelegates:
+    # AppLocalizations.localizationsDelegates`). Surfaced by v0.3.0
+    # field test on bike_news_room (which uses the getter style).
+    r"localizationsDelegates\s*:\s*(?:const\s+)?(?:\[|[\w.]+)"
 )
 _RE_RTL_LOCALES = re.compile(r"['\"](ar|he|fa|ur|yi|sd|ps)['\"]")
 _RE_DIRECTIONALITY = re.compile(r"\bDirectionality\s*\(|TextDirection\.")

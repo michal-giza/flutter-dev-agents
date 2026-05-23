@@ -94,6 +94,7 @@ from pathlib import Path
 
 from ..failures import FilesystemFailure
 from ..result import Result, err, ok
+from ._helpers import is_path_excluded
 from .base import BaseUseCase
 
 
@@ -208,7 +209,7 @@ class AuditCodeSeniority(
             )
 
         roots = _resolve_roots(params.project_path, params.paths)
-        files = _collect_dart_files(roots)
+        files = _collect_dart_files(roots, params.project_path)
 
         all_findings: list[SeniorityFinding] = []
         all_previews: list[PreviewDiff] = []
@@ -304,7 +305,9 @@ def _resolve_roots(
     return roots
 
 
-def _collect_dart_files(roots: list[Path]) -> list[Path]:
+def _collect_dart_files(
+    roots: list[Path], project_root: Path,
+) -> list[Path]:
     files: list[Path] = []
     for root in roots:
         if root.is_file() and root.suffix == ".dart":
@@ -313,6 +316,10 @@ def _collect_dart_files(roots: list[Path]) -> list[Path]:
         if not root.is_dir():
             continue
         for f in root.rglob("*.dart"):
+            # Skip build/, .claude/worktrees/, .dart_tool/, etc.
+            # (v0.3.0 field-test calibration finding)
+            if is_path_excluded(f, project_root):
+                continue
             # Skip generated files — they're not human code.
             name = f.name
             if (
@@ -326,6 +333,43 @@ def _collect_dart_files(roots: list[Path]) -> list[Path]:
                 continue
             files.append(f)
     return sorted(files)
+
+
+_RE_BARREL_LINE = re.compile(
+    r"^\s*(?:library\s+[\w.]+;|export\s+['\"][^'\"]+['\"](?:\s+(?:show|hide)\s+[^;]+)?;|//.*|/\*.*?\*/|\s*)$",
+    re.DOTALL,
+)
+
+
+def _is_barrel_file(content: str) -> bool:
+    """A barrel file is one that only re-exports other files —
+    no testable logic of its own. Heuristic: every non-blank,
+    non-comment line is either `library X;` or `export 'x.dart';`.
+
+    Surfaced by v0.3.0 field test on party_games_ui where
+    `party_games_ui.dart` (just `export` statements) was flagged
+    as an orphan_source.
+    """
+    if not content.strip():
+        return False  # empty file isn't a barrel — flag it separately
+    # Strip block comments crudely (close-enough for our purpose).
+    cleaned = re.sub(r"/\*.*?\*/", "", content, flags=re.DOTALL)
+    lines = [
+        ln for ln in cleaned.splitlines()
+        if ln.strip() and not ln.lstrip().startswith("//")
+    ]
+    if not lines:
+        return False
+    # Must have at least one export to be a barrel (not just a
+    # library declaration alone).
+    has_export = any(ln.strip().startswith("export ") for ln in lines)
+    if not has_export:
+        return False
+    # Every non-comment, non-blank line is library/export
+    return all(
+        ln.strip().startswith(("library ", "export ", "part "))
+        for ln in lines
+    )
 
 
 def _collect_test_files(project_path: Path) -> set[str]:
@@ -607,11 +651,17 @@ def _scan_file(
         rel.startswith("lib")
         and not src_stem.startswith("_")
         and src_stem not in test_stems
-        # Pure model/entity files often legitimately untested.
+        # Pure model/entity/token files are often legitimately
+        # untested (data shapes / constants).
         and "/entities/" not in rel
         and "/models/" not in rel
         and "/failures/" not in rel
+        and "/tokens/" not in rel
         and not rel.endswith("main.dart")
+        # Barrel files (only `library X;` + `export 'y.dart';`
+        # statements + comments) have no testable logic.
+        # Surfaced by v0.3.0 field test on party_games_ui.
+        and not _is_barrel_file(content)
     ):
         findings.append(_mk(
             "orphan_source",

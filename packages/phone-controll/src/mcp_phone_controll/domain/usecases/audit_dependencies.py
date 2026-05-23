@@ -38,6 +38,7 @@ from pathlib import Path
 
 from ..failures import FilesystemFailure
 from ..result import Result, err, ok
+from ._helpers import is_path_excluded
 from .base import BaseUseCase
 
 
@@ -245,6 +246,15 @@ class AuditDependencies(
             params.project_path / "lib"
         )
 
+        # Exclude the project's OWN package name from
+        # `transitive_used_as_direct` — the project legitimately
+        # imports its own package via `package:<own>/foo.dart`.
+        # Surfaced by v0.3.0 field test on mytaskboardapp where
+        # `mytaskboardapp` was flagged as undeclared transitive.
+        own_pkg = _parse_pubspec_name(pubspec_text)
+        if own_pkg:
+            used_packages = used_packages - {own_pkg}
+
         all_findings: list[DependencyFinding] = []
 
         # Apply rules
@@ -360,6 +370,20 @@ _RE_PACKAGE_IMPORT = re.compile(
 )
 
 
+def _parse_pubspec_name(text: str) -> str | None:
+    """Extract the `name:` top-level field from a pubspec.yaml.
+
+    Returns the package name string or None if not found.
+    Used by audit_dependencies to exclude self-imports from
+    `transitive_used_as_direct`.
+    """
+    for line in text.splitlines():
+        m = re.match(r"^name:\s*['\"]?([a-z][a-z0-9_]*)['\"]?\s*$", line)
+        if m:
+            return m.group(1)
+    return None
+
+
 def _parse_pubspec(
     text: str,
 ) -> tuple[dict[str, str], dict[str, str], dict[str, str]]:
@@ -441,7 +465,12 @@ def _collect_imported_packages(lib: Path) -> set[str]:
     if not lib.is_dir():
         return set()
     used: set[str] = set()
+    project_root = lib.parent
     for f in lib.rglob("*.dart"):
+        # Skip build/, .claude/worktrees/, .dart_tool/, etc.
+        # (v0.3.0 field-test calibration finding)
+        if is_path_excluded(f, project_root):
+            continue
         # Skip generated
         name = f.name
         if (
