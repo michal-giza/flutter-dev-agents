@@ -72,6 +72,10 @@ from .audit_test_quality import (
     AuditTestQualityParams,
 )
 from .base import BaseUseCase
+from .ingest_maestro_report import (
+    IngestMaestroReport,
+    IngestMaestroReportParams,
+)
 
 
 class Verdict(str, Enum):
@@ -104,17 +108,24 @@ class AuditReleaseReadinessParams:
     include_localization: bool = True
     include_dependencies: bool = True
     include_test_quality: bool = True
+    # If a Maestro execution report path is provided, the
+    # test_execution domain is added to the composite. Pure
+    # opt-in — Maestro is not required.
+    maestro_report_path: Path | None = None
+    maestro_prior_report_path: Path | None = None
     # Whether your app ships to production (passed to
     # audit_dependencies' is_published toggle).
     is_published: bool = True
     # Per-domain weights for composite score. Must sum > 0.
     # Defaults weight security highest, then dependencies, then
-    # test_quality, then seniority, then localization.
+    # test_quality / test_execution, then seniority, then
+    # localization.
     weight_seniority: float = 1.0
     weight_security: float = 2.0
     weight_localization: float = 1.0
     weight_dependencies: float = 1.5
     weight_test_quality: float = 1.5
+    weight_test_execution: float = 1.5
     # Cap on findings preserved in `top_actions`.
     max_top_actions: int = 10
 
@@ -155,6 +166,9 @@ _DEPENDENCIES_GRADE_SCORES = {
 _TEST_QUALITY_GRADE_SCORES = {
     "excellent": 100, "acceptable": 75, "fragile": 40,
     "unreliable": 0,
+}
+_TEST_EXECUTION_GRADE_SCORES = {
+    "clean": 100, "acceptable": 75, "at_risk": 40, "blocked": 0,
 }
 
 
@@ -255,6 +269,23 @@ class AuditReleaseReadiness(
                 ),
             ))
             weights["test_quality"] = params.weight_test_quality
+
+        # Opt-in: Maestro execution report → test_execution domain
+        if params.maestro_report_path is not None:
+            domain_tasks.append((
+                "test_execution",
+                asyncio.create_task(
+                    IngestMaestroReport()(
+                        IngestMaestroReportParams(
+                            report_path=params.maestro_report_path,
+                            prior_report_path=(
+                                params.maestro_prior_report_path
+                            ),
+                        )
+                    )
+                ),
+            ))
+            weights["test_execution"] = params.weight_test_execution
 
         if not domain_tasks:
             return err(
@@ -377,6 +408,23 @@ def _reduce(
     findings = getattr(value, "findings", ())
     findings_count = len(findings)
     blockers_count = _count_blockers(domain, findings)
+    # Some domains don't return per-finding objects but DO return a
+    # grade that's effectively a blocker (e.g. test_execution's
+    # "blocked" means failed flows ran; audit_security's "critical"
+    # means a leaked API key). Synthesise blocker count from grade
+    # so the verdict logic fires.
+    if blockers_count == 0 and grade in ("blocked", "critical", "unreliable"):
+        # Prefer the typed count when available (flows_failed,
+        # findings_by_severity['critical'/'blocker'], etc.)
+        n_failed = getattr(value, "flows_failed", None)
+        if isinstance(n_failed, int) and n_failed > 0:
+            blockers_count = n_failed
+        else:
+            by_sev = getattr(value, "findings_by_severity", {}) or {}
+            blockers_count = (
+                by_sev.get("critical", 0) + by_sev.get("blocker", 0)
+                or 1  # minimum: at least 1 blocker
+            )
     advice = getattr(value, "advice", None)
     top_acts = list(getattr(value, "top_actions", ()))
 
@@ -413,6 +461,7 @@ def _score_for_domain(domain: str, grade: str | None) -> float:
         "localization": _LOCALIZATION_GRADE_SCORES,
         "dependencies": _DEPENDENCIES_GRADE_SCORES,
         "test_quality": _TEST_QUALITY_GRADE_SCORES,
+        "test_execution": _TEST_EXECUTION_GRADE_SCORES,
     }.get(domain, {})
     return float(table.get(grade, 50))  # unknown grade → 50
 

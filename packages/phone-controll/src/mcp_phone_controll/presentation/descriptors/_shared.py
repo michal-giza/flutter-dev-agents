@@ -150,6 +150,10 @@ def default_annotations(tool_name: str) -> dict[str, bool]:
         "design_test_plan",
         # v0.3.0 phase 12 — read-only test-suite scan
         "audit_test_quality",
+        # v0.4.0 phase 13 — read-only Maestro YAML scan
+        "audit_maestro_flow",
+        # v0.4.0 phase 14 — parses external JUnit/JSON, no writes
+        "ingest_maestro_report",
     )
     # Destructive tools — touch device state, install/launch/stop apps,
     # write files in arbitrary places, modify project source.

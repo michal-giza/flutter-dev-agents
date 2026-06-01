@@ -29,6 +29,7 @@ from ..domain.usecases.audit_accessibility import AuditAccessibility
 from ..domain.usecases.audit_code_seniority import AuditCodeSeniority
 from ..domain.usecases.audit_dependencies import AuditDependencies
 from ..domain.usecases.audit_localization import AuditLocalization
+from ..domain.usecases.audit_maestro_flow import AuditMaestroFlow
 from ..domain.usecases.audit_release_readiness import AuditReleaseReadiness
 from ..domain.usecases.audit_security import AuditSecurity
 from ..domain.usecases.audit_test_quality import AuditTestQuality
@@ -94,6 +95,7 @@ from ..domain.usecases.ide import (
     OpenProjectInIde,
     WriteVscodeLaunchConfig,
 )
+from ..domain.usecases.ingest_maestro_report import IngestMaestroReport
 from ..domain.usecases.inspect_image_safety import (
     InspectImageSafety,
 )
@@ -241,6 +243,7 @@ from .descriptors._param_builders import (
     _params_audit_code_seniority,
     _params_audit_dependencies,
     _params_audit_localization,
+    _params_audit_maestro_flow,
     _params_audit_release_readiness,
     _params_audit_security,
     _params_audit_test_quality,
@@ -276,6 +279,7 @@ from .descriptors._param_builders import (
     _params_grep_logs,
     _params_index_project,
     _params_infer_pose,
+    _params_ingest_maestro_report,
     _params_inspect_image_safety,
     _params_inspect_project,
     _params_install_app,
@@ -525,6 +529,10 @@ class UseCases:
     design_test_plan: DesignTestPlan
     # v0.3.0 phase 12 — test-suite quality audit (post-write)
     audit_test_quality: AuditTestQuality
+    # v0.4.0 phase 13 — Maestro flow audit (composition with Maestro MCP)
+    audit_maestro_flow: AuditMaestroFlow
+    # v0.4.0 phase 14 — Maestro execution report ingest
+    ingest_maestro_report: IngestMaestroReport
     new_session: NewSession
     get_artifacts_dir: GetArtifactsDir
     fetch_artifact: FetchArtifact
@@ -2835,6 +2843,15 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
                     "include_localization": _bool("Default true."),
                     "include_dependencies": _bool("Default true."),
                     "include_test_quality": _bool("Default true."),
+                    "maestro_report_path": _string(
+                        "Optional path to a Maestro JUnit XML or "
+                        "JSON report. When provided, adds a "
+                        "test_execution domain to the composite."
+                    ),
+                    "maestro_prior_report_path": _string(
+                        "Optional prior Maestro report for "
+                        "regression detection (passed-then-failed)."
+                    ),
                     "is_published": _bool(
                         "Passed to audit_dependencies. Default true."
                     ),
@@ -2843,6 +2860,9 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
                     "weight_localization": _number("Default 1.0."),
                     "weight_dependencies": _number("Default 1.5."),
                     "weight_test_quality": _number("Default 1.5."),
+                    "weight_test_execution": _number(
+                        "Default 1.5. Only active if maestro_report_path set."
+                    ),
                     "max_top_actions": _number(
                         "Cap on cross-domain actions. Default 10."
                     ),
@@ -2954,6 +2974,81 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             build_params=_params_audit_test_quality,
             invoke=_bind(
                 uc.audit_test_quality, _params_audit_test_quality,
+            ),
+        ),
+        # ---- v0.4.0 phase 13 — Maestro flow audit (composition) ----
+        ToolDescriptor(
+            name="audit_maestro_flow",
+            description=(
+                "Lint Maestro YAML flows with senior-tester "
+                "discipline. 12 rules across 4 tiers: "
+                "hardcoded_locale_string (Polish-phone lesson "
+                "in YAML form), vacuous_assertion (assertVisible "
+                "'.*'), sleep_in_flow (wait: 3000 instead of "
+                "waitForAnimationToEnd), no_assertions, "
+                "no_appId, no_tags, missing_failure_path, "
+                "nested_runFlow_deep, hardcoded_credentials, "
+                "and more. Pure compute. The composition play: "
+                "Maestro's MCP authors + executes flows; we "
+                "audit them. See docs/maestro-flow-rubric.md."
+            ),
+            input_schema=_schema(
+                {
+                    "project_path": _string("Project root."),
+                    "paths": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": (
+                            "Optional subset of paths to scan. "
+                            "Default tries .maestro/, maestro/, "
+                            "tests/maestro/, test/maestro/."
+                        ),
+                    },
+                    "min_level": _enum(
+                        ["junior", "mid", "senior", "staff"],
+                        "Minimum tier to flag.",
+                    ),
+                    "max_findings": _number(
+                        "Cap on findings returned. Default 200."
+                    ),
+                },
+                ["project_path"],
+            ),
+            build_params=_params_audit_maestro_flow,
+            invoke=_bind(
+                uc.audit_maestro_flow, _params_audit_maestro_flow,
+            ),
+        ),
+        # ---- v0.4.0 phase 14 — Maestro execution report ingest ----
+        ToolDescriptor(
+            name="ingest_maestro_report",
+            description=(
+                "Parse Maestro execution report (JUnit XML or "
+                "JSON), surface pass/fail/flaky counts, runtimes, "
+                "regressions vs prior report. Returns "
+                "grade (clean/acceptable/at_risk/blocked), per-"
+                "flow execution detail, top_failures, advice. "
+                "Pure compute. Stdlib parsers only. Pairs with "
+                "audit_maestro_flow (lint) and Maestro's own "
+                "run tool — we audit the report, they run the flows."
+            ),
+            input_schema=_schema(
+                {
+                    "report_path": _string(
+                        "Path to Maestro JUnit XML, JSON, or a "
+                        "directory containing one."
+                    ),
+                    "prior_report_path": _string(
+                        "Optional path to a prior report for "
+                        "regression detection (passed-then-failed)."
+                    ),
+                },
+                ["report_path"],
+            ),
+            build_params=_params_ingest_maestro_report,
+            invoke=_bind(
+                uc.ingest_maestro_report,
+                _params_ingest_maestro_report,
             ),
         ),
         ToolDescriptor(
