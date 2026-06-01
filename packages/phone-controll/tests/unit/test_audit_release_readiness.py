@@ -356,6 +356,50 @@ async def test_test_quality_domain_runs_by_default(tmp_path: Path):
 
 
 @pytest.mark.asyncio
+async def test_maestro_report_adds_test_execution_domain(tmp_path: Path):
+    """Phase 14.5: when maestro_report_path is provided,
+    test_execution becomes the 6th domain."""
+    proj = _minimal_clean_project(tmp_path)
+    _write(
+        tmp_path / "maestro_report.xml",
+        "<testsuite name='m' tests='2'>"
+        "<testcase name='login' time='2.0'/>"
+        "<testcase name='checkout' time='3.0'/>"
+        "</testsuite>",
+    )
+    res = await _run(
+        proj,
+        maestro_report_path=tmp_path / "maestro_report.xml",
+    )
+    assert isinstance(res, Ok)
+    domains = {d.domain for d in res.value.domains}
+    assert "test_execution" in domains
+    te = next(d for d in res.value.domains if d.domain == "test_execution")
+    assert te.grade == "clean"
+
+
+@pytest.mark.asyncio
+async def test_maestro_failure_propagates_to_block_verdict(tmp_path: Path):
+    """A failed Maestro flow should force verdict=block."""
+    proj = _minimal_clean_project(tmp_path)
+    _write(
+        tmp_path / "maestro_report.xml",
+        "<testsuite name='m' tests='2'>"
+        "<testcase name='login' time='2.0'/>"
+        "<testcase name='checkout' time='3.0'>"
+        "<failure message='broken'>broken</failure>"
+        "</testcase>"
+        "</testsuite>",
+    )
+    res = await _run(
+        proj,
+        maestro_report_path=tmp_path / "maestro_report.xml",
+    )
+    assert isinstance(res, Ok)
+    assert res.value.verdict == "block"
+
+
+@pytest.mark.asyncio
 async def test_test_quality_blocker_propagates_to_composite(tmp_path: Path):
     """A blocker in the test_quality domain (e.g. real Dio in test)
     should force `block` verdict regardless of other domains."""

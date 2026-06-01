@@ -37,6 +37,9 @@ from ...domain.usecases.audit_dependencies import (
 from ...domain.usecases.audit_localization import (
     AuditLocalizationParams,
 )
+from ...domain.usecases.audit_maestro_flow import (
+    AuditMaestroFlowParams,
+)
 from ...domain.usecases.audit_release_readiness import (
     AuditReleaseReadinessParams,
 )
@@ -100,6 +103,9 @@ from ...domain.usecases.ide import (
     IsIdeAvailableParams,
     OpenProjectInIdeParams,
     WriteVscodeLaunchConfigParams,
+)
+from ...domain.usecases.ingest_maestro_report import (
+    IngestMaestroReportParams,
 )
 from ...domain.usecases.inspect_image_safety import InspectImageSafetyParams
 from ...domain.usecases.lifecycle import (
@@ -1067,6 +1073,32 @@ def _params_audit_dependencies(args: JsonDict) -> AuditDependenciesParams:
     )
 
 
+# ---- v0.4.0 phase 14 — Maestro execution report ingest -----------------
+
+
+def _params_ingest_maestro_report(
+    args: JsonDict,
+) -> IngestMaestroReportParams:
+    prior = args.get("prior_report_path")
+    return IngestMaestroReportParams(
+        report_path=Path(args["report_path"]).expanduser(),
+        prior_report_path=Path(prior).expanduser() if prior else None,
+    )
+
+
+# ---- v0.4.0 phase 13 — Maestro flow audit ------------------------------
+
+
+def _params_audit_maestro_flow(args: JsonDict) -> AuditMaestroFlowParams:
+    paths = args.get("paths") or ()
+    return AuditMaestroFlowParams(
+        project_path=Path(args["project_path"]).expanduser(),
+        paths=tuple(str(p) for p in paths),
+        min_level=str(args.get("min_level", "junior")),
+        max_findings=int(args.get("max_findings", 200)),
+    )
+
+
 # ---- v0.3.0 phase 12 — test-suite quality audit (post-write) -----------
 
 
@@ -1117,12 +1149,21 @@ def _params_audit_release_readiness(
         include_localization=bool(args.get("include_localization", True)),
         include_dependencies=bool(args.get("include_dependencies", True)),
         include_test_quality=bool(args.get("include_test_quality", True)),
+        maestro_report_path=(
+            Path(args["maestro_report_path"]).expanduser()
+            if args.get("maestro_report_path") else None
+        ),
+        maestro_prior_report_path=(
+            Path(args["maestro_prior_report_path"]).expanduser()
+            if args.get("maestro_prior_report_path") else None
+        ),
         is_published=bool(args.get("is_published", True)),
         weight_seniority=float(args.get("weight_seniority", 1.0)),
         weight_security=float(args.get("weight_security", 2.0)),
         weight_localization=float(args.get("weight_localization", 1.0)),
         weight_dependencies=float(args.get("weight_dependencies", 1.5)),
         weight_test_quality=float(args.get("weight_test_quality", 1.5)),
+        weight_test_execution=float(args.get("weight_test_execution", 1.5)),
         max_top_actions=int(args.get("max_top_actions", 10)),
     )
 

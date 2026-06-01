@@ -87,6 +87,7 @@ from .domain.usecases.audit_accessibility import AuditAccessibility
 from .domain.usecases.audit_code_seniority import AuditCodeSeniority
 from .domain.usecases.audit_dependencies import AuditDependencies
 from .domain.usecases.audit_localization import AuditLocalization
+from .domain.usecases.audit_maestro_flow import AuditMaestroFlow
 from .domain.usecases.audit_release_readiness import AuditReleaseReadiness
 from .domain.usecases.audit_security import AuditSecurity
 from .domain.usecases.audit_test_quality import AuditTestQuality
@@ -143,6 +144,7 @@ from .domain.usecases.ide import (
     OpenProjectInIde,
     WriteVscodeLaunchConfig,
 )
+from .domain.usecases.ingest_maestro_report import IngestMaestroReport
 from .domain.usecases.inspect_image_safety import InspectImageSafety
 from .domain.usecases.lifecycle import (
     ClearAppData,
@@ -677,6 +679,10 @@ def build_runtime(
         design_test_plan=DesignTestPlan(),
         # v0.3.0 phase 12 — test-suite quality audit (post-write)
         audit_test_quality=AuditTestQuality(),
+        # v0.4.0 phase 13 — Maestro YAML flow audit (composition)
+        audit_maestro_flow=AuditMaestroFlow(),
+        # v0.4.0 phase 14 — Maestro execution report ingest
+        ingest_maestro_report=IngestMaestroReport(),
         new_session=NewSession(artifacts_repo),
         get_artifacts_dir=GetArtifactsDir(artifacts_repo),
         fetch_artifact=FetchArtifact(),

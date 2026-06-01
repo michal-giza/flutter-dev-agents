@@ -386,6 +386,48 @@
       "destructiveHint": false,
       "readOnlyHint": true
     },
+    "description": "Lint Maestro YAML flows with senior-tester discipline. 12 rules across 4 tiers: hardcoded_locale_string (Polish-phone lesson in YAML form), vacuous_assertion (assertVisible '.*'), sleep_in_flow (wait: 3000 instead of waitForAnimationToEnd), no_assertions, no_appId, no_tags, missing_failure_path, nested_runFlow_deep, hardcoded_credentials, and more. Pure compute. The composition play: Maestro's MCP authors + executes flows; we audit them. See docs/maestro-flow-rubric.md.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "max_findings": {
+          "description": "Cap on findings returned. Default 200.",
+          "type": "number"
+        },
+        "min_level": {
+          "description": "Minimum tier to flag.",
+          "enum": [
+            "junior",
+            "mid",
+            "senior",
+            "staff"
+          ],
+          "type": "string"
+        },
+        "paths": {
+          "description": "Optional subset of paths to scan. Default tries .maestro/, maestro/, tests/maestro/, test/maestro/.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "project_path": {
+          "description": "Project root.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_path"
+      ],
+      "type": "object"
+    },
+    "name": "audit_maestro_flow"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "readOnlyHint": true
+    },
     "description": "Release-readiness gate. Composes the 4 v0.3.0 audit verticals (seniority, security, localization, dependencies) concurrently into one ship/hold/block verdict. Returns composite letter grade A-F, per-domain breakdown, cross-domain top_actions, and a paste-ready release-PR summary. Pure compute. Sub-second. See docs/release-readiness-rubric.md.",
     "inputSchema": {
       "additionalProperties": false,
@@ -413,6 +455,14 @@
         "is_published": {
           "description": "Passed to audit_dependencies. Default true.",
           "type": "boolean"
+        },
+        "maestro_prior_report_path": {
+          "description": "Optional prior Maestro report for regression detection (passed-then-failed).",
+          "type": "string"
+        },
+        "maestro_report_path": {
+          "description": "Optional path to a Maestro JUnit XML or JSON report. When provided, adds a test_execution domain to the composite.",
+          "type": "string"
         },
         "max_top_actions": {
           "description": "Cap on cross-domain actions. Default 10.",
@@ -446,6 +496,10 @@
         },
         "weight_seniority": {
           "description": "Default 1.0.",
+          "type": "number"
+        },
+        "weight_test_execution": {
+          "description": "Default 1.5. Only active if maestro_report_path set.",
           "type": "number"
         },
         "weight_test_quality": {
@@ -1624,6 +1678,31 @@
       "type": "object"
     },
     "name": "infer_camera_pose"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Parse Maestro execution report (JUnit XML or JSON), surface pass/fail/flaky counts, runtimes, regressions vs prior report. Returns grade (clean/acceptable/at_risk/blocked), per-flow execution detail, top_failures, advice. Pure compute. Stdlib parsers only. Pairs with audit_maestro_flow (lint) and Maestro's own run tool \u2014 we audit the report, they run the flows.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "prior_report_path": {
+          "description": "Optional path to a prior report for regression detection (passed-then-failed).",
+          "type": "string"
+        },
+        "report_path": {
+          "description": "Path to Maestro JUnit XML, JSON, or a directory containing one.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "report_path"
+      ],
+      "type": "object"
+    },
+    "name": "ingest_maestro_report"
   },
   {
     "annotations": {

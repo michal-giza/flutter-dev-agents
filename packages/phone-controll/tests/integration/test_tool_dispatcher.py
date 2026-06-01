@@ -35,6 +35,9 @@ from mcp_phone_controll.domain.usecases.audit_dependencies import (
 from mcp_phone_controll.domain.usecases.audit_localization import (
     AuditLocalization,
 )
+from mcp_phone_controll.domain.usecases.audit_maestro_flow import (
+    AuditMaestroFlow,
+)
 from mcp_phone_controll.domain.usecases.audit_release_readiness import (
     AuditReleaseReadiness,
 )
@@ -102,6 +105,9 @@ from mcp_phone_controll.domain.usecases.ide import (
     ListIdeWindows,
     OpenProjectInIde,
     WriteVscodeLaunchConfig,
+)
+from mcp_phone_controll.domain.usecases.ingest_maestro_report import (
+    IngestMaestroReport,
 )
 from mcp_phone_controll.domain.usecases.inspect_image_safety import InspectImageSafety
 from mcp_phone_controll.domain.usecases.lifecycle import (
@@ -444,6 +450,8 @@ def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:
         audit_release_readiness=AuditReleaseReadiness(),
         design_test_plan=DesignTestPlan(),
         audit_test_quality=AuditTestQuality(),
+        audit_maestro_flow=AuditMaestroFlow(),
+        ingest_maestro_report=IngestMaestroReport(),
         new_session=NewSession(artifacts),
         get_artifacts_dir=GetArtifactsDir(artifacts),
         fetch_artifact=FetchArtifact(),
@@ -698,5 +706,9 @@ async def test_registry_covers_all_use_case_fields(tmp_path: Path):
         "design_test_plan",
         # v0.3.0 phase 12 (test-suite quality audit)
         "audit_test_quality",
+        # v0.4.0 phase 13 (Maestro flow audit)
+        "audit_maestro_flow",
+        # v0.4.0 phase 14 (Maestro execution report ingest)
+        "ingest_maestro_report",
     }
     assert names == expected

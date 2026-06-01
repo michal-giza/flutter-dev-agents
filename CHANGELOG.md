@@ -5,6 +5,110 @@ All notable changes to `flutter-dev-agents` / `mcp-phone-controll`.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] — 2026-05-23
+
+The Maestro composition release. v0.3.x established the
+opinionated audit layer; v0.4.0 makes that layer **compose
+explicitly with Maestro** (mobile.dev's flow-based cross-
+platform mobile test framework, whose MCP launched Feb 2026).
+
+We are the audit layer ON TOP of Maestro — they author + run
+flows, we audit them. Same posture for Google's official MCP
+and Arenukvern's flutter-inspector. See
+`docs/flutter-mcp-comparison.md` for the full 3-player
+landscape analysis.
+
+### Added — `audit_maestro_flow` (phase 13)
+
+Lints Maestro YAML flows against the senior-tester discipline.
+12 rules across 4 tiers:
+
+  **junior** — hardcoded_locale_string, vacuous_assertion,
+  sleep_in_flow, no_assertions
+  **mid** — no_appId, no_tags, inline_script_too_long
+  **senior** — missing_failure_path, untagged_when_many,
+  no_test_data_factory_dir
+  **staff** — nested_runFlow_deep, hardcoded_credentials_in_env
+
+Returns grade (excellent/acceptable/fragile/unreliable),
+per-flow counts, top_actions. Pure compute, hand-parsed YAML
+(no PyYAML dependency). Auto-discovers flows under `.maestro/`,
+`maestro/`, `tests/maestro/`, `test/maestro/`.
+
+### Added — `ingest_maestro_report` (phase 14)
+
+Parses Maestro execution reports (JUnit XML or JSON), surfaces
+pass/fail/flaky counts, runtimes, slowest flow, regressions
+vs prior report. Stdlib parsers only (no XML or JSON deps).
+
+Returns `IngestMaestroReportResult` with:
+
+- `grade` — clean / acceptable / at_risk / blocked
+- `flows_total / passed / failed / flaky / skipped`
+- `flake_rate` (flaky / total)
+- `pass_rate` (passed / (passed + failed))
+- `slowest_flow` + `slowest_runtime_s`
+- `regressions[]` — flow names that passed-then-failed
+- `top_failures[]` — paste-ready summaries
+
+### Changed — `audit_release_readiness` (phase 14.5)
+
+Now optionally accepts a Maestro report path as a 6th
+domain (`test_execution`):
+
+```python
+audit_release_readiness(
+    project_path="/path/to/app",
+    maestro_report_path="/path/to/maestro-report.xml",
+    maestro_prior_report_path="/path/to/prior-report.xml",  # optional
+)
+```
+
+The composite now covers (when all enabled):
+
+  seniority    weight 1.0  — architecture
+  security     weight 2.0  — OWASP MASVS
+  localization weight 1.0  — i18n hygiene
+  dependencies weight 1.5  — supply chain
+  test_quality weight 1.5  — test suite (Dart)
+  test_execution weight 1.5 — Maestro run results  ← new
+
+### Fixed — grade-based blocker propagation
+
+In `audit_release_readiness._reduce()`, domains that don't
+return per-finding objects (like `ingest_maestro_report`,
+which returns flow objects) but DO return a blocker-grade
+(`blocked`/`critical`/`unreliable`) now correctly translate
+to blocker count > 0 — making the verdict logic fire as
+expected.
+
+### Stats
+
+- Tools: 135 → **137** (+2)
+- Tests: 859 → **904** (+45)
+- New external dependencies: **0** (stdlib XML + JSON only)
+- All 3 CI checks green; contract snapshot refreshed
+
+### Strategic note
+
+This release makes us composable with the fastest-growing
+Flutter test framework. The audit layer is durable
+differentiation — Maestro doesn't ship audit tooling, Google
+doesn't, Arenukvern doesn't. We do, now translated for
+Maestro YAML idioms.
+
+The composition story is now demonstrable end-to-end:
+
+```
+Maestro MCP authors flow → ourMCP audit_maestro_flow lints it
+                ↓
+Maestro MCP runs flow on device
+                ↓
+ourMCP ingest_maestro_report parses results
+                ↓
+ourMCP audit_release_readiness composites into ship/hold/block
+```
+
 ## [0.3.1] — 2026-05-22
 
 Calibration release. v0.3.0 shipped + got field-tested against
