@@ -1,0 +1,253 @@
+# The Stack
+
+> How `mcp-phone-controll` composes with the other Flutter MCP
+> servers in your Claude session. Updated for v0.4.0.
+
+## TL;DR
+
+```
+   ┌────────────────────────────────────────────────────────────────┐
+   │  Your Claude Code / Claude Desktop / Cursor session            │
+   │                                                                │
+   │  ┌──────────────────────────────────────────────────────────┐  │
+   │  │  Google's dart_mcp_server          SDK plumbing          │  │
+   │  │  (24 tools)                        — pub, dart_fix,      │  │
+   │  │                                      hot_reload, lsp     │  │
+   │  └──────────────────────────────────────────────────────────┘  │
+   │  ┌──────────────────────────────────────────────────────────┐  │
+   │  │  Maestro MCP (mobile.dev)          flow auth + execute   │  │
+   │  │  (9 tools)                         — YAML flows, run,    │  │
+   │  │                                      Maestro Cloud       │  │
+   │  └──────────────────────────────────────────────────────────┘  │
+   │  ┌──────────────────────────────────────────────────────────┐  │
+   │  │  Arenukvern's mcp-flutter-inspector  visual + semantic   │  │
+   │  │  (n tools)                           snapshots           │  │
+   │  └──────────────────────────────────────────────────────────┘  │
+   │  ┌──────────────────────────────────────────────────────────┐  │
+   │  │  mcp-phone-controll (us)           opinionated audit +   │  │
+   │  │  (137 tools)                       judgment + on-device  │  │
+   │  │                                    ─────────────────     │  │
+   │  │   • 7-vertical audit suite                               │  │
+   │  │   • senior-tester discipline (design + audit)            │  │
+   │  │   • multi-device locking + Patrol                        │  │
+   │  │   • Maestro flow lint + report ingest (v0.4.0)           │  │
+   │  │   • AR/vision + operational fixes                        │  │
+   │  └──────────────────────────────────────────────────────────┘  │
+   └────────────────────────────────────────────────────────────────┘
+```
+
+**Each MCP owns its layer.** They don't conflict; they compose.
+You add the ones you need.
+
+## Why four MCPs and not one
+
+Different teams ship different layers because each requires
+different judgment + maintenance velocity:
+
+| Layer | Who owns it | Why |
+|---|---|---|
+| **SDK plumbing** | Google | They own the Dart/Flutter SDK |
+| **Flow auth + execution** | Maestro | Cross-platform mobile testing is their product |
+| **Visual snapshots** | Arenukvern | Visual debugging is their niche |
+| **Opinionated audit + judgment** | Us | Encoding senior Flutter taste as 100+ rules requires real Flutter experience |
+
+Trying to put all of this in one MCP would mean either huge
+surface area or shallow coverage everywhere. The composition
+keeps each focused.
+
+## Installing the stack
+
+### Claude Code (CLI)
+
+```bash
+# Google's official Dart/Flutter MCP
+claude mcp add dart_mcp -- dart pub global run dart_mcp_server
+
+# Maestro MCP (mobile.dev)
+claude mcp add maestro -- maestro mcp
+
+# us
+claude mcp add phone-controll -- python -m mcp_phone_controll
+
+# (Optional) Arenukvern's flutter-inspector
+# See https://github.com/Arenukvern/mcp_flutter for setup
+```
+
+After adding, `claude mcp list` should show all of them. They
+register independently; no coordination needed.
+
+### Claude Desktop
+
+Open **Settings → MCP Servers** → **Add Server** for each, with
+the same commands above. Or import via `.json` config files
+(see each project's docs).
+
+### Cursor / Windsurf / others
+
+Refer to the host's MCP configuration — same commands apply.
+
+## The end-to-end loop
+
+What composing these MCPs actually enables a Claude session
+to do:
+
+```
+1. dart_mcp.analyze_files                 ← compile errors first
+       ↓
+2. phone-controll.design_test_plan         ← what tests to write
+       ↓ (agent writes Dart tests)
+3. phone-controll.audit_test_quality       ← are they good tests?
+       ↓
+4. dart_mcp.run_tests                      ← run them
+       ↓
+5. maestro.run flow.yaml                   ← run UI flow
+       ↓
+6. phone-controll.ingest_maestro_report    ← parse run results
+       ↓
+7. phone-controll.audit_maestro_flow       ← lint the YAML
+       ↓
+8. phone-controll.audit_release_readiness  ← composite verdict
+       ↓
+   verdict == "ship" → merge
+   verdict == "hold" → resolve top_actions
+   verdict == "block" → STOP
+```
+
+That's the full loop. Each step belongs to the right tool.
+
+## Per-layer guidance
+
+### When to invoke Google's `dart_mcp_server`
+
+- **Type / syntax errors**: `dart_mcp.analyze_files`
+- **Auto-fix lint issues**: `dart_mcp.dart_fix`
+- **Format code**: `dart_mcp.dart_format`
+- **Manage dependencies**: `dart_mcp.pub`
+- **Search pub.dev**: `dart_mcp.pub_dev_search`
+- **Hot reload during dev**: `dart_mcp.hot_reload` /
+  `dart_mcp.hot_restart`
+- **List devices**: `dart_mcp.list_devices` (both servers
+  expose this — preference is yours)
+
+**We deprecated our own** `dart_analyze`/`dart_fix`/
+`dart_format`/`flutter_pub_get`/`flutter_pub_outdated`
+in favor of Google's. They stay for backward compat but
+defer to Google's tools when both are registered.
+
+### When to invoke Maestro MCP
+
+- **Author a flow from natural language**: `maestro.run` with
+  inline YAML the agent generates
+- **Execute existing flows**: `maestro.run` with a file/dir path
+- **Inspect live view hierarchy**: `maestro.inspect_screen`
+- **Cloud execution**: `maestro.run_on_cloud` +
+  `maestro.get_cloud_run_status`
+- **Reference Maestro syntax**: `maestro.cheat_sheet`
+
+### When to invoke our MCP
+
+- **Audit code architecture**: `audit_code_seniority`
+- **Audit security**: `audit_security`
+- **Audit i18n**: `audit_localization`
+- **Audit supply chain**: `audit_dependencies`
+- **Audit test code**: `audit_test_quality`
+- **Audit Maestro YAML flows**: `audit_maestro_flow` (v0.4.0)
+- **Parse Maestro reports**: `ingest_maestro_report` (v0.4.0)
+- **Composite verdict**: `audit_release_readiness`
+- **Plan tests with discipline**: `design_test_plan`
+- **Real-device UI driving**: `tap`, `swipe`, `take_screenshot`,
+  Patrol integration, AR/vision
+- **Multi-device factory loop**: `select_device`,
+  `release_device`, `force_release_lock`
+- **AVD operational fix**: `pause_ui_automation` +
+  `resume_ui_automation`
+- **Plan-walker for YAML test plans**: `run_test_plan` (our own
+  phase-state-machine syntax, distinct from Maestro flows)
+
+## Composition examples
+
+### Example 1 — Build + audit a new feature
+
+```
+> dart_mcp.analyze_files paths=["lib/features/auth/"]
+> phone-controll.design_test_plan user_story="..." feature_kind="auth"
+> (agent writes tests in test/features/auth/)
+> phone-controll.audit_test_quality project_path="..."
+> dart_mcp.run_tests
+> phone-controll.audit_release_readiness project_path="..."
+```
+
+### Example 2 — Maestro-driven E2E flow
+
+```
+> maestro.run inline_yaml="appId: com.example.app
+                          ---
+                          - launchApp
+                          - tapOn: 'Sign in'
+                          - inputText: '${USERNAME}'
+                          - assertVisible: 'Welcome'"
+> phone-controll.ingest_maestro_report report_path="./maestro/report.xml"
+> phone-controll.audit_maestro_flow project_path="./"
+> phone-controll.audit_release_readiness \
+    project_path="./" \
+    maestro_report_path="./maestro/report.xml"
+```
+
+### Example 3 — Multi-device parallel factory
+
+```
+> phone-controll.select_device serial="R3CYA05CHXB"     # Galaxy S25
+> phone-controll.start_debug_session project_path="/path/to/app"
+> dart_mcp.hot_reload
+> phone-controll.tap_and_verify text="Sign in" expect_text="Welcome"
+> phone-controll.read_debug_log session_id="..."
+> phone-controll.stop_debug_session
+> phone-controll.release_device
+```
+
+Run that flow in 4 Claude windows pointed at 4 different
+devices simultaneously — our device-lock layer prevents
+collisions.
+
+## Where the layers conflict (and why they don't)
+
+Some surface overlap exists but it's narrow and handled:
+
+| Capability | Google | Maestro | Us |
+|---|---|---|---|
+| `list_devices` | ✓ | ✓ | ✓ |
+| `take_screenshot` | — | ✓ | ✓ |
+| `dump_ui` / view hierarchy | (via inspector) | ✓ (inspect_screen) | ✓ (multiple variants) |
+| Hot reload / restart | ✓ | — | ✓ (lock-aware variant) |
+| Run tests | ✓ (`run_tests`) | ✓ (`run`) | ✓ (Patrol + YAML plan-walker) |
+| Source analysis | ✓ (`analyze_files`) | — | (deprecated `dart_analyze`) |
+
+When multiple MCPs expose the same capability, the agent picks
+the one whose surface fits the task. The audit suite is **only
+in our MCP** — that's the durable differentiation.
+
+## When NOT to add all four
+
+You probably don't need all of them simultaneously. Common
+shapes:
+
+- **Solo Flutter dev, no Maestro yet**: Google + us
+- **Team adopting Maestro for E2E**: Google + Maestro + us
+- **Heavy visual / inspector debugging**: Add Arenukvern
+- **Factory loop (multiple devices in parallel)**: us +
+  whichever others you need
+
+The lightest-weight shape (our MCP alone) is still useful —
+you get the audit suite + on-device driving + Patrol
+integration. Adding Google + Maestro is the high-ROI
+extension when you need it.
+
+## See also
+
+- `docs/flutter-mcp-comparison.md` — full 3-player landscape
+  analysis, tool-by-tool diff
+- `docs/senior-tester-discipline.md` — the 8 principles encoded
+  by `design_test_plan` + `audit_test_quality`
+- `docs/release-readiness-rubric.md` — composite verdict logic
+  + weighting
+- `CHANGELOG.md` — what changed in each release of our MCP
