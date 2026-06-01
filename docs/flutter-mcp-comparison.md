@@ -1,27 +1,37 @@
-# Comparison: `flutter-dev-agents` vs the official Dart/Flutter MCP Server
+# Comparison: `flutter-dev-agents` vs the Flutter MCP ecosystem
 
-> Memo dated 2026-05-22. Purpose: confirm we're not duplicating
-> Google's surface before continuing to build, and make explicit
-> where we lead, where we're at parity, and where we should
-> deprecate or step out of the way.
+> Memo originally dated 2026-05-22, **updated 2026-05-23** with
+> Maestro MCP (mobile.dev) coverage after the user flagged it as
+> a known competitor. Purpose: confirm we're not duplicating
+> any of the major Flutter MCP surfaces — Google's official one,
+> Arenukvern's flutter-inspector MCP, **Maestro**, or any rising
+> third-party — and make explicit where we lead, where we should
+> compose, and where to step out of the way.
 
-## TL;DR strategic posture
+## TL;DR strategic posture (post-Maestro update)
 
-> **We will lose** if we compete with the Dart/Flutter team on
-> commodity plumbing — `pub`, `dart_fix`, `dart_format`, basic
-> `launch_app` / `hot_reload`, generic `run_tests`. They own the
-> SDK and ship those for free.
+> The Flutter MCP space has **three established players** plus us:
 >
-> **We will win** by leading on opinionated, audit-grade,
-> AI-judgment tooling that requires real Flutter taste: the
-> seven-domain audit suite (seniority, security, localization,
-> dependencies, accessibility, test-quality, app-size), the
-> senior-tester loop (design + audit), Patrol integration,
-> multi-device orchestration, plan-walker, AR/vision, and the
-> operational tools nobody else ships (`pause_ui_automation`,
-> bracket-paired profiling, multi-app IDE-window control).
-
-**Action items at the bottom.** No build pivots needed.
+> - **Google** owns SDK plumbing (`pub`, `dart_fix`, `dart_format`,
+>   `launch_app`, `hot_reload`, generic `run_tests`).
+> - **Maestro** owns **flow authoring + execution** — natural-
+>   language → YAML flow → run on device. Cross-platform
+>   (Flutter + RN + native + web).
+> - **Arenukvern's mcp-flutter-inspector** owns the visual /
+>   semantic snapshot niche for in-app debugging.
+> - **We own opinionated audit + judgment** — the 7-vertical
+>   audit suite, senior-tester loop, multi-device locking, AR
+>   tooling, operational fixes.
+>
+> **The compose-don't-compete play**: when teams adopt Maestro,
+> we sit ON TOP of them. They generate + run the flow; we audit
+> the flow YAML against the senior-tester discipline + ingest
+> the execution report into our release-readiness composite.
+> Same for Google's tools and Arenukvern's inspector.
+>
+> **Action items at the bottom.** Some pivots: deprecate ~14
+> commodity tools long-term; add `ingest_maestro_flow` +
+> `ingest_maestro_report` for v0.4.0.
 
 ## The official Dart/Flutter MCP Server
 
@@ -48,7 +58,40 @@ Sources:
 - [docs.flutter.dev/ai/mcp-server](https://docs.flutter.dev/ai/mcp-server)
 - [GitHub: dart-lang/ai/pkgs/dart_mcp_server](https://github.com/dart-lang/ai/tree/main/pkgs/dart_mcp_server)
 
-## Side-by-side: ours (135) vs theirs (24)
+## Maestro MCP Server (mobile.dev) — added 2026-05-23
+
+Mobile.dev's Maestro is a flow-based cross-platform mobile test
+framework (Flutter + React Native + native iOS/Android + web).
+Their MCP server launched **February 2026**. **9 tools**:
+
+| Category | Tools |
+|---|---|
+| **devices** | `list_devices`, `list_cloud_devices` |
+| **inspection** | `inspect_screen` (view hierarchy as JSON), `take_screenshot` |
+| **flow execution** | `run` (executes inline YAML, files, or directories) |
+| **Maestro Cloud** | `run_on_cloud`, `get_cloud_run_status` |
+| **viewer** | `open_maestro_viewer` |
+| **docs** | `cheat_sheet` (Maestro syntax reference) |
+
+**Their differentiation**: natural language → YAML flow →
+execute. The `run` tool both authors AND executes, so the agent
+can iterate: describe → run → fix → re-run. Cross-platform
+matters — same flow runs on iOS + Android + web.
+
+For Flutter specifically, Maestro uses the Semantics Tree
+(same source we use via `dump_widget_tree`), so they're already
+Flutter-aware.
+
+**Cloud is a real moat**: `run_on_cloud` + `get_cloud_run_status`
+let teams run flows on Maestro Cloud's device farm without
+managing their own. We don't ship anything like that.
+
+Sources:
+- [Maestro MCP docs](https://docs.maestro.dev/get-started/maestro-mcp)
+- [maestro.dev blog: Maestro MCP — an introduction](https://maestro.dev/blog/maestro-mcp-an-introduction)
+- [VeryGoodVentures: Maestro MCP + Claude](https://verygood.ventures/blog/maestro-mcp-claude-mobile-ui-test-automation/)
+
+## Side-by-side: ours (135) vs Google's (24) vs Maestro's (9)
 
 ### Direct overlap — they likely win long-term (12 tools we have)
 
@@ -71,7 +114,62 @@ Sources:
 
 **~14 of our 135 tools are commodity overlap. ~10% surface area.**
 
-### Where we lead — they don't ship this (121 unique tools)
+### Overlap with Maestro MCP — minimal, mostly orthogonal
+
+| Our tool | Maestro tool | Verdict |
+|---|---|---|
+| `list_devices` | `list_devices` | parity (commodity) |
+| `take_screenshot` | `take_screenshot` | parity (commodity) |
+| `dump_ui` / `dump_widget_tree` / `extract_ui_graph` | `inspect_screen` | parity-ish; different output shapes (we return structured graph; they return JSON hierarchy) |
+| `run_test_plan` (YAML phase walker) | `run` (Maestro YAML) | **different syntaxes, different goals** — ours is phase-state-machine driven (PRE_FLIGHT → CLEAN → UNDER_TEST → VERDICT); theirs is flow-step driven |
+| `run_patrol_test` / `run_patrol_suite` | `run` | different frameworks (Patrol vs Maestro) |
+| — | `list_cloud_devices`, `run_on_cloud`, `get_cloud_run_status` | **Maestro Cloud — we have no equivalent** |
+| — | `cheat_sheet` | Maestro's own docs |
+| — | `open_maestro_viewer` | Maestro web viewer |
+
+**Overlap = ~3 tools (commodity)**. Maestro doesn't ship any
+audit / grading / discipline tooling. They're a test framework
++ runner; we're an opinionated reviewer.
+
+### The Maestro composition story (the high-leverage play)
+
+Teams that adopt Maestro write YAML flows. Those flows are
+test code — and test code has quality smells (no failure-path
+assertions, hardcoded English labels that break on Polish-locale
+phones, vacuous assertions, etc.).
+
+**We can audit Maestro flows with the senior-tester discipline.**
+
+Two new tools for v0.4.0:
+
+```python
+# Audit a Maestro YAML flow against test-quality rules
+audit_maestro_flow(
+    flow_path="/path/to/flow.yaml",
+    min_level="junior",
+)
+# Returns: same shape as audit_test_quality result, but
+# rule names translated for Maestro YAML idioms:
+#   - hardcoded_locale_string: tapOn: "Sign in" → use textBy semantic
+#   - missing_failure_path: every passing flow needs a paired
+#     failing assertion variant
+#   - sleep_in_flow: `- wait: 3000` → use `waitForAnimationToEnd`
+#   - vacuous_assertion: `- assertVisible: ".*"` is a wildcard pass
+
+# Ingest Maestro test execution report into release_readiness
+ingest_maestro_report(
+    report_path="/path/to/maestro-report.xml",
+)
+# Returns: per-flow pass/fail/flaky + signals fed into
+# audit_release_readiness composite as a test_execution
+# domain (6th domain after test_quality).
+```
+
+This is **the most strategic v0.4.0 candidate** — it makes us
+the audit layer for the most popular Flutter test framework's
+output. Maestro brings the users; we bring the judgment.
+
+### Where we lead — none of them ship this (~120 unique tools)
 
 #### 🔑 The audit suite (7 verticals + composite) — our killer differentiator
 | Tool | What | Their offering |
@@ -209,33 +307,63 @@ Full lifecycle for iOS sims + Android AVDs.
   defaults
 - `pub_dev_search` — don't bother; theirs is better
 
-### 4. Compatibility note for users
-- Add a section to `README.md` clarifying that our MCP **stacks
-  with** the official Dart/Flutter MCP. Both can run in the same
-  Claude session via `claude mcp add`. Ours adds the audit /
-  device-driving / Patrol / multi-device layer on top of their
-  pure-SDK surface.
+### 4. Compatibility note for users — write the stack-up doc
+- Add `docs/the-stack.md` showing how the MCPs compose:
+    - **Google's** `dart_mcp_server` (SDK plumbing)
+    - **Maestro's** MCP (flow authoring + execution)
+    - **Arenukvern's** mcp-flutter-inspector (visual snapshots)
+    - **Ours** mcp-phone-controll (audit + judgment + lock + AR)
+- All four can register in the same Claude session via
+  `claude mcp add`. Each owns its layer.
 
-### 5. Watch list (re-check quarterly)
-- If the official MCP ships an audit equivalent → deprecate
-  ours and contribute upstream
-- If they ship Patrol integration → deprecate ours
-- If they ship multi-device locking → deprecate ours
+### 5. v0.4.0 candidate: Maestro composition (the strategic move)
+- **`audit_maestro_flow(flow_path)`** — audit a Maestro YAML
+  flow with senior-tester discipline. Same rule shape as
+  `audit_test_quality` but translated for YAML idioms
+  (`tapOn`, `assertVisible`, `runFlow`, etc.).
+- **`ingest_maestro_report(report_path)`** — feed Maestro's
+  execution report into `audit_release_readiness` as a new
+  `test_execution` domain. Tracks flaky-flow rates, per-flow
+  pass/fail history.
+- This is **the highest-leverage v0.4.0 work**: Maestro brings
+  the users (they're growing fast in 2026); we bring the
+  judgment layer they don't ship.
 
-History suggests they ship infrastructure, not opinionated audits.
-The differentiation is durable.
+### 6. Watch list (re-check quarterly)
+- **Google's MCP** — if they ship an audit equivalent →
+  deprecate ours and contribute upstream
+- **Maestro's MCP** — if they add a `audit_flow` or
+  `lint_flow` tool → re-scope our composition story
+- **Arenukvern's MCP** — if they expand into our audit space →
+  evaluate alignment / cooperation
+- **Any newcomer** that ships opinionated rubrics → take a
+  hard look at whether to compete or contribute
 
-## Bottom line
+Historical pattern: none of these teams have shipped
+opinionated audits in their first year. The differentiation is
+durable for at least the v0.4.x window.
 
-We have **~10% commodity overlap** (14 of 135 tools) and **~90%
-unique surface** (121 tools the official MCP doesn't ship). The
-strategic posture from before the memo holds:
+## Bottom line (3-player landscape post-Maestro)
 
-> **Lead on opinionated audit-grade tooling. Defer to Google on
-> SDK plumbing. Don't pivot.**
+We have **~10% commodity overlap with Google**, **~3% overlap
+with Maestro** (mostly `list_devices` + `take_screenshot` +
+`inspect_screen`-shape), and **~120 tools nobody else ships**.
+
+The strategic posture stays the same:
+
+> **Lead on opinionated audit-grade tooling. Compose with
+> Google + Maestro + Arenukvern rather than compete. Don't pivot.**
+
+The Maestro composition (`audit_maestro_flow` +
+`ingest_maestro_report`) is the v0.4.0 candidate that makes
+this explicit — we become the audit layer on top of the
+fastest-growing Flutter test framework, not a competitor.
 
 Sources:
 - [Dart and Flutter MCP server (docs.flutter.dev)](https://docs.flutter.dev/ai/mcp-server)
 - [dart-lang/ai/pkgs/dart_mcp_server (GitHub)](https://github.com/dart-lang/ai/tree/main/pkgs/dart_mcp_server)
+- [Maestro MCP docs](https://docs.maestro.dev/get-started/maestro-mcp)
+- [maestro.dev blog: Maestro MCP — an introduction](https://maestro.dev/blog/maestro-mcp-an-introduction)
+- [VeryGoodVentures: Maestro MCP + Claude](https://verygood.ventures/blog/maestro-mcp-claude-mobile-ui-test-automation/)
 - [Voxturrlabs: MCP Servers for Dart and Flutter Developers (2026 Guide)](https://voxturrlabs.com/blog/mcp-servers-for-dart-and-flutter-developers-2026/)
 - [Very Good Ventures: 7 MCP Servers Every Dart and Flutter Developer Should Know](https://verygood.ventures/blog/7-mcp-servers-every-dart-and-flutter-developer-should-know/)
