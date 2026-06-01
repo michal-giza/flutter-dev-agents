@@ -934,7 +934,7 @@
       "openWorldHint": true,
       "readOnlyHint": true
     },
-    "description": "Run `dart analyze --format=json` and return structured issues (severity, code, message, file, line, column). Optional min_severity filter.",
+    "description": "[COMMODITY \u2014 prefer Google's dart_mcp_server.analyze_files when both MCPs are registered] Run `dart analyze --format=json` and return structured issues (severity, code, message, file, line, column). Optional min_severity filter.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -965,7 +965,7 @@
       "openWorldHint": true,
       "readOnlyHint": false
     },
-    "description": "Run `dart fix`. apply=false (default) is a dry-run; apply=true modifies files. Returns count of fixes + files changed.",
+    "description": "[COMMODITY \u2014 prefer Google's dart_mcp_server.dart_fix when both MCPs are registered] Run `dart fix`. apply=false (default) is a dry-run; apply=true modifies files. Returns count of fixes + files changed.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -991,7 +991,7 @@
       "openWorldHint": true,
       "readOnlyHint": false
     },
-    "description": "Run `dart format` on a file or directory. dry_run=true reports what would change without rewriting.",
+    "description": "[COMMODITY \u2014 prefer Google's dart_mcp_server.dart_format when both MCPs are registered] Run `dart format` on a file or directory. dry_run=true reports what would change without rewriting.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -1426,7 +1426,7 @@
       "openWorldHint": true,
       "readOnlyHint": false
     },
-    "description": "Run `flutter pub get` to refresh dependencies.",
+    "description": "[COMMODITY \u2014 prefer Google's dart_mcp_server.pub when both MCPs are registered] Run `flutter pub get` to refresh dependencies.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -1449,7 +1449,7 @@
       "openWorldHint": true,
       "readOnlyHint": true
     },
-    "description": "Run `flutter pub outdated` to see stale dependencies.",
+    "description": "[COMMODITY \u2014 prefer Google's dart_mcp_server.pub with outdated subcommand when both MCPs are registered] Run `flutter pub outdated` to see stale dependencies.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {

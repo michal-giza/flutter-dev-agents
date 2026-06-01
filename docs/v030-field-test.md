@@ -183,21 +183,78 @@ moved the audit suite from "useful with manual filtering" to
   we got 15 — strong signal that running the tools on real
   projects is the highest-leverage activity available.
 
-## What's next
+## Field-test re-run (2026-06-01, after v0.4.0)
 
-After v0.3.1 ships:
+Re-ran all 5 audits against the same 3 projects to verify the
+v0.3.1 patches held. **7 of 8 patches landed cleanly. One
+patch had a residual leak; fixed in v0.4.1.**
 
-1. Re-run all 5 audits against the same 3 projects to confirm
-   the calibration improvements (the unit tests verify each
-   patch in isolation; the integration is in the field).
-2. Pick 1 of the 3 projects (probably `bike_news_room`) and
-   actually FIX the real findings the audit surfaced. That's
-   the loop the v0.3.0 release notes mentioned: tools find
-   problems → developer fixes → tests now cover the area →
-   release-readiness improves.
-3. If the post-v0.3.1 ratio holds, queue v0.3.2 features rather
-   than patches:
+### Confirmed clean (7 patches)
+
+| # | Patch | Project | v0.3.0 result | v0.4.1 result |
+|---|---|---|---|---|
+| 1 | Exclude `build/` | bike_news_room security | 17 findings | **1** |
+| 2 | Exclude `.claude/worktrees/` | mytaskboardapp security | 30 findings | **1** |
+| 3 | `firebase_options.dart` exception | mytaskboardapp security | 15 critical FPs | **0** |
+| 4 | Patrol `$.tester` await | bike_news_room test_quality | 8 FPs | **0** |
+| 6 | Own-package self-import | mytaskboardapp deps | 1 FP | **0** |
+| 7 | `orphan_source` barrel files | party_games_ui seniority | `party_games_ui.dart` FP | **gone** |
+| 8 | `missing_localizations_delegates` getter | bike_news_room l10n | 1 FP | **0** |
+
+### Residual leak found + patched (#5)
+
+The v0.3.1 patch on `test_imports_test` excluded
+`package:flutter_test/`, `package:test/`, and `package:patrol/`
+— but missed `package:integration_test/`. The re-run on
+`bike_news_room` (which has 4 integration tests) flagged
+`import 'package:integration_test/integration_test.dart'` as
+"this test imports another test."
+
+**Fixed in v0.4.1** by extending the regex exclusion list to
+also cover `integration_test`. One-line change. Existing
+regression tests still pass (they verified the framework
+exclusion behaviour; the new framework is just additive).
+
+### New post-v0.4.1 signal:noise table
+
+| Project × Audit | v0.3.0 | v0.4.1 | FP rate |
+|---|---|---|---|
+| bike_news_room × security | 6% real | **100%** | 0% FP |
+| mytaskboardapp × security | 3% real | **100%** | 0% FP |
+| mytaskboardapp × deps | 90% real | **100%** | 0% FP |
+| bike_news_room × test_quality | 60% real | **~95%** | rare FP |
+| bike_news_room × l10n | 93% real | **100%** | 0% FP |
+| party_games_ui × seniority | 98% real | **100%** | 0% FP |
+
+**Composite signal:noise across these 6 combinations: 73% → ~98%.**
+
+### Calibration loop closed
+
+The v0.3.0 → v0.3.1 → v0.4.1 cycle is the canonical proof that
+field testing finds what unit tests don't — and that fast
+patch turnaround keeps the audit suite useful as the user base
+hits new edge cases.
+
+The audit suite is now production-grade for the 3 calibration
+projects. Future field tests on new projects will surface new
+edge cases; the loop continues.
+
+## What's next (queue for v0.4.2+)
+
+1. **Run on more projects** — every new project shape surfaces
+   new edge cases. Especially: monorepo with Melos, multi-flavor
+   apps, projects using Riverpod (different DI pattern than
+   GetIt), projects without flutter_bloc.
+2. **Pick `bike_news_room`** (or another) and actually FIX the
+   real findings the audit surfaced → case study material.
+   That's the loop the v0.3.0 release notes anticipated:
+   tools find problems → developer fixes → tests now cover the
+   area → release-readiness improves.
+3. **v0.4.2 feature candidates** (if signal:noise holds):
    - `pin_threshold` config for `audit_dependencies`
-   - "design system" detection heuristic for `audit_code_seniority`
-     that lowers `orphan_source` severity for widget-only packages
-   - More feature_kinds in `design_test_plan` (camera, AR, audio)
+   - "design system" detection heuristic for
+     `audit_code_seniority` that lowers `orphan_source`
+     severity for widget-only packages
+   - More feature_kinds in `design_test_plan` (camera, AR,
+     audio)
+   - Riverpod-aware rule variants for `direct_di_lookup`

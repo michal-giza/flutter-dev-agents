@@ -1714,9 +1714,10 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
         ToolDescriptor(
             name="dart_analyze",
             description=(
-                "Run `dart analyze --format=json` and return structured issues "
-                "(severity, code, message, file, line, column). Optional "
-                "min_severity filter."
+                "[COMMODITY — prefer Google's dart_mcp_server.analyze_files "
+                "when both MCPs are registered] Run `dart analyze "
+                "--format=json` and return structured issues (severity, code, "
+                "message, file, line, column). Optional min_severity filter."
             ),
             input_schema=_schema(
                 {
@@ -1731,8 +1732,10 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
         ToolDescriptor(
             name="dart_format",
             description=(
-                "Run `dart format` on a file or directory. dry_run=true reports "
-                "what would change without rewriting."
+                "[COMMODITY — prefer Google's dart_mcp_server.dart_format "
+                "when both MCPs are registered] Run `dart format` on a file "
+                "or directory. dry_run=true reports what would change "
+                "without rewriting."
             ),
             input_schema=_schema(
                 {
@@ -1747,8 +1750,10 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
         ToolDescriptor(
             name="dart_fix",
             description=(
-                "Run `dart fix`. apply=false (default) is a dry-run; apply=true "
-                "modifies files. Returns count of fixes + files changed."
+                "[COMMODITY — prefer Google's dart_mcp_server.dart_fix when "
+                "both MCPs are registered] Run `dart fix`. apply=false "
+                "(default) is a dry-run; apply=true modifies files. Returns "
+                "count of fixes + files changed."
             ),
             input_schema=_schema(
                 {
@@ -1762,7 +1767,11 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
         ),
         ToolDescriptor(
             name="flutter_pub_get",
-            description="Run `flutter pub get` to refresh dependencies.",
+            description=(
+                "[COMMODITY — prefer Google's dart_mcp_server.pub when both "
+                "MCPs are registered] Run `flutter pub get` to refresh "
+                "dependencies."
+            ),
             input_schema=_schema(
                 {"project_path": _string("")}, ["project_path"]
             ),
@@ -1771,7 +1780,11 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
         ),
         ToolDescriptor(
             name="flutter_pub_outdated",
-            description="Run `flutter pub outdated` to see stale dependencies.",
+            description=(
+                "[COMMODITY — prefer Google's dart_mcp_server.pub with "
+                "outdated subcommand when both MCPs are registered] Run "
+                "`flutter pub outdated` to see stale dependencies."
+            ),
             input_schema=_schema(
                 {"project_path": _string("")}, ["project_path"]
             ),
