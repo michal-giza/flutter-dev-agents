@@ -5,6 +5,80 @@ All notable changes to `flutter-dev-agents` / `mcp-phone-controll`.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] — 2026-06-01
+
+Field-test re-verification release. v0.4.0 was field-tested
+against the same 3 calibration projects from v0.3.0
+(`party_games_ui`, `mytaskboardapp`, `bike_news_room`) to
+confirm the 8 v0.3.1 patches held. **7 of 8 patches landed
+cleanly. One small regression in patch #5 was found + patched
+here.**
+
+### Fixed — `test_imports_test` regex (residual leak from v0.3.1)
+
+The v0.3.1 patch excluded `package:flutter_test/`,
+`package:test/`, `package:patrol/` from the
+`test_imports_test` regex. Field-test re-run on
+`bike_news_room` (which has integration tests) surfaced one
+more framework URI we missed:
+
+```dart
+import 'package:integration_test/integration_test.dart';
+```
+
+This still got flagged because the URI ends in `_test.dart`.
+**Now also excluded.** No new false positives elsewhere.
+
+The negative regression test
+(`test_test_importing_another_test_still_fires`) confirms
+real cross-test imports still fire after the additional
+exclusion.
+
+### Changed — `[COMMODITY]` prefix on 5 overlap tools
+
+Added explicit `[COMMODITY — prefer Google's dart_mcp_server.*
+when both MCPs are registered]` prefix to the tool descriptions
+of the 5 plumbing tools that directly overlap Google's official
+MCP:
+
+- `dart_analyze` → `dart_mcp_server.analyze_files`
+- `dart_fix` → `dart_mcp_server.dart_fix`
+- `dart_format` → `dart_mcp_server.dart_format`
+- `flutter_pub_get` → `dart_mcp_server.pub`
+- `flutter_pub_outdated` → `dart_mcp_server.pub` (outdated)
+
+The tools still work; they're just labeled honestly so adopters
+running the stack (us + Google) know which to call. Behaviour
+unchanged.
+
+### Verified — calibration table after re-run
+
+| Project | Audit | v0.3.0 findings | v0.4.1 findings | Reduction |
+|---|---|---|---|---|
+| bike_news_room | security | 17 (16 FPs) | **1** | 94% |
+| mytaskboardapp | security | 30 (29 FPs) | **1** | 97% |
+| mytaskboardapp | dependencies | 10 (1 FP) | **9** | self-import gone |
+| bike_news_room | test_quality | 20 (9 FPs) | 18 (1 FP) | 89% |
+| bike_news_room | localization | 15 (1 FP) | 14 (0 FPs) | 100% |
+| party_games_ui | seniority | 48 (1 FP) | **10** (cap) | barrel-file gone |
+
+**Signal:noise across 6 audit×project combinations: ~73% → ~98%.**
+
+### Stats
+
+- Tools: **137** (unchanged)
+- Tests: **904** (unchanged — existing test_imports_test
+  regression tests now also cover integration_test)
+- Tool description size: ~600 bytes added (commodity prefixes)
+- 0 behaviour changes
+- 0 new dependencies
+
+### Documentation
+
+The field-test re-run results are reflected in
+`docs/v030-field-test.md` (existing file, updated with the
+post-patch numbers).
+
 ## [0.4.0] — 2026-05-23
 
 The Maestro composition release. v0.3.x established the

@@ -347,12 +347,14 @@ _RE_FAILURE_ASSERT = re.compile(
     r"isA<\s*\w*Failure\s*>",
 )
 _RE_TEST_HELPER_IMPORT = re.compile(
-    # Match `import 'foo_test.dart'` BUT NOT
-    # `import 'package:flutter_test/flutter_test.dart'` or
-    # `import 'package:test/test.dart'` (those are the
-    # standard test-framework imports, not 'this test imports
-    # another test'). v0.3.0 field-test calibration finding.
-    r"import\s+['\"](?!package:(?:flutter_test|test|patrol)/)[^'\"]*?_test\.dart['\"]",
+    # Match `import 'foo_test.dart'` BUT NOT the standard
+    # test-framework imports — those URIs happen to end in
+    # `_test.dart` but they're framework packages, not
+    # 'this test imports another test'.
+    # v0.3.0 field-test calibration: added flutter_test, test, patrol.
+    # v0.4.0 field-test re-run: added integration_test (still leaked
+    # on bike_news_room's `import 'package:integration_test/integration_test.dart'`).
+    r"import\s+['\"](?!package:(?:flutter_test|integration_test|test|patrol)/)[^'\"]*?_test\.dart['\"]",
 )
 _RE_GROUP = re.compile(r"\bgroup\s*\(")
 _RE_SETUP_ALL = re.compile(r"\bsetUpAll\s*\(")
