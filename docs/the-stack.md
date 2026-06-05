@@ -1,7 +1,7 @@
 # The Stack
 
 > How `mcp-phone-controll` composes with the other Flutter MCP
-> servers in your Claude session. Updated for v0.4.0.
+> servers in your Claude session. Updated for v0.5.0.
 
 ## TL;DR
 
@@ -24,13 +24,19 @@
    │  │  (n tools)                           snapshots           │  │
    │  └──────────────────────────────────────────────────────────┘  │
    │  ┌──────────────────────────────────────────────────────────┐  │
+   │  │  Chrome MCP (official, claude-in-chrome)  browser drive  │  │
+   │  │                                      — DOM nav, click,   │  │
+   │  │                                        eval, console     │  │
+   │  └──────────────────────────────────────────────────────────┘  │
+   │  ┌──────────────────────────────────────────────────────────┐  │
    │  │  mcp-phone-controll (us)           opinionated audit +   │  │
-   │  │  (137 tools)                       judgment + on-device  │  │
+   │  │  (139 tools)                       judgment + on-device  │  │
    │  │                                    ─────────────────     │  │
-   │  │   • 7-vertical audit suite                               │  │
+   │  │   • 9-vertical audit suite (+ web shell, v0.5.0)         │  │
    │  │   • senior-tester discipline (design + audit)            │  │
    │  │   • multi-device locking + Patrol                        │  │
    │  │   • Maestro flow lint + report ingest (v0.4.0)           │  │
+   │  │   • Lighthouse web-vitals ingest (v0.5.0)               │  │
    │  │   • AR/vision + operational fixes                        │  │
    │  └──────────────────────────────────────────────────────────┘  │
    └────────────────────────────────────────────────────────────────┘
@@ -49,7 +55,19 @@ different judgment + maintenance velocity:
 | **SDK plumbing** | Google | They own the Dart/Flutter SDK |
 | **Flow auth + execution** | Maestro | Cross-platform mobile testing is their product |
 | **Visual snapshots** | Arenukvern | Visual debugging is their niche |
+| **Browser driving** (web) | Chrome MCP (official) | Anthropic ships a DOM-aware browser driver; we don't re-build it |
 | **Opinionated audit + judgment** | Us | Encoding senior Flutter taste as 100+ rules requires real Flutter experience |
+
+> **We deliberately do not ship a browser driver.** For clicking
+> through a running Flutter **web** build, compose with the
+> official **Chrome MCP** (`mcp__claude-in-chrome__*`) or with
+> Maestro (which drives Flutter web flows). Our web layer is
+> **audit-grade and pure-compute**: `audit_web_app` grades the
+> `web/` shell statically, and `ingest_lighthouse_report` parses
+> the vitals you (or CI) measured. We grade; the official tools
+> drive. Re-shipping a browser driver would duplicate a
+> first-party, better-maintained tool for no differentiation. See
+> `docs/web-app-rubric.md`.
 
 Trying to put all of this in one MCP would mean either huge
 surface area or shallow coverage everywhere. The composition
@@ -71,6 +89,9 @@ claude mcp add phone-controll -- python -m mcp_phone_controll
 
 # (Optional) Arenukvern's flutter-inspector
 # See https://github.com/Arenukvern/mcp_flutter for setup
+
+# (Optional, for Flutter web) the official Chrome MCP —
+# enable "Claude in Chrome" in your client; no command to add.
 ```
 
 After adding, `claude mcp list` should show all of them. They
@@ -144,6 +165,21 @@ defer to Google's tools when both are registered.
   `maestro.get_cloud_run_status`
 - **Reference Maestro syntax**: `maestro.cheat_sheet`
 
+### When to invoke Chrome MCP (Flutter web)
+
+The official browser driver — use it to *drive* a running
+Flutter web build; use **our** tools to *grade* it.
+
+- **Navigate to the running web app**: `navigate`
+- **Click / type in the DOM**: `computer`, `form_input`
+- **Read console / network**: `read_console_messages`,
+  `read_network_requests`
+- **Run JS in the page**: `javascript_tool`
+
+We intentionally expose **none** of these — they're first-party
+and well-maintained. Our seam is `audit_web_app` (static) +
+`ingest_lighthouse_report` (vitals).
+
 ### When to invoke our MCP
 
 - **Audit code architecture**: `audit_code_seniority`
@@ -153,6 +189,10 @@ defer to Google's tools when both are registered.
 - **Audit test code**: `audit_test_quality`
 - **Audit Maestro YAML flows**: `audit_maestro_flow` (v0.4.0)
 - **Parse Maestro reports**: `ingest_maestro_report` (v0.4.0)
+- **Audit the web shell**: `audit_web_app` (v0.5.0) — `web/`
+  index.html + manifest + headers, 12 rules
+- **Parse Lighthouse reports**: `ingest_lighthouse_report`
+  (v0.5.0) — Core Web Vitals, CanvasKit-aware
 - **Composite verdict**: `audit_release_readiness`
 - **Plan tests with discipline**: `design_test_plan`
 - **Real-device UI driving**: `tap`, `swipe`, `take_screenshot`,
@@ -209,6 +249,25 @@ Run that flow in 4 Claude windows pointed at 4 different
 devices simultaneously — our device-lock layer prevents
 collisions.
 
+### Example 4 — Flutter web release loop (v0.5.0)
+
+We grade the shell + vitals; Chrome MCP drives the browser.
+
+```
+> phone-controll.audit_web_app project_path="./"        # static: web/ shell ready?
+> dart_mcp.pub  (flutter build web)                      # build
+> (you/CI run: lighthouse <url> --output=json ...)       # measure vitals
+> phone-controll.ingest_lighthouse_report report_path="./lighthouse.json"
+> chrome.navigate url="http://localhost:8080"            # ← official driver
+> chrome.computer  (click through the running app)        # ← official driver
+> phone-controll.audit_release_readiness \
+    project_path="./" \
+    lighthouse_report_path="./lighthouse.json"           # 8-domain verdict
+```
+
+The two `chrome.*` steps are the **only** place a browser driver
+appears — and it's the official one. We never re-implement it.
+
 ## Where the layers conflict (and why they don't)
 
 Some surface overlap exists but it's narrow and handled:
@@ -234,6 +293,8 @@ shapes:
 - **Solo Flutter dev, no Maestro yet**: Google + us
 - **Team adopting Maestro for E2E**: Google + Maestro + us
 - **Heavy visual / inspector debugging**: Add Arenukvern
+- **Shipping a Flutter web app**: us (audit shell + vitals) +
+  official Chrome MCP (drive the browser)
 - **Factory loop (multiple devices in parallel)**: us +
   whichever others you need
 
@@ -246,6 +307,9 @@ extension when you need it.
 
 - `docs/flutter-mcp-comparison.md` — full 3-player landscape
   analysis, tool-by-tool diff
+- `docs/web-app-rubric.md` — the web layer: `audit_web_app` 12
+  rules, CanvasKit threshold, and why we compose with Chrome MCP
+  instead of shipping a browser driver
 - `docs/senior-tester-discipline.md` — the 8 principles encoded
   by `design_test_plan` + `audit_test_quality`
 - `docs/release-readiness-rubric.md` — composite verdict logic
