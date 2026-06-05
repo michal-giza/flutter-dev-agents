@@ -452,9 +452,17 @@
           "description": "Default true.",
           "type": "boolean"
         },
+        "include_web_app": {
+          "description": "Default true. Audits web/ if present; auto-excluded on mobile-only projects.",
+          "type": "boolean"
+        },
         "is_published": {
           "description": "Passed to audit_dependencies. Default true.",
           "type": "boolean"
+        },
+        "lighthouse_report_path": {
+          "description": "Optional path to a Lighthouse JSON report. When provided, adds a web_vitals domain to the composite.",
+          "type": "string"
         },
         "maestro_prior_report_path": {
           "description": "Optional prior Maestro report for regression detection (passed-then-failed).",
@@ -596,6 +604,45 @@
       "type": "object"
     },
     "name": "audit_test_quality"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Flutter web production-readiness audit. Walks web/index.html + web/manifest.json + web/_headers. 12 rules across 4 tiers: html_no_lang_attr, no_viewport_meta, placeholder_meta_description, no_favicon, no_csp, no_theme_color, manifest_missing_pwa_fields, manifest_no_maskable_icon, placeholder_app_name, no_seo_meta, no_apple_touch_icon, no_loading_indicator. Returns grade (excellent/acceptable/needs_polish/not_production_ready/not_web_app). Pure compute. See docs/web-app-rubric.md.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "max_findings": {
+          "description": "Cap on findings returned. Default 200.",
+          "type": "number"
+        },
+        "min_level": {
+          "description": "Minimum tier to flag.",
+          "enum": [
+            "junior",
+            "mid",
+            "senior",
+            "staff"
+          ],
+          "type": "string"
+        },
+        "project_path": {
+          "description": "Flutter project root.",
+          "type": "string"
+        },
+        "web_dir": {
+          "description": "Override the web directory. Default: 'web'.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_path"
+      ],
+      "type": "object"
+    },
+    "name": "audit_web_app"
   },
   {
     "annotations": {
@@ -1678,6 +1725,31 @@
       "type": "object"
     },
     "name": "infer_camera_pose"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Parse a Lighthouse JSON report. Returns category scores (performance/accessibility/seo/pwa), Core Web Vitals (LCP/CLS/TBT/FCP/TTI), top opportunities, and a grade (good/needs_improvement/poor/blocked). CanvasKit-aware perf threshold (default 70). Pure compute \u2014 you run lighthouse, we parse it. See docs/web-app-rubric.md.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "perf_good_threshold": {
+          "description": "Perf score considered 'good'. Default 70 (CanvasKit-aware). Raise for HTML/wasm renderer.",
+          "type": "number"
+        },
+        "report_path": {
+          "description": "Path to a Lighthouse JSON report, or a directory containing one.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "report_path"
+      ],
+      "type": "object"
+    },
+    "name": "ingest_lighthouse_report"
   },
   {
     "annotations": {

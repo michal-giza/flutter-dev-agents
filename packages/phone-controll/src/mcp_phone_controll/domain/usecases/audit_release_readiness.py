@@ -71,7 +71,15 @@ from .audit_test_quality import (
     AuditTestQuality,
     AuditTestQualityParams,
 )
+from .audit_web_app import (
+    AuditWebApp,
+    AuditWebAppParams,
+)
 from .base import BaseUseCase
+from .ingest_lighthouse_report import (
+    IngestLighthouseReport,
+    IngestLighthouseReportParams,
+)
 from .ingest_maestro_report import (
     IngestMaestroReport,
     IngestMaestroReportParams,
@@ -108,11 +116,18 @@ class AuditReleaseReadinessParams:
     include_localization: bool = True
     include_dependencies: bool = True
     include_test_quality: bool = True
+    # Flutter-web audit (web/index.html + manifest). Opt-in —
+    # only runs if the project has a web/ directory anyway, so
+    # safe to leave on; returns not_web_app (excluded) otherwise.
+    include_web_app: bool = True
     # If a Maestro execution report path is provided, the
     # test_execution domain is added to the composite. Pure
     # opt-in — Maestro is not required.
     maestro_report_path: Path | None = None
     maestro_prior_report_path: Path | None = None
+    # If a Lighthouse report path is provided, the web_vitals
+    # domain is added. Pure opt-in.
+    lighthouse_report_path: Path | None = None
     # Whether your app ships to production (passed to
     # audit_dependencies' is_published toggle).
     is_published: bool = True
@@ -126,6 +141,8 @@ class AuditReleaseReadinessParams:
     weight_dependencies: float = 1.5
     weight_test_quality: float = 1.5
     weight_test_execution: float = 1.5
+    weight_web_app: float = 1.0
+    weight_web_vitals: float = 1.0
     # Cap on findings preserved in `top_actions`.
     max_top_actions: int = 10
 
@@ -169,6 +186,13 @@ _TEST_QUALITY_GRADE_SCORES = {
 }
 _TEST_EXECUTION_GRADE_SCORES = {
     "clean": 100, "acceptable": 75, "at_risk": 40, "blocked": 0,
+}
+_WEB_APP_GRADE_SCORES = {
+    "excellent": 100, "acceptable": 80, "needs_polish": 55,
+    "not_production_ready": 20, "not_web_app": 100,  # n/a → neutral-high
+}
+_WEB_VITALS_GRADE_SCORES = {
+    "good": 100, "needs_improvement": 55, "poor": 25, "blocked": 0,
 }
 
 
@@ -287,6 +311,38 @@ class AuditReleaseReadiness(
             ))
             weights["test_execution"] = params.weight_test_execution
 
+        # Flutter web static audit → web_app domain. The use case
+        # returns grade=not_web_app when there's no web/ dir, which
+        # maps to a neutral-high score (excluded from dragging the
+        # composite down on a mobile-only project).
+        if params.include_web_app:
+            domain_tasks.append((
+                "web_app",
+                asyncio.create_task(
+                    AuditWebApp()(
+                        AuditWebAppParams(
+                            project_path=params.project_path,
+                            min_level=params.min_level,
+                        )
+                    )
+                ),
+            ))
+            weights["web_app"] = params.weight_web_app
+
+        # Opt-in: Lighthouse report → web_vitals domain
+        if params.lighthouse_report_path is not None:
+            domain_tasks.append((
+                "web_vitals",
+                asyncio.create_task(
+                    IngestLighthouseReport()(
+                        IngestLighthouseReportParams(
+                            report_path=params.lighthouse_report_path,
+                        )
+                    )
+                ),
+            ))
+            weights["web_vitals"] = params.weight_web_vitals
+
         if not domain_tasks:
             return err(
                 FilesystemFailure(
@@ -404,6 +460,21 @@ def _reduce(
     assert isinstance(audit_res, Ok)
     value = audit_res.value
     grade = getattr(value, "grade", None)
+
+    # web_app on a mobile-only project returns not_web_app — exclude
+    # it from the composite rather than letting a neutral-high score
+    # inflate a mobile project's grade.
+    if domain == "web_app" and grade == "not_web_app":
+        return (
+            DomainResult(
+                domain=domain, ran=False, grade=grade,
+                score=0.0, findings_count=0, blockers_count=0,
+                error="not a web project (no web/ dir) — excluded",
+                advice=getattr(value, "advice", None),
+            ),
+            0, 0, [],
+        )
+
     score = _score_for_domain(domain, grade)
     findings = getattr(value, "findings", ())
     findings_count = len(findings)
@@ -462,6 +533,8 @@ def _score_for_domain(domain: str, grade: str | None) -> float:
         "dependencies": _DEPENDENCIES_GRADE_SCORES,
         "test_quality": _TEST_QUALITY_GRADE_SCORES,
         "test_execution": _TEST_EXECUTION_GRADE_SCORES,
+        "web_app": _WEB_APP_GRADE_SCORES,
+        "web_vitals": _WEB_VITALS_GRADE_SCORES,
     }.get(domain, {})
     return float(table.get(grade, 50))  # unknown grade → 50
 

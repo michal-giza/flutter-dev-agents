@@ -49,6 +49,9 @@ from ...domain.usecases.audit_security import (
 from ...domain.usecases.audit_test_quality import (
     AuditTestQualityParams,
 )
+from ...domain.usecases.audit_web_app import (
+    AuditWebAppParams,
+)
 from ...domain.usecases.build_install import (
     BuildAppParams,
     InstallAppParams,
@@ -103,6 +106,9 @@ from ...domain.usecases.ide import (
     IsIdeAvailableParams,
     OpenProjectInIdeParams,
     WriteVscodeLaunchConfigParams,
+)
+from ...domain.usecases.ingest_lighthouse_report import (
+    IngestLighthouseReportParams,
 )
 from ...domain.usecases.ingest_maestro_report import (
     IngestMaestroReportParams,
@@ -1073,6 +1079,30 @@ def _params_audit_dependencies(args: JsonDict) -> AuditDependenciesParams:
     )
 
 
+# ---- v0.5.0 phase 16 — Lighthouse report ingest ------------------------
+
+
+def _params_ingest_lighthouse_report(
+    args: JsonDict,
+) -> IngestLighthouseReportParams:
+    return IngestLighthouseReportParams(
+        report_path=Path(args["report_path"]).expanduser(),
+        perf_good_threshold=float(args.get("perf_good_threshold", 70.0)),
+    )
+
+
+# ---- v0.5.0 phase 15 — Flutter web production-readiness audit -----------
+
+
+def _params_audit_web_app(args: JsonDict) -> AuditWebAppParams:
+    return AuditWebAppParams(
+        project_path=Path(args["project_path"]).expanduser(),
+        web_dir=args.get("web_dir"),
+        min_level=str(args.get("min_level", "junior")),
+        max_findings=int(args.get("max_findings", 200)),
+    )
+
+
 # ---- v0.4.0 phase 14 — Maestro execution report ingest -----------------
 
 
@@ -1149,6 +1179,7 @@ def _params_audit_release_readiness(
         include_localization=bool(args.get("include_localization", True)),
         include_dependencies=bool(args.get("include_dependencies", True)),
         include_test_quality=bool(args.get("include_test_quality", True)),
+        include_web_app=bool(args.get("include_web_app", True)),
         maestro_report_path=(
             Path(args["maestro_report_path"]).expanduser()
             if args.get("maestro_report_path") else None
@@ -1157,6 +1188,10 @@ def _params_audit_release_readiness(
             Path(args["maestro_prior_report_path"]).expanduser()
             if args.get("maestro_prior_report_path") else None
         ),
+        lighthouse_report_path=(
+            Path(args["lighthouse_report_path"]).expanduser()
+            if args.get("lighthouse_report_path") else None
+        ),
         is_published=bool(args.get("is_published", True)),
         weight_seniority=float(args.get("weight_seniority", 1.0)),
         weight_security=float(args.get("weight_security", 2.0)),
@@ -1164,6 +1199,8 @@ def _params_audit_release_readiness(
         weight_dependencies=float(args.get("weight_dependencies", 1.5)),
         weight_test_quality=float(args.get("weight_test_quality", 1.5)),
         weight_test_execution=float(args.get("weight_test_execution", 1.5)),
+        weight_web_app=float(args.get("weight_web_app", 1.0)),
+        weight_web_vitals=float(args.get("weight_web_vitals", 1.0)),
         max_top_actions=int(args.get("max_top_actions", 10)),
     )
 
