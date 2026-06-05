@@ -154,6 +154,10 @@ def default_annotations(tool_name: str) -> dict[str, bool]:
         "audit_maestro_flow",
         # v0.4.0 phase 14 — parses external JUnit/JSON, no writes
         "ingest_maestro_report",
+        # v0.5.0 phase 15 — read-only web/ scan
+        "audit_web_app",
+        # v0.5.0 phase 16 — parses external Lighthouse JSON, no writes
+        "ingest_lighthouse_report",
     )
     # Destructive tools — touch device state, install/launch/stop apps,
     # write files in arbitrary places, modify project source.

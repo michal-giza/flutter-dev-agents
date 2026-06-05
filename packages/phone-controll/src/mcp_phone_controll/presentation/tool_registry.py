@@ -33,6 +33,7 @@ from ..domain.usecases.audit_maestro_flow import AuditMaestroFlow
 from ..domain.usecases.audit_release_readiness import AuditReleaseReadiness
 from ..domain.usecases.audit_security import AuditSecurity
 from ..domain.usecases.audit_test_quality import AuditTestQuality
+from ..domain.usecases.audit_web_app import AuditWebApp
 from ..domain.usecases.build_install import (
     BuildApp,
     InstallApp,
@@ -95,6 +96,7 @@ from ..domain.usecases.ide import (
     OpenProjectInIde,
     WriteVscodeLaunchConfig,
 )
+from ..domain.usecases.ingest_lighthouse_report import IngestLighthouseReport
 from ..domain.usecases.ingest_maestro_report import IngestMaestroReport
 from ..domain.usecases.inspect_image_safety import (
     InspectImageSafety,
@@ -247,6 +249,7 @@ from .descriptors._param_builders import (
     _params_audit_release_readiness,
     _params_audit_security,
     _params_audit_test_quality,
+    _params_audit_web_app,
     _params_boot_simulator,
     _params_build_app,
     _params_calibrate_camera,
@@ -279,6 +282,7 @@ from .descriptors._param_builders import (
     _params_grep_logs,
     _params_index_project,
     _params_infer_pose,
+    _params_ingest_lighthouse_report,
     _params_ingest_maestro_report,
     _params_inspect_image_safety,
     _params_inspect_project,
@@ -533,6 +537,10 @@ class UseCases:
     audit_maestro_flow: AuditMaestroFlow
     # v0.4.0 phase 14 — Maestro execution report ingest
     ingest_maestro_report: IngestMaestroReport
+    # v0.5.0 phase 15 — Flutter web production-readiness audit
+    audit_web_app: AuditWebApp
+    # v0.5.0 phase 16 — Lighthouse report ingest (web vitals)
+    ingest_lighthouse_report: IngestLighthouseReport
     new_session: NewSession
     get_artifacts_dir: GetArtifactsDir
     fetch_artifact: FetchArtifact
@@ -2856,6 +2864,10 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
                     "include_localization": _bool("Default true."),
                     "include_dependencies": _bool("Default true."),
                     "include_test_quality": _bool("Default true."),
+                    "include_web_app": _bool(
+                        "Default true. Audits web/ if present; "
+                        "auto-excluded on mobile-only projects."
+                    ),
                     "maestro_report_path": _string(
                         "Optional path to a Maestro JUnit XML or "
                         "JSON report. When provided, adds a "
@@ -2864,6 +2876,11 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
                     "maestro_prior_report_path": _string(
                         "Optional prior Maestro report for "
                         "regression detection (passed-then-failed)."
+                    ),
+                    "lighthouse_report_path": _string(
+                        "Optional path to a Lighthouse JSON report. "
+                        "When provided, adds a web_vitals domain "
+                        "to the composite."
                     ),
                     "is_published": _bool(
                         "Passed to audit_dependencies. Default true."
@@ -3062,6 +3079,72 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             invoke=_bind(
                 uc.ingest_maestro_report,
                 _params_ingest_maestro_report,
+            ),
+        ),
+        # ---- v0.5.0 phase 15 — Flutter web production-readiness ----
+        ToolDescriptor(
+            name="audit_web_app",
+            description=(
+                "Flutter web production-readiness audit. Walks "
+                "web/index.html + web/manifest.json + web/_headers. "
+                "12 rules across 4 tiers: html_no_lang_attr, "
+                "no_viewport_meta, placeholder_meta_description, "
+                "no_favicon, no_csp, no_theme_color, "
+                "manifest_missing_pwa_fields, manifest_no_maskable_icon, "
+                "placeholder_app_name, no_seo_meta, no_apple_touch_icon, "
+                "no_loading_indicator. Returns grade (excellent/"
+                "acceptable/needs_polish/not_production_ready/"
+                "not_web_app). Pure compute. See docs/web-app-rubric.md."
+            ),
+            input_schema=_schema(
+                {
+                    "project_path": _string("Flutter project root."),
+                    "web_dir": _string(
+                        "Override the web directory. Default: 'web'."
+                    ),
+                    "min_level": _enum(
+                        ["junior", "mid", "senior", "staff"],
+                        "Minimum tier to flag.",
+                    ),
+                    "max_findings": _number(
+                        "Cap on findings returned. Default 200."
+                    ),
+                },
+                ["project_path"],
+            ),
+            build_params=_params_audit_web_app,
+            invoke=_bind(uc.audit_web_app, _params_audit_web_app),
+        ),
+        # ---- v0.5.0 phase 16 — Lighthouse report ingest ----
+        ToolDescriptor(
+            name="ingest_lighthouse_report",
+            description=(
+                "Parse a Lighthouse JSON report. Returns category "
+                "scores (performance/accessibility/seo/pwa), Core "
+                "Web Vitals (LCP/CLS/TBT/FCP/TTI), top "
+                "opportunities, and a grade (good/needs_improvement/"
+                "poor/blocked). CanvasKit-aware perf threshold "
+                "(default 70). Pure compute — you run lighthouse, "
+                "we parse it. See docs/web-app-rubric.md."
+            ),
+            input_schema=_schema(
+                {
+                    "report_path": _string(
+                        "Path to a Lighthouse JSON report, or a "
+                        "directory containing one."
+                    ),
+                    "perf_good_threshold": _number(
+                        "Perf score considered 'good'. Default 70 "
+                        "(CanvasKit-aware). Raise for HTML/wasm "
+                        "renderer."
+                    ),
+                },
+                ["report_path"],
+            ),
+            build_params=_params_ingest_lighthouse_report,
+            invoke=_bind(
+                uc.ingest_lighthouse_report,
+                _params_ingest_lighthouse_report,
             ),
         ),
         ToolDescriptor(

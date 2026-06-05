@@ -47,6 +47,9 @@ from mcp_phone_controll.domain.usecases.audit_security import (
 from mcp_phone_controll.domain.usecases.audit_test_quality import (
     AuditTestQuality,
 )
+from mcp_phone_controll.domain.usecases.audit_web_app import (
+    AuditWebApp,
+)
 from mcp_phone_controll.domain.usecases.build_install import (
     BuildApp,
     InstallApp,
@@ -105,6 +108,9 @@ from mcp_phone_controll.domain.usecases.ide import (
     ListIdeWindows,
     OpenProjectInIde,
     WriteVscodeLaunchConfig,
+)
+from mcp_phone_controll.domain.usecases.ingest_lighthouse_report import (
+    IngestLighthouseReport,
 )
 from mcp_phone_controll.domain.usecases.ingest_maestro_report import (
     IngestMaestroReport,
@@ -452,6 +458,8 @@ def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:
         audit_test_quality=AuditTestQuality(),
         audit_maestro_flow=AuditMaestroFlow(),
         ingest_maestro_report=IngestMaestroReport(),
+        audit_web_app=AuditWebApp(),
+        ingest_lighthouse_report=IngestLighthouseReport(),
         new_session=NewSession(artifacts),
         get_artifacts_dir=GetArtifactsDir(artifacts),
         fetch_artifact=FetchArtifact(),
@@ -710,5 +718,9 @@ async def test_registry_covers_all_use_case_fields(tmp_path: Path):
         "audit_maestro_flow",
         # v0.4.0 phase 14 (Maestro execution report ingest)
         "ingest_maestro_report",
+        # v0.5.0 phase 15 (Flutter web production-readiness audit)
+        "audit_web_app",
+        # v0.5.0 phase 16 (Lighthouse report ingest)
+        "ingest_lighthouse_report",
     }
     assert names == expected

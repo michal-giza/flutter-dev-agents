@@ -91,6 +91,7 @@ from .domain.usecases.audit_maestro_flow import AuditMaestroFlow
 from .domain.usecases.audit_release_readiness import AuditReleaseReadiness
 from .domain.usecases.audit_security import AuditSecurity
 from .domain.usecases.audit_test_quality import AuditTestQuality
+from .domain.usecases.audit_web_app import AuditWebApp
 from .domain.usecases.build_install import BuildApp, InstallApp, UninstallApp
 from .domain.usecases.code_quality import (
     DartAnalyze,
@@ -144,6 +145,7 @@ from .domain.usecases.ide import (
     OpenProjectInIde,
     WriteVscodeLaunchConfig,
 )
+from .domain.usecases.ingest_lighthouse_report import IngestLighthouseReport
 from .domain.usecases.ingest_maestro_report import IngestMaestroReport
 from .domain.usecases.inspect_image_safety import InspectImageSafety
 from .domain.usecases.lifecycle import (
@@ -683,6 +685,10 @@ def build_runtime(
         audit_maestro_flow=AuditMaestroFlow(),
         # v0.4.0 phase 14 — Maestro execution report ingest
         ingest_maestro_report=IngestMaestroReport(),
+        # v0.5.0 phase 15 — Flutter web production-readiness audit
+        audit_web_app=AuditWebApp(),
+        # v0.5.0 phase 16 — Lighthouse report ingest (web vitals)
+        ingest_lighthouse_report=IngestLighthouseReport(),
         new_session=NewSession(artifacts_repo),
         get_artifacts_dir=GetArtifactsDir(artifacts_repo),
         fetch_artifact=FetchArtifact(),

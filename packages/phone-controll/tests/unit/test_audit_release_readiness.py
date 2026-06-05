@@ -92,6 +92,7 @@ async def test_all_domains_disabled_returns_failure(tmp_path: Path):
         include_localization=False,
         include_dependencies=False,
         include_test_quality=False,
+        include_web_app=False,
     )
     assert isinstance(res, Err)
     assert res.failure.next_action == "fix_arguments"
@@ -120,13 +121,22 @@ async def test_per_domain_breakdown_populated(tmp_path: Path):
     res = await _run(proj)
     assert isinstance(res, Ok)
     domains = {d.domain for d in res.value.domains}
-    assert domains == {
+    # The 5 static domains always run. web_app is included by
+    # default but EXCLUDED (ran=False) on this mobile-only project.
+    assert {
         "seniority", "security", "localization",
         "dependencies", "test_quality",
-    }
-    # All four domains ran successfully
-    assert all(d.ran for d in res.value.domains)
-    assert all(d.grade is not None for d in res.value.domains)
+    } <= domains
+    # The 5 static domains ran successfully with a grade
+    ran_domains = [
+        d for d in res.value.domains
+        if d.domain in {
+            "seniority", "security", "localization",
+            "dependencies", "test_quality",
+        }
+    ]
+    assert all(d.ran for d in ran_domains)
+    assert all(d.grade is not None for d in ran_domains)
 
 
 # ---- verdict transitions -----------------------------------------------
@@ -255,6 +265,7 @@ async def test_single_domain_run(tmp_path: Path):
         include_localization=False,
         include_dependencies=True,  # only deps
         include_test_quality=False,
+        include_web_app=False,
     )
     assert isinstance(res, Ok)
     assert len(res.value.domains) == 1
@@ -279,8 +290,12 @@ async def test_sub_audit_error_does_not_kill_composite(tmp_path: Path):
     )
     assert not deps_domain.ran
     assert deps_domain.error is not None
-    # The other 3 still ran
-    others = [d for d in res.value.domains if d.domain != "dependencies"]
+    # The other static domains still ran. (web_app is excluded —
+    # this fixture has no web/ dir — so don't count it here.)
+    others = [
+        d for d in res.value.domains
+        if d.domain not in ("dependencies", "web_app")
+    ]
     assert all(d.ran for d in others)
 
 
@@ -353,6 +368,131 @@ async def test_test_quality_domain_runs_by_default(tmp_path: Path):
     tq = next(d for d in res.value.domains if d.domain == "test_quality")
     # Empty project has no tests → grade=excellent
     assert tq.grade == "excellent"
+
+
+@pytest.mark.asyncio
+async def test_web_app_domain_excluded_on_mobile_only(tmp_path: Path):
+    """Phase 16.5: a project with no web/ dir gets web_app graded
+    not_web_app, which is EXCLUDED from the composite (ran=False)
+    so it doesn't inflate a mobile-only project's score."""
+    proj = _minimal_clean_project(tmp_path)  # no web/ dir
+    res = await _run(proj)
+    assert isinstance(res, Ok)
+    web = next(
+        (d for d in res.value.domains if d.domain == "web_app"), None
+    )
+    assert web is not None
+    assert web.ran is False
+    assert web.grade == "not_web_app"
+
+
+@pytest.mark.asyncio
+async def test_web_app_domain_runs_when_web_dir_present(tmp_path: Path):
+    """When web/index.html exists, web_app is a scored domain."""
+    proj = _minimal_clean_project(tmp_path)
+    _write(
+        tmp_path / "web" / "index.html",
+        '<!DOCTYPE html><html lang="en"><head>'
+        '<meta name="viewport" content="width=device-width">'
+        '<meta name="description" content="Real desc.">'
+        '<meta name="theme-color" content="#000">'
+        '<meta http-equiv="Content-Security-Policy" content="default-src \'self\'">'
+        '<meta property="og:title" content="X">'
+        '<link rel="apple-touch-icon" href="i.png">'
+        '<link rel="icon" href="favicon.png"></head>'
+        '<body><div id="loading"></div></body></html>',
+    )
+    import json as _json
+    _write(
+        tmp_path / "web" / "manifest.json",
+        _json.dumps({
+            "name": "Real App", "short_name": "RA", "start_url": ".",
+            "display": "standalone",
+            "icons": [{"src": "i.png", "sizes": "192x192",
+                       "type": "image/png", "purpose": "maskable"}],
+        }),
+    )
+    _write(tmp_path / "web" / "favicon.png", "x")
+    res = await _run(proj)
+    assert isinstance(res, Ok)
+    web = next(
+        (d for d in res.value.domains if d.domain == "web_app"), None
+    )
+    assert web is not None
+    assert web.ran is True
+    assert web.grade == "excellent"
+
+
+@pytest.mark.asyncio
+async def test_lighthouse_report_adds_web_vitals_domain(tmp_path: Path):
+    """Phase 16.5: a Lighthouse report path adds the web_vitals
+    domain to the composite."""
+    import json as _json
+    proj = _minimal_clean_project(tmp_path)
+    _write(
+        tmp_path / "lighthouse.json",
+        _json.dumps({
+            "finalUrl": "https://example.com/",
+            "categories": {
+                "performance": {"score": 0.85},
+                "accessibility": {"score": 0.95},
+                "best-practices": {"score": 0.93},
+                "seo": {"score": 0.92},
+            },
+            "audits": {
+                "largest-contentful-paint": {
+                    "numericValue": 2100.0, "score": 0.9,
+                    "displayValue": "2.1 s",
+                },
+                "cumulative-layout-shift": {
+                    "numericValue": 0.05, "score": 0.95,
+                    "displayValue": "0.05",
+                },
+            },
+        }),
+    )
+    res = await _run(
+        proj,
+        lighthouse_report_path=tmp_path / "lighthouse.json",
+    )
+    assert isinstance(res, Ok)
+    wv = next(
+        (d for d in res.value.domains if d.domain == "web_vitals"), None
+    )
+    assert wv is not None
+    assert wv.ran is True
+    assert wv.grade == "good"
+
+
+@pytest.mark.asyncio
+async def test_poor_web_vitals_blocks_composite(tmp_path: Path):
+    """A blocked Lighthouse grade (poor LCP) forces verdict=block."""
+    import json as _json
+    proj = _minimal_clean_project(tmp_path)
+    _write(
+        tmp_path / "lighthouse.json",
+        _json.dumps({
+            "finalUrl": "https://example.com/",
+            "categories": {
+                "performance": {"score": 0.40},
+                "accessibility": {"score": 0.95},
+                "best-practices": {"score": 0.90},
+                "seo": {"score": 0.90},
+            },
+            "audits": {
+                "largest-contentful-paint": {
+                    "numericValue": 5000.0, "score": 0.2,  # 5s — poor
+                    "displayValue": "5.0 s",
+                },
+            },
+        }),
+    )
+    res = await _run(
+        proj,
+        lighthouse_report_path=tmp_path / "lighthouse.json",
+    )
+    assert isinstance(res, Ok)
+    assert res.value.verdict == "block"
 
 
 @pytest.mark.asyncio

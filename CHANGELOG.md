@@ -5,6 +5,71 @@ All notable changes to `flutter-dev-agents` / `mcp-phone-controll`.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] — 2026-06-05
+
+Flutter **web** coverage. The mobile audits never knew about
+the `web/` shell or runtime web vitals — this release closes
+that gap with two pure-compute tools and extends the composite
+to eight domains. Tool count: **137 → 139**.
+
+### Added — `audit_web_app` (static web-shell audit)
+
+Walks `web/index.html`, `web/manifest.json`, and `web/_headers`
+to grade Flutter web production-readiness across **12 rules in
+4 seniority tiers**:
+
+- **Junior** — `html_no_lang_attr`, `no_viewport_meta`,
+  `placeholder_meta_description`, `no_favicon`
+- **Mid** — `no_csp`, `manifest_missing_pwa_fields`,
+  `manifest_no_maskable_icon`, `no_theme_color`
+- **Senior** — `placeholder_app_name`, `no_seo_meta`,
+  `no_apple_touch_icon`
+- **Staff** — `no_loading_indicator`
+
+Grades: `excellent / acceptable / needs_polish /
+not_production_ready / not_web_app`. CSP is detected in either
+a `<meta http-equiv>` tag **or** a `web/_headers` line
+(Cloudflare Pages / Netlify convention).
+
+**Field-tested** against `bike_news_room/frontend/web` →
+exactly **1 finding** (`html_no_lang_attr`) on an otherwise
+exemplary web app. Zero false positives.
+
+### Added — `ingest_lighthouse_report` (runtime web vitals)
+
+Parses a Lighthouse JSON report (you run `lighthouse`, we parse
+it — same posture as `ingest_maestro_report`). Returns category
+scores, Core Web Vitals (LCP/CLS/TBT/FCP/SI/TTI) as typed
+numbers, top opportunities, and a grade
+(`good / needs_improvement / poor / blocked`).
+
+**CanvasKit-aware:** the default `perf_good_threshold` is **70**,
+not Lighthouse's own 90 — a healthy CanvasKit app ships a
+~1.5 MB wasm payload and rarely scores above 80 on performance.
+Pass `perf_good_threshold=90` for the HTML/wasm renderer.
+Grade thresholds follow Google's official Core Web Vitals
+boundaries (LCP 2.5/4.0 s, CLS 0.1/0.25, TBT 200/600 ms);
+accessibility < 50 is a hard release gate.
+
+### Changed — `audit_release_readiness` is now an 8-domain composite
+
+Added two web domains:
+
+- `web_app` — **auto-runs** when `web/` exists; auto-excluded
+  (`ran=False`) on mobile-only projects so it never inflates the
+  weighted score.
+- `web_vitals` — opt-in via `lighthouse_report_path`.
+
+New params: `include_web_app` (default `True`),
+`lighthouse_report_path`, `weight_web_app`, `weight_web_vitals`.
+
+### Docs
+
+- `docs/web-app-rubric.md` — the 12 rules, the CanvasKit
+  threshold rationale, Core Web Vitals boundaries, and the full
+  web release-loop composition story (audit_web_app → build →
+  lighthouse → ingest → composite).
+
 ## [0.4.1] — 2026-06-01
 
 Field-test re-verification release. v0.4.0 was field-tested
