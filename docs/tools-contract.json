@@ -819,38 +819,71 @@
     },
     "name": "check_environment",
     "outputSchema": {
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
-        "checks": {
-          "items": {
-            "additionalProperties": false,
-            "properties": {
-              "detail": {
-                "type": [
-                  "string",
-                  "null"
-                ]
+        "data": {
+          "additionalProperties": true,
+          "properties": {
+            "checks": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "detail": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "fix": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "ok": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "name",
+                  "ok"
+                ],
+                "type": "object"
               },
-              "fix": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "name": {
-                "type": "string"
-              },
-              "ok": {
-                "type": "boolean"
-              }
+              "type": "array"
             },
-            "required": [
-              "name",
-              "ok"
-            ],
-            "type": "object"
+            "ok": {
+              "type": "boolean"
+            }
           },
-          "type": "array"
+          "required": [
+            "ok"
+          ],
+          "type": "object"
+        },
+        "error": {
+          "additionalProperties": true,
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "details": {
+              "type": "object"
+            },
+            "message": {
+              "type": "string"
+            },
+            "next_action": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
         },
         "ok": {
           "type": "boolean"
@@ -1820,60 +1853,93 @@
     },
     "name": "inspect_project",
     "outputSchema": {
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
-        "flavors": {
-          "items": {
-            "type": "string"
+        "data": {
+          "additionalProperties": true,
+          "properties": {
+            "flavors": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "notes": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "package_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "path": {
+              "type": "string"
+            },
+            "test_frameworks": {
+              "items": {
+                "enum": [
+                  "patrol",
+                  "flutter",
+                  "xcuitest",
+                  "espresso",
+                  "detox",
+                  "playwright",
+                  "unknown"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": {
+              "enum": [
+                "flutter",
+                "native_android",
+                "native_ios",
+                "react_native",
+                "web",
+                "unknown"
+              ],
+              "type": "string"
+            }
           },
-          "type": "array"
-        },
-        "notes": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "package_id": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "path": {
-          "type": "string"
-        },
-        "test_frameworks": {
-          "items": {
-            "enum": [
-              "patrol",
-              "flutter",
-              "xcuitest",
-              "espresso",
-              "detox",
-              "playwright",
-              "unknown"
-            ],
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "type": {
-          "enum": [
-            "flutter",
-            "native_android",
-            "native_ios",
-            "react_native",
-            "web",
-            "unknown"
+          "required": [
+            "path",
+            "type",
+            "test_frameworks"
           ],
-          "type": "string"
+          "type": "object"
+        },
+        "error": {
+          "additionalProperties": true,
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "details": {
+              "type": "object"
+            },
+            "message": {
+              "type": "string"
+            },
+            "next_action": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        },
+        "ok": {
+          "type": "boolean"
         }
       },
       "required": [
-        "path",
-        "type",
-        "test_frameworks"
+        "ok"
       ],
       "type": "object"
     }
@@ -2195,57 +2261,90 @@
     },
     "name": "mcp_ping",
     "outputSchema": {
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
-        "git_branch": {
-          "type": "string"
-        },
-        "git_dirty": {
-          "type": "boolean"
-        },
-        "git_sha": {
-          "type": "string"
-        },
-        "image_backends": {
-          "items": {
-            "type": "string"
+        "data": {
+          "additionalProperties": true,
+          "properties": {
+            "git_branch": {
+              "type": "string"
+            },
+            "git_dirty": {
+              "type": "boolean"
+            },
+            "git_sha": {
+              "type": "string"
+            },
+            "image_backends": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "image_cap_px": {
+              "type": "integer"
+            },
+            "n_tools": {
+              "type": "integer"
+            },
+            "package_version": {
+              "type": "string"
+            },
+            "pid": {
+              "type": "integer"
+            },
+            "python_version": {
+              "type": "string"
+            },
+            "started_at": {
+              "type": "string"
+            },
+            "uptime_s": {
+              "type": "number"
+            }
           },
-          "type": "array"
+          "required": [
+            "package_version",
+            "git_sha",
+            "git_branch",
+            "git_dirty",
+            "started_at",
+            "uptime_s",
+            "python_version",
+            "pid",
+            "image_backends",
+            "image_cap_px",
+            "n_tools"
+          ],
+          "type": "object"
         },
-        "image_cap_px": {
-          "type": "integer"
+        "error": {
+          "additionalProperties": true,
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "details": {
+              "type": "object"
+            },
+            "message": {
+              "type": "string"
+            },
+            "next_action": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
         },
-        "n_tools": {
-          "type": "integer"
-        },
-        "package_version": {
-          "type": "string"
-        },
-        "pid": {
-          "type": "integer"
-        },
-        "python_version": {
-          "type": "string"
-        },
-        "started_at": {
-          "type": "string"
-        },
-        "uptime_s": {
-          "type": "number"
+        "ok": {
+          "type": "boolean"
         }
       },
       "required": [
-        "package_version",
-        "git_sha",
-        "git_branch",
-        "git_dirty",
-        "started_at",
-        "uptime_s",
-        "python_version",
-        "pid",
-        "image_backends",
-        "image_cap_px",
-        "n_tools"
+        "ok"
       ],
       "type": "object"
     }
@@ -3317,61 +3416,94 @@
     },
     "name": "session_summary",
     "outputSchema": {
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
-        "entries": {
-          "items": {
-            "additionalProperties": false,
-            "properties": {
-              "args": {
+        "data": {
+          "additionalProperties": true,
+          "properties": {
+            "entries": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "type": "object"
+                  },
+                  "artifact_paths": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "error_code": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "ok": {
+                    "type": "boolean"
+                  },
+                  "sequence": {
+                    "type": "integer"
+                  },
+                  "summary": {
+                    "type": "string"
+                  },
+                  "tool_name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "sequence",
+                  "tool_name",
+                  "args",
+                  "ok",
+                  "error_code",
+                  "summary"
+                ],
                 "type": "object"
               },
-              "artifact_paths": {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              "error_code": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "ok": {
-                "type": "boolean"
-              },
-              "sequence": {
-                "type": "integer"
-              },
-              "summary": {
-                "type": "string"
-              },
-              "tool_name": {
-                "type": "string"
-              }
+              "type": "array"
             },
-            "required": [
-              "sequence",
-              "tool_name",
-              "args",
-              "ok",
-              "error_code",
-              "summary"
-            ],
-            "type": "object"
+            "session_id": {
+              "type": "string"
+            },
+            "started_at": {}
           },
-          "type": "array"
+          "required": [
+            "session_id",
+            "started_at",
+            "entries"
+          ],
+          "type": "object"
         },
-        "session_id": {
-          "type": "string"
+        "error": {
+          "additionalProperties": true,
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "details": {
+              "type": "object"
+            },
+            "message": {
+              "type": "string"
+            },
+            "next_action": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
         },
-        "started_at": {}
+        "ok": {
+          "type": "boolean"
+        }
       },
       "required": [
-        "session_id",
-        "started_at",
-        "entries"
+        "ok"
       ],
       "type": "object"
     }

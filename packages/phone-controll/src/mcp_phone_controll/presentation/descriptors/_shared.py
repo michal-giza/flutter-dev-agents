@@ -418,3 +418,52 @@ def dataclass_to_json_schema(cls: type) -> JsonDict:
         "required": required,
         "additionalProperties": False,
     }
+
+
+def envelope_output_schema(data_cls: type) -> JsonDict:
+    """Wrap a Result-payload dataclass schema in the dispatcher envelope.
+
+    THE BUG THIS FIXES (2026-06-06): tools never return a bare dataclass —
+    they return the universal envelope ``{"ok": bool, "data"?: ...,
+    "error"?: {...}}``. The MCP 2025-06-18 host (mcp SDK >= ~1.9)
+    validates ``structuredContent`` against the advertised ``outputSchema``
+    and, crucially, *errors* if a tool declares an ``outputSchema`` but
+    returns no structured content. Our ``structuredContent`` IS the
+    envelope, so the schema must describe the **envelope**, not the bare
+    payload. Advertising ``dataclass_to_json_schema(X)`` directly made the
+    SDK reject ``check_environment`` / ``mcp_ping`` / ``session_summary`` /
+    ``inspect_project`` with "outputSchema defined but no structured
+    output returned" once a host upgraded to a strict SDK.
+
+    Design choices that keep validation from *false*-failing:
+      - only ``ok`` is required — the error branch carries no ``data``.
+      - ``additionalProperties: true`` at the top level and on ``data`` so
+        post-dispatch middleware that enriches the envelope (trace,
+        seatbelt) can't trip strict validation.
+      - ``data`` still carries the dataclass property types, so a host
+        that wants to introspect the success payload still can.
+    """
+    data_schema = dataclass_to_json_schema(data_cls)
+    # Relax the payload's own strictness — middleware may add fields, and
+    # the schema is advisory (our envelope already validates at runtime).
+    if isinstance(data_schema, dict) and data_schema.get("type") == "object":
+        data_schema = {**data_schema, "additionalProperties": True}
+    return {
+        "type": "object",
+        "properties": {
+            "ok": {"type": "boolean"},
+            "data": data_schema,
+            "error": {
+                "type": "object",
+                "properties": {
+                    "code": {"type": "string"},
+                    "message": {"type": "string"},
+                    "next_action": {"type": ["string", "null"]},
+                    "details": {"type": "object"},
+                },
+                "additionalProperties": True,
+            },
+        },
+        "required": ["ok"],
+        "additionalProperties": True,
+    }
