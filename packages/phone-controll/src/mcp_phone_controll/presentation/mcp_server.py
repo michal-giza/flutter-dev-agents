@@ -53,6 +53,26 @@ async def serve_stdio(dispatcher: ToolDispatcher, server_name: str = "phone-cont
     from mcp.server.stdio import stdio_server  # type: ignore[import-not-found]
     from mcp.types import TextContent, Tool  # type: ignore[import-not-found]
 
+    # MCP 2025-06-18 structured output capability probe. Strict SDKs
+    # (mcp >= ~1.9) REQUIRE a tool that advertises `outputSchema` to also
+    # return `structuredContent`, erroring otherwise ("outputSchema defined
+    # but no structured output returned"). They consume a 2-tuple
+    # `(content, structuredContent)` from the call handler. Older SDKs
+    # (our >=1.2.0 floor) don't have `CallToolResult.structuredContent`,
+    # can't parse the tuple, AND strip `outputSchema` in `_list_tools`
+    # below — so for them we return content only. Probe the *imported*
+    # types module (which tests monkeypatch) rather than assuming.
+    try:
+        from mcp.types import (  # type: ignore[import-not-found]
+            CallToolResult as _CallToolResult,
+        )
+
+        _structured_output_supported = "structuredContent" in getattr(
+            _CallToolResult, "model_fields", {}
+        )
+    except ImportError:
+        _structured_output_supported = False
+
     server: Any = Server(server_name)
 
     from .descriptors._shared import default_annotations
@@ -106,9 +126,17 @@ async def serve_stdio(dispatcher: ToolDispatcher, server_name: str = "phone-cont
         return out
 
     @server.call_tool()
-    async def _call_tool(name: str, arguments: dict[str, Any] | None) -> list[TextContent]:
+    async def _call_tool(name: str, arguments: dict[str, Any] | None) -> Any:
         envelope = await dispatcher.dispatch(name, arguments)
-        return [TextContent(type="text", text=json.dumps(envelope, ensure_ascii=False))]
+        content = [TextContent(type="text", text=json.dumps(envelope, ensure_ascii=False))]
+        # On a strict SDK, return BOTH unstructured (the JSON text every
+        # existing agent decodes) AND structured (the envelope as a dict).
+        # The envelope is what every `outputSchema` we advertise describes
+        # (see envelope_output_schema), so the SDK's structuredContent
+        # validation passes; tools without an outputSchema pass it through.
+        if _structured_output_supported:
+            return content, envelope
+        return content
 
     async with stdio_server() as (read_stream, write_stream):
         await server.run(

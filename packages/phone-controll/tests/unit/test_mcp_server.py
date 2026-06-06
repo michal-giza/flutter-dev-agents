@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import sys
 import types
-from typing import Any
+from typing import Any, ClassVar
 
 import pytest
 
@@ -70,10 +70,22 @@ class _FakeTextContent:
         self.text = text
 
 
-def _install_fake_mcp_sdk(monkeypatch, fake_server: _FakeServer):
+class _FakeCallToolResult:
+    """Stand-in for a strict-SDK `mcp.types.CallToolResult`. Its presence
+    plus a `structuredContent` model field is how `serve_stdio` probes
+    whether the SDK supports MCP 2025-06-18 structured output."""
+
+    model_fields: ClassVar[dict] = {"structuredContent": object(), "content": object()}
+
+
+def _install_fake_mcp_sdk(monkeypatch, fake_server: _FakeServer, *, structured: bool = False):
     """Inject a fake `mcp.server` + `mcp.server.stdio` + `mcp.types`
     module hierarchy so `serve_stdio`'s local imports resolve to our
-    fakes instead of the real SDK."""
+    fakes instead of the real SDK.
+
+    `structured=True` adds a `CallToolResult` with a `structuredContent`
+    model field, simulating a strict SDK (mcp >= ~1.9) so the call
+    handler returns the `(content, envelope)` 2-tuple."""
     fake_server_mod = types.ModuleType("mcp.server")
     fake_server_mod.Server = lambda name: fake_server  # type: ignore[attr-defined]
 
@@ -90,6 +102,8 @@ def _install_fake_mcp_sdk(monkeypatch, fake_server: _FakeServer):
     fake_types_mod = types.ModuleType("mcp.types")
     fake_types_mod.Tool = _FakeTool  # type: ignore[attr-defined]
     fake_types_mod.TextContent = _FakeTextContent  # type: ignore[attr-defined]
+    if structured:
+        fake_types_mod.CallToolResult = _FakeCallToolResult  # type: ignore[attr-defined]
 
     fake_root = types.ModuleType("mcp")
 
@@ -213,3 +227,46 @@ async def test_call_tool_with_none_arguments_is_handled(monkeypatch):
     result = await fake_server._call_handler("ping_tool", None)
     envelope = json.loads(result[0].text)
     assert envelope == {"ok": True, "data": {"echo": "hello"}}
+
+
+@pytest.mark.asyncio
+async def test_call_tool_returns_structured_content_on_strict_sdk(monkeypatch):
+    """REGRESSION (2026-06-06): on a strict MCP SDK (>= ~1.9), a tool that
+    advertises `outputSchema` MUST also return `structuredContent` or the
+    SDK rejects the call with "outputSchema defined but no structured
+    output returned". The handler must therefore return a
+    `(content, structuredContent)` 2-tuple where the structured payload IS
+    the envelope. This broke `check_environment` / `mcp_ping` for users
+    after an SDK upgrade."""
+    import json
+
+    fake_server = _FakeServer("phone-controll")
+    _install_fake_mcp_sdk(monkeypatch, fake_server, structured=True)
+    dispatcher = _two_tool_dispatcher()
+    await serve_stdio(dispatcher)
+
+    result = await fake_server._call_handler("ping_tool", {})
+
+    # Strict path → 2-tuple: (content list, structured envelope dict).
+    assert isinstance(result, tuple)
+    assert len(result) == 2
+    content, structured = result
+    assert content[0].type == "text"
+    # The unstructured text and the structured dict are the SAME envelope.
+    assert json.loads(content[0].text) == structured
+    assert structured == {"ok": True, "data": {"echo": "hello"}}
+
+
+@pytest.mark.asyncio
+async def test_call_tool_stays_content_only_on_legacy_sdk(monkeypatch):
+    """The flip side: an SDK without `CallToolResult.structuredContent`
+    (our >=1.2.0 floor) can't consume the 2-tuple, so the handler must
+    fall back to content-only. Guards against breaking older hosts."""
+    fake_server = _FakeServer("phone-controll")
+    _install_fake_mcp_sdk(monkeypatch, fake_server, structured=False)
+    dispatcher = _two_tool_dispatcher()
+    await serve_stdio(dispatcher)
+
+    result = await fake_server._call_handler("ping_tool", {})
+    assert isinstance(result, list)
+    assert result[0].type == "text"

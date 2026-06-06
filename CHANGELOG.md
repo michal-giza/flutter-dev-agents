@@ -5,6 +5,57 @@ All notable changes to `flutter-dev-agents` / `mcp-phone-controll`.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] — 2026-06-06
+
+Bug fix — **strict MCP SDK structured-output rejection**. Tools that
+advertise an `outputSchema` (`mcp_ping`, `check_environment`,
+`session_summary`, `inspect_project`) failed on clients running a
+strict MCP SDK (mcp ≥ ~1.9) with:
+
+> Output validation error: outputSchema defined but no structured
+> output returned
+
+`list_devices` and other schema-less tools kept working — which is
+exactly how the regression presented (reported in the field after a
+client/SDK upgrade).
+
+### Root cause
+
+Two latent mismatches, both triggered the moment a host enforced
+MCP 2025-06-18 output validation:
+
+1. **`_call_tool` never returned `structuredContent`.** It returned
+   only unstructured `TextContent`. A strict SDK *requires* a tool
+   that declares `outputSchema` to also return structured content.
+2. **The advertised schema described the bare dataclass, not the
+   envelope.** Every tool returns `{"ok": bool, "data"?: ...,
+   "error"?: {...}}`, but the schema was `dataclass_to_json_schema(X)`
+   — which has `additionalProperties: false` + dataclass `required`,
+   so the envelope could never validate against it even once
+   structured content *was* returned.
+
+### Fix
+
+- `_call_tool` now returns `(content, structuredContent)` where
+  `structuredContent` **is** the dispatcher envelope — gated on an
+  SDK capability probe (`CallToolResult.structuredContent`), so older
+  SDKs (our `mcp>=1.2.0` floor) still get content-only and don't choke
+  on the 2-tuple.
+- New `envelope_output_schema(data_cls)` wraps the payload schema in
+  the `{ok, data, error}` envelope. `additionalProperties` stays open
+  and only `ok` is required, so the **error** branch (no `data`) and
+  middleware-enriched envelopes never false-fail validation.
+
+### Tests
+
+- `test_output_schema_envelope.py` (8 new) — the wrapped schema
+  validates both success and error envelopes; tripwire that every
+  live `outputSchema` is envelope-wrapped, not a bare dataclass.
+- `test_mcp_server.py` (+2) — strict-SDK path returns the 2-tuple;
+  legacy-SDK path stays content-only.
+- Contract snapshot refreshed for the 4 rewrapped schemas.
+- Full suite: **957 passed, 33 skipped.** ruff clean.
+
 ## [0.5.0] — 2026-06-05
 
 Flutter **web** coverage. The mobile audits never knew about

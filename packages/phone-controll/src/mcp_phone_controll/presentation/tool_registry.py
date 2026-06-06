@@ -373,7 +373,7 @@ from .descriptors._shared import (
     _params_no,
     _schema,
     _string,
-    dataclass_to_json_schema,
+    envelope_output_schema,
 )
 from .serialization import to_jsonable
 
@@ -568,7 +568,7 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             input_schema=_schema({}),
             build_params=_params_no,
             invoke=_bind(uc.check_environment, _params_no),
-            output_schema=dataclass_to_json_schema(EnvironmentReport),
+            output_schema=envelope_output_schema(EnvironmentReport),
         ),
         ToolDescriptor(
             name="describe_capabilities",
@@ -609,11 +609,13 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             input_schema=_schema({}),
             build_params=_params_no,
             invoke=_bind(uc.mcp_ping, _params_no),
-            # MCP 2025-06-18 outputSchema. See dataclass_to_json_schema()
-            # in descriptors/_shared.py. Tier 0 rollout: BASIC tools that
-            # return structured dataclasses (list/Path/None returns get
-            # trivial schemas, so we skip them).
-            output_schema=dataclass_to_json_schema(McpPingResult),
+            # MCP 2025-06-18 outputSchema. envelope_output_schema() wraps
+            # the dataclass in the {ok, data, error} envelope the dispatcher
+            # actually returns — a strict SDK validates structuredContent
+            # (= the envelope) against this. See descriptors/_shared.py.
+            # Tier 0 rollout: BASIC tools that return structured dataclasses
+            # (list/Path/None returns get trivial schemas, so we skip them).
+            output_schema=envelope_output_schema(McpPingResult),
         ),
         ToolDescriptor(
             name="set_agent_profile",
@@ -737,7 +739,7 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             input_schema=_schema({"session_id": _string("Defaults to current.")}),
             build_params=_params_session_summary,
             invoke=_bind(uc.session_summary, _params_session_summary),
-            output_schema=dataclass_to_json_schema(SessionTrace),
+            output_schema=envelope_output_schema(SessionTrace),
         ),
         ToolDescriptor(
             name="tool_usage_report",
@@ -817,7 +819,7 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             ),
             build_params=_params_inspect_project,
             invoke=_bind(uc.inspect_project, _params_inspect_project),
-            output_schema=dataclass_to_json_schema(ProjectInfo),
+            output_schema=envelope_output_schema(ProjectInfo),
         ),
         ToolDescriptor(
             name="list_devices",
