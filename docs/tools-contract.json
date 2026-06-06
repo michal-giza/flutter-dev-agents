@@ -3244,10 +3244,19 @@
       "openWorldHint": true,
       "readOnlyHint": false
     },
-    "description": "Run `flutter test` (unit / widget tests, no device).",
+    "description": "Run `flutter test` (unit / widget tests, no device). platform='auto' (default) runs on the VM and auto-retries on Chrome if the app imports a web-only library (dart:html); force with platform='chrome' for Flutter web apps or 'vm'.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
+        "platform": {
+          "description": "Test platform. 'auto' (default): VM, then retry on Chrome if a web-only library (dart:html) blocks the VM run. 'chrome': force `--platform chrome` (Flutter web). 'vm': force the default VM, no retry.",
+          "enum": [
+            "auto",
+            "vm",
+            "chrome"
+          ],
+          "type": "string"
+        },
         "project_path": {
           "description": "",
           "type": "string"
@@ -3281,6 +3290,15 @@
         "plain_name": {
           "description": "If true, name_pattern is a literal substring (--plain-name) instead of a regex.",
           "type": "boolean"
+        },
+        "platform": {
+          "description": "Test platform. 'auto' (default): VM, then retry on Chrome if a web-only library (dart:html) blocks the VM run. 'chrome': force Flutter web. 'vm': force VM.",
+          "enum": [
+            "auto",
+            "vm",
+            "chrome"
+          ],
+          "type": "string"
         },
         "project_path": {
           "description": "Flutter project root.",

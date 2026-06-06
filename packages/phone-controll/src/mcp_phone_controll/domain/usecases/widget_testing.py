@@ -74,6 +74,10 @@ class RunWidgetTestParams:
     tags: str | None = None             # e.g. "golden" or "smoke"
     coverage: bool = False
     update_goldens: bool = False
+    # "auto" (default) runs on the VM, then retries on `--platform chrome`
+    # if a web-only library (dart:html, …) isn't available on the VM.
+    # "vm" / "chrome" force the platform.
+    platform: str = "auto"
 
 
 class RunWidgetTest(BaseUseCase[RunWidgetTestParams, TestRun]):
@@ -96,31 +100,54 @@ class RunWidgetTest(BaseUseCase[RunWidgetTestParams, TestRun]):
 
     async def execute(self, params: RunWidgetTestParams) -> Result[TestRun]:
         from ...data.parsers.flutter_test_reporter_parser import (
+            looks_like_web_platform_error,
             parse_flutter_json_reporter,
         )
 
-        result = await self._cli.test_widget(
-            project_path=params.project_path,
-            test_path=params.test_path,
-            name_pattern=params.name_pattern,
-            tags=params.tags,
-            plain_name=params.plain_name,
-            coverage=params.coverage,
-            update_goldens=params.update_goldens,
-        )
+        async def _run(cli_platform: str | None):
+            return await self._cli.test_widget(
+                project_path=params.project_path,
+                test_path=params.test_path,
+                name_pattern=params.name_pattern,
+                tags=params.tags,
+                plain_name=params.plain_name,
+                coverage=params.coverage,
+                update_goldens=params.update_goldens,
+                platform=cli_platform,
+            )
+
+        # platform: "auto" | "vm" | "chrome" — mirrors run_unit_tests.
+        if params.platform == "chrome":
+            result = await _run("chrome")
+        elif params.platform == "vm":
+            result = await _run(None)
+        else:  # auto: VM first, retry on chrome if web-only-lib error
+            result = await _run(None)
+            if looks_like_web_platform_error(result.stdout, result.stderr):
+                result = await _run("chrome")
+
         run = parse_flutter_json_reporter(result.stdout)
         if not result.ok and run.total == 0:
+            details: dict = {
+                "platform": params.platform,
+                "stderr_tail": (result.stderr or "")[-2000:],
+                "filter_used": {
+                    "test_path": params.test_path,
+                    "name_pattern": params.name_pattern,
+                    "tags": params.tags,
+                },
+            }
+            if looks_like_web_platform_error(result.stdout, result.stderr):
+                # Only reachable with an explicit wrong platform — auto retries.
+                details["hint"] = (
+                    "A web-only Dart library (e.g. dart:html) isn't available "
+                    "on this test platform. Re-run with platform='chrome' (or "
+                    "platform='auto')."
+                )
             return err(
                 TestExecutionFailure(
                     message="flutter test did not produce results",
-                    details={
-                        "stderr_tail": (result.stderr or "")[-2000:],
-                        "filter_used": {
-                            "test_path": params.test_path,
-                            "name_pattern": params.name_pattern,
-                            "tags": params.tags,
-                        },
-                    },
+                    details=details,
                 )
             )
         return ok(run)

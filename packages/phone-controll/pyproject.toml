@@ -1,6 +1,6 @@
 [project]
 name = "mcp-phone-controll"
-version = "0.5.1"
+version = "0.5.2"
 description = "MCP server for building, deploying and testing Flutter apps on real Android + iOS devices"
 readme = "README.md"
 requires-python = ">=3.11"

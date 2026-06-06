@@ -15,6 +15,10 @@ from .base import BaseUseCase
 @dataclass(frozen=True, slots=True)
 class RunUnitTestsParams:
     project_path: Path
+    # "auto" (default) runs on the VM, then transparently retries on
+    # `--platform chrome` if the run hits a web-only-library error
+    # (Flutter web apps importing dart:html). "vm" / "chrome" force it.
+    platform: str = "auto"
 
 
 class RunUnitTests(BaseUseCase[RunUnitTestsParams, TestRun]):
@@ -22,7 +26,9 @@ class RunUnitTests(BaseUseCase[RunUnitTestsParams, TestRun]):
         self._tests = tests
 
     async def execute(self, params: RunUnitTestsParams) -> Result[TestRun]:
-        return await self._tests.run_unit_tests(params.project_path)
+        return await self._tests.run_unit_tests(
+            params.project_path, platform=params.platform
+        )
 
 
 @dataclass(frozen=True, slots=True)

@@ -88,13 +88,18 @@ class FlutterCli:
         return await self._runner.run(argv, cwd=project_path, timeout_s=timeout_s)
 
     async def test_unit(
-        self, project_path: Path, timeout_s: float = 600.0
+        self,
+        project_path: Path,
+        platform: str | None = None,
+        timeout_s: float = 600.0,
     ) -> ProcessResult:
-        return await self._runner.run(
-            [self._flutter, "test", "--reporter=json"],
-            cwd=project_path,
-            timeout_s=timeout_s,
-        )
+        # `platform` maps to `flutter test --platform <X>` (e.g. "chrome"
+        # for Flutter web apps whose code imports dart:html, "vm" for the
+        # default). None → omit the flag (Flutter's own default = VM).
+        argv = [self._flutter, "test", "--reporter=json"]
+        if platform:
+            argv += ["--platform", platform]
+        return await self._runner.run(argv, cwd=project_path, timeout_s=timeout_s)
 
     async def test_integration(
         self,
@@ -125,6 +130,7 @@ class FlutterCli:
         plain_name: bool = False,
         coverage: bool = False,
         update_goldens: bool = False,
+        platform: str | None = None,
         timeout_s: float = 600.0,
     ) -> ProcessResult:
         """`flutter test` with the targeting flags widget testing needs.
@@ -148,11 +154,17 @@ class FlutterCli:
           mismatches REGENERATE the saved images instead of
           failing. Use deliberately — running this against a
           regressed UI silently wipes the regression detection.
+        - `platform` — maps to `--platform` (e.g. "chrome"). Flutter
+          web apps whose widgets pull in `dart:html` won't compile on
+          the default VM platform; "chrome" runs them in a headless
+          browser. None omits the flag (VM default).
 
         All flags compose. `--reporter=json` stays on so the
         existing parser still works.
         """
         argv = [self._flutter, "test", "--reporter=json"]
+        if platform:
+            argv += ["--platform", platform]
         if coverage:
             argv.append("--coverage")
         if update_goldens:

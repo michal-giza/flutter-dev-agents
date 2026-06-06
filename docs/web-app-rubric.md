@@ -148,6 +148,31 @@ app), compose with:
 We don't ship a browser driver — that's the layer the others own.
 See `docs/the-stack.md`.
 
+## Running tests for a web app
+
+Flutter web apps whose code imports `dart:html` (directly or
+transitively — which is most of them) **won't compile on the default
+VM test platform**. `flutter test` errors with:
+
+```
+Error: Dart library 'dart:html' is not available on this platform.
+```
+
+`run_unit_tests` and `run_widget_test` handle this (v0.5.2):
+
+```python
+run_unit_tests(project_path="...")                    # platform="auto"
+```
+
+- **`platform="auto"` (default)** — runs on the VM, then transparently
+  retries on `--platform chrome` if it hits the web-only-library marker.
+  So a web app "just works" without you flagging it.
+- **`platform="chrome"`** — force Flutter web (skips the VM probe).
+- **`platform="vm"`** — force the default VM, no retry.
+
+This mirrors the convention web repos already use
+(`flutter test --platform chrome`).
+
 ## What this is NOT
 
 - **Not a Lighthouse runner.** You (or CI) run `lighthouse`; we

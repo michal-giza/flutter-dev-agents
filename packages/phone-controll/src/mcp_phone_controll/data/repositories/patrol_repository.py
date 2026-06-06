@@ -74,10 +74,15 @@ class PatrolTestRepository(PatrolRepository, TestRepository):
 
     # ----- TestRepository surface (drop-in replacement for FlutterTestRepository) ----
 
-    async def run_unit_tests(self, project_path: Path) -> Result[TestRun]:
+    async def run_unit_tests(
+        self, project_path: Path, platform: str = "auto"
+    ) -> Result[TestRun]:
         # Patrol orchestrates integration tests; unit tests are still plain `flutter test`.
         # We expose this here so use cases that take a TestRepository can still call it,
         # delegating via the patrol CLI's underlying flutter (it accepts non-integration paths).
+        # `platform` is accepted for protocol compatibility but not applied — Patrol drives
+        # its own runner; the FlutterTestRepository path is where --platform chrome lands.
+        del platform
         return await self._run(
             project_path, target=Path("test"), device_serial=None, flavor=None,
             build_mode=BuildMode.DEBUG,

@@ -1234,8 +1234,25 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
         ),
         ToolDescriptor(
             name="run_unit_tests",
-            description="Run `flutter test` (unit / widget tests, no device).",
-            input_schema=_schema({"project_path": _string("")}, ["project_path"]),
+            description=(
+                "Run `flutter test` (unit / widget tests, no device). "
+                "platform='auto' (default) runs on the VM and auto-retries "
+                "on Chrome if the app imports a web-only library (dart:html); "
+                "force with platform='chrome' for Flutter web apps or 'vm'."
+            ),
+            input_schema=_schema(
+                {
+                    "project_path": _string(""),
+                    "platform": _enum(
+                        ["auto", "vm", "chrome"],
+                        "Test platform. 'auto' (default): VM, then retry on "
+                        "Chrome if a web-only library (dart:html) blocks the "
+                        "VM run. 'chrome': force `--platform chrome` (Flutter "
+                        "web). 'vm': force the default VM, no retry.",
+                    ),
+                },
+                ["project_path"],
+            ),
             build_params=_params_run_unit,
             invoke=_bind(uc.run_unit_tests, _params_run_unit),
         ),
@@ -2346,6 +2363,12 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
                         "DANGEROUS — overwrites golden images on "
                         "mismatch. Use update_goldens tool instead "
                         "for clarity."
+                    ),
+                    "platform": _enum(
+                        ["auto", "vm", "chrome"],
+                        "Test platform. 'auto' (default): VM, then retry on "
+                        "Chrome if a web-only library (dart:html) blocks the "
+                        "VM run. 'chrome': force Flutter web. 'vm': force VM.",
                     ),
                 },
                 ["project_path"],

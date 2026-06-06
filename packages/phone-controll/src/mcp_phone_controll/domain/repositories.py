@@ -127,7 +127,13 @@ class ObservationRepository(Protocol):
 
 @runtime_checkable
 class TestRepository(Protocol):
-    async def run_unit_tests(self, project_path: Path) -> Result[TestRun]: ...
+    async def run_unit_tests(
+        self, project_path: Path, platform: str = "auto"
+    ) -> Result[TestRun]:
+        """Run `flutter test`. `platform` is "auto" (VM first, then retry on
+        `--platform chrome` if the run hits a web-only-library error),
+        "vm", or "chrome"."""
+        ...
     async def run_integration_tests(
         self,
         project_path: Path,
