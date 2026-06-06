@@ -165,6 +165,7 @@ from ...domain.usecases.recommend_test_path import (
     RecommendTestPathParams,
 )
 from ...domain.usecases.release_screenshot import CaptureReleaseScreenshotParams
+from ...domain.usecases.run_lighthouse import RunLighthouseParams
 from ...domain.usecases.set_agent_profile import SetAgentProfileParams
 from ...domain.usecases.skill_library import (
     PromoteSequenceParams,
@@ -1092,6 +1093,19 @@ def _params_ingest_lighthouse_report(
     return IngestLighthouseReportParams(
         report_path=Path(args["report_path"]).expanduser(),
         perf_good_threshold=float(args.get("perf_good_threshold", 70.0)),
+    )
+
+
+def _params_run_lighthouse(args: JsonDict) -> RunLighthouseParams:
+    cats = args.get("categories")
+    output = args.get("output_path")
+    return RunLighthouseParams(
+        url=str(args["url"]),
+        output_path=Path(output).expanduser() if output else None,
+        categories=tuple(cats) if isinstance(cats, list) and cats else None,
+        preset=args.get("preset"),
+        perf_good_threshold=float(args.get("perf_good_threshold", 70.0)),
+        timeout_s=float(args.get("timeout_s", 180.0)),
     )
 
 

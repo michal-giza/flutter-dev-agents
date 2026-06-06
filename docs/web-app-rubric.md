@@ -71,9 +71,28 @@ CSP can live in two places — we check both:
 2. A `Content-Security-Policy:` line in `web/_headers`
    (Cloudflare Pages / Netlify convention)
 
-## `ingest_lighthouse_report` — web vitals
+## `run_lighthouse` — run + parse in one call (v0.6.0)
 
-You generate the report:
+If you have the `lighthouse` CLI (or `npx`) + Chrome on the host, let
+the MCP run it for you:
+
+```python
+run_lighthouse(url="http://localhost:8080")            # mobile preset
+run_lighthouse(url="http://localhost:8080", preset="desktop")
+```
+
+It shells out to Lighthouse headless, saves the JSON (path returned for
+re-ingest/diff), and returns the **same parsed result** as
+`ingest_lighthouse_report` — category scores, Core Web Vitals, top
+opportunities, CanvasKit-aware grade. If the CLI is missing it returns a
+clean install hint (`npm install -g lighthouse`).
+
+This is the *runner*; `ingest_lighthouse_report` is the *parser* — use
+the parser directly when CI already produced the JSON.
+
+## `ingest_lighthouse_report` — parse an existing report
+
+You (or CI) generate the report:
 
 ```bash
 lighthouse https://your-app.pages.dev \
@@ -127,9 +146,9 @@ Lighthouse + (optionally) Chrome MCP / Maestro:
        ↓ (fix CSP, SEO, lang, manifest)
 2. flutter build web              ← (Google's dart_mcp or shell)
        ↓
-3. lighthouse <url> --output=json ← you run it (or CI does)
-       ↓
-4. ingest_lighthouse_report       ← parse vitals
+3. run_lighthouse url=<url>        ← we run lighthouse + parse (v0.6.0)
+   (or: lighthouse <url> --output=json  +  ingest_lighthouse_report)
+       ↓                              if CI already produced the JSON
        ↓
 5. audit_release_readiness        ← composite, now 8 domains:
    project_path=...                  seniority/security/l10n/deps/

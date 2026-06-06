@@ -3107,6 +3107,54 @@
   },
   {
     "annotations": {
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Run Lighthouse against a URL (e.g. http://localhost:8080) and parse it in one call: category scores, Core Web Vitals (LCP/CLS/TBT), top opportunities, CanvasKit-aware grade. Needs the lighthouse CLI (or npx) + Chrome. The runner companion to ingest_lighthouse_report; saves the JSON for re-ingest. See docs/web-app-rubric.md.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "categories": {
+          "description": "Restrict to categories, e.g. ['performance','accessibility']. Omit for all.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "output_path": {
+          "description": "Where to save the JSON report. Omit for a temp file (the path is returned for re-ingest).",
+          "type": "string"
+        },
+        "perf_good_threshold": {
+          "description": "Perf score considered 'good'. Default 70 (CanvasKit-aware).",
+          "type": "number"
+        },
+        "preset": {
+          "description": "Lighthouse preset. Default is mobile/throttled; use 'desktop' for a desktop Flutter web build.",
+          "enum": [
+            "mobile",
+            "desktop"
+          ],
+          "type": "string"
+        },
+        "timeout_s": {
+          "description": "Max seconds for the Lighthouse run. Default 180.",
+          "type": "number"
+        },
+        "url": {
+          "description": "URL to audit, e.g. http://localhost:8080 (serve a `flutter build web` first).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "type": "object"
+    },
+    "name": "run_lighthouse"
+  },
+  {
+    "annotations": {
       "destructiveHint": true,
       "openWorldHint": true,
       "readOnlyHint": false

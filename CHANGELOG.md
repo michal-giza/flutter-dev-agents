@@ -5,6 +5,55 @@ All notable changes to `flutter-dev-agents` / `mcp-phone-controll`.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] — 2026-06-06
+
+Field report (web capabilities): "MCP has `ingest_lighthouse_report`
+but doesn't *run* Lighthouse — a runner is missing." Fixed. Tool
+count: **139 → 140**.
+
+### Added — `run_lighthouse`
+
+Runs the Lighthouse CLI headless against a URL (e.g.
+`http://localhost:8080` serving a `flutter build web`) and parses it
+in **one call** — category scores, Core Web Vitals (LCP/CLS/TBT), top
+opportunities, and the CanvasKit-aware grade. The saved JSON path is
+returned so you can re-ingest / diff later.
+
+```python
+run_lighthouse(url="http://localhost:8080")              # mobile preset
+run_lighthouse(url="http://localhost:8080", preset="desktop")
+run_lighthouse(url="...", categories=["performance", "accessibility"])
+```
+
+- **Composition, not reinvention.** We run the official Lighthouse CLI
+  (resolved as `lighthouse` on PATH, else `npx --yes lighthouse`) — the
+  same orchestrate-the-toolchain posture as running `flutter` / `adb` /
+  `patrol`. Parsing + grading is **100% reused** from
+  `ingest_lighthouse_report` (shared `IngestLighthouseReport`).
+- **Clean install hint** when the CLI / Chrome is absent
+  (`next_action: install_lighthouse`) — same posture as
+  `check_environment` for adb/flutter.
+- `run_lighthouse` = runner; `ingest_lighthouse_report` = parser (use
+  the parser directly when CI already produced the JSON).
+
+### Not in scope (deliberately)
+
+- **Browser driving** (click/scroll/login before measuring) stays with
+  the official **Chrome MCP** — we don't ship a browser driver. See
+  `docs/the-stack.md`.
+- **Live VM-Service profiling for web** (`flutter run -d chrome` →
+  `start_debug_session` / `attach_debug_session`) is the next web
+  lever; it reuses the existing daemon machinery but needs live
+  verification on a real Flutter+Chrome host before shipping.
+
+### Tests
+
+- `test_run_lighthouse.py` (11 new) — run+parse happy path, option
+  pass-through, CLI-not-found / no-report / empty-url failures, and
+  `LighthouseCli` argv building + `lighthouse`/`npx` resolution.
+- Contract snapshot refreshed (run_lighthouse registered).
+- Full suite: **975 passed, 33 skipped.** ruff clean.
+
 ## [0.5.2] — 2026-06-06
 
 Bug fix — **test runners couldn't test Flutter web apps**. Field
