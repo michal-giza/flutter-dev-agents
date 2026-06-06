@@ -433,7 +433,10 @@ def _params_tail_logs(args: JsonDict) -> TailLogsParams:
 
 
 def _params_run_unit(args: JsonDict) -> RunUnitTestsParams:
-    return RunUnitTestsParams(project_path=Path(args["project_path"]).expanduser())
+    return RunUnitTestsParams(
+        project_path=Path(args["project_path"]).expanduser(),
+        platform=args.get("platform", "auto"),
+    )
 
 
 def _params_run_integration(args: JsonDict) -> RunIntegrationTestsParams:
@@ -942,6 +945,7 @@ def _params_run_widget_test(args: JsonDict) -> RunWidgetTestParams:
         tags=args.get("tags"),
         coverage=bool(args.get("coverage", False)),
         update_goldens=bool(args.get("update_goldens", False)),
+        platform=args.get("platform", "auto"),
     )
 
 

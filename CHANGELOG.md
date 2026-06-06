@@ -5,6 +5,52 @@ All notable changes to `flutter-dev-agents` / `mcp-phone-controll`.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.2] — 2026-06-06
+
+Bug fix — **test runners couldn't test Flutter web apps**. Field
+report: `run_unit_tests` ran `flutter test` on the default VM
+platform, so a Flutter **web** app whose code imports `dart:html`
+(transitively, via nearly the whole package) errored with:
+
+> Error: Dart library 'dart:html' is not available on this platform.
+
+The repo's own `make runtests` uses `flutter test --platform chrome`,
+where the same suite is green. There was no way to pass that through
+the MCP — `run_unit_tests` / `run_widget_test` had only `project_path`.
+
+### Added — `platform` param on `run_unit_tests` + `run_widget_test`
+
+`platform` is one of:
+
+- **`auto`** (default) — runs on the VM, then **transparently retries
+  on `--platform chrome`** if the run hits the web-only-library marker
+  (`"is not available on this platform"`). A Flutter web app now "just
+  works" without the agent knowing it's web.
+- **`chrome`** — force `flutter test --platform chrome` (skips the VM
+  probe).
+- **`vm`** — force the default VM, no retry. The error path now carries
+  a `hint` pointing at `platform='chrome'`.
+
+Auto-detection is by the **actual compiler error**, not by scanning
+imports — so no false positives/negatives from conditional imports.
+
+### Implementation
+
+- `FlutterCli.test_unit` / `test_widget` add `--platform <X>` when set.
+- `looks_like_web_platform_error()` (parser module) is the shared
+  detector; the `FlutterTestRepository` and `RunWidgetTest` use case
+  both use it for the auto-retry.
+- `TestRepository.run_unit_tests` protocol gains `platform="auto"`;
+  threaded through the composite + Patrol runners.
+- An `info`-level `test_platform_autoswitch` log fires on auto-retry.
+
+### Tests
+
+- `test_run_tests_platform.py` (12 new) — CLI argv, marker detection,
+  repo auto-retry / force-chrome / force-vm, widget auto-retry.
+- Contract snapshot refreshed (platform param on the 2 tools).
+- Full suite: **967 passed, 33 skipped.** ruff clean.
+
 ## [0.5.1] — 2026-06-06
 
 Bug fix — **strict MCP SDK structured-output rejection**. Tools that

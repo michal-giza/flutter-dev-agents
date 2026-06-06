@@ -14,6 +14,24 @@ from dataclasses import dataclass
 
 from ...domain.entities import TestCase, TestRun, TestStatus
 
+# The canonical Dart compiler message when a test (transitively) imports a
+# web-only library (`dart:html`, `dart:js`, `dart:ui_web`, …) but the run
+# targeted the VM, or vice-versa. `flutter test` defaults to the VM, so a
+# Flutter *web* app whose code pulls in `dart:html` errors with exactly
+# this string. We use it to auto-retry on `--platform chrome`. The message
+# is stable across Dart SDKs (it's emitted by the front-end, not Flutter).
+_WEB_PLATFORM_ERROR_MARKER = "is not available on this platform"
+
+
+def looks_like_web_platform_error(stdout: str | None, stderr: str | None = None) -> bool:
+    """True if a `flutter test` run failed because a web-only Dart library
+    isn't available on the (default) VM platform — the signal to retry on
+    `--platform chrome`. Scans both streams; the message lands on stderr
+    for whole-suite compile failures and inside the JSON stream (stdout)
+    for per-file ones."""
+    blob = f"{stdout or ''}\n{stderr or ''}"
+    return _WEB_PLATFORM_ERROR_MARKER in blob
+
 
 @dataclass
 class _Pending:

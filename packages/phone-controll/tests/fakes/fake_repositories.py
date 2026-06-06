@@ -167,7 +167,7 @@ class FakeTestRepository:
             total=1, passed=1, failed=0, errored=0, skipped=0, duration_ms=10
         )
 
-    async def run_unit_tests(self, project_path):
+    async def run_unit_tests(self, project_path, platform="auto"):
         return ok(self.run)
 
     async def run_integration_tests(self, project_path, device_serial, test_path="integration_test/"):
@@ -252,8 +252,8 @@ class FakePatrolRepository:
         return ok(self.run)
 
     # Also acts as a TestRepository for composite routing tests.
-    async def run_unit_tests(self, project_path):
-        self.calls.append(("run_unit_tests", str(project_path)))
+    async def run_unit_tests(self, project_path, platform="auto"):
+        self.calls.append(("run_unit_tests", str(project_path), platform))
         return ok(self.run)
 
     async def run_integration_tests(self, project_path, device_serial, test_path="integration_test/"):

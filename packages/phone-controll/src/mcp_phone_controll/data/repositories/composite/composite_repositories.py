@@ -311,9 +311,11 @@ class CompositeTestRepository(TestRepository):
         self._framework_runners = framework_runners or {}
         self._inspector = inspector
 
-    async def run_unit_tests(self, project_path: Path) -> Result[TestRun]:
+    async def run_unit_tests(
+        self, project_path: Path, platform: str = "auto"
+    ) -> Result[TestRun]:
         runner = await self._pick_runner(project_path) or self._android
-        return await runner.run_unit_tests(project_path)
+        return await runner.run_unit_tests(project_path, platform=platform)
 
     async def run_integration_tests(
         self,
