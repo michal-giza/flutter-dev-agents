@@ -166,6 +166,7 @@ from mcp_phone_controll.domain.usecases.recommend_test_path import (
 from mcp_phone_controll.domain.usecases.release_screenshot import (
     CaptureReleaseScreenshot,
 )
+from mcp_phone_controll.domain.usecases.run_lighthouse import RunLighthouse
 from mcp_phone_controll.domain.usecases.set_agent_profile import SetAgentProfile
 from mcp_phone_controll.domain.usecases.skill_library import (
     ListSkills,
@@ -227,6 +228,8 @@ from mcp_phone_controll.domain.usecases.widget_testing import (
     TestCoverageReport,
     UpdateGoldens,
 )
+from mcp_phone_controll.infrastructure.lighthouse_cli import LighthouseCli
+from mcp_phone_controll.infrastructure.process_runner import AsyncProcessRunner
 from mcp_phone_controll.presentation.tool_registry import (
     ToolDispatcher,
     UseCases,
@@ -460,6 +463,9 @@ def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:
         ingest_maestro_report=IngestMaestroReport(),
         audit_web_app=AuditWebApp(),
         ingest_lighthouse_report=IngestLighthouseReport(),
+        run_lighthouse=RunLighthouse(
+            LighthouseCli(AsyncProcessRunner()), IngestLighthouseReport()
+        ),
         new_session=NewSession(artifacts),
         get_artifacts_dir=GetArtifactsDir(artifacts),
         fetch_artifact=FetchArtifact(),
@@ -722,5 +728,7 @@ async def test_registry_covers_all_use_case_fields(tmp_path: Path):
         "audit_web_app",
         # v0.5.0 phase 16 (Lighthouse report ingest)
         "ingest_lighthouse_report",
+        # v0.6.0 (Lighthouse runner)
+        "run_lighthouse",
     }
     assert names == expected

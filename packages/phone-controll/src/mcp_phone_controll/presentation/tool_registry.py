@@ -160,6 +160,7 @@ from ..domain.usecases.recommend_test_path import RecommendTestPath
 from ..domain.usecases.release_screenshot import (
     CaptureReleaseScreenshot,
 )
+from ..domain.usecases.run_lighthouse import RunLighthouse
 from ..domain.usecases.set_agent_profile import (
     PROFILES as _AGENT_PROFILES,
 )
@@ -317,6 +318,7 @@ from .descriptors._param_builders import (
     _params_restart_debug_session,
     _params_resume_ui_automation,
     _params_run_integration,
+    _params_run_lighthouse,
     _params_run_patrol_suite,
     _params_run_patrol_test,
     _params_run_quick_check,
@@ -541,6 +543,8 @@ class UseCases:
     audit_web_app: AuditWebApp
     # v0.5.0 phase 16 — Lighthouse report ingest (web vitals)
     ingest_lighthouse_report: IngestLighthouseReport
+    # v0.6.0 — Lighthouse runner (run + ingest in one call)
+    run_lighthouse: RunLighthouse
     new_session: NewSession
     get_artifacts_dir: GetArtifactsDir
     fetch_artifact: FetchArtifact
@@ -3171,6 +3175,55 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
                 uc.ingest_lighthouse_report,
                 _params_ingest_lighthouse_report,
             ),
+        ),
+        # ---- v0.6.0 — Lighthouse runner (run + ingest) ----
+        ToolDescriptor(
+            name="run_lighthouse",
+            description=(
+                "Run Lighthouse against a URL (e.g. http://localhost:8080) "
+                "and parse it in one call: category scores, Core Web Vitals "
+                "(LCP/CLS/TBT), top opportunities, CanvasKit-aware grade. "
+                "Needs the lighthouse CLI (or npx) + Chrome. The runner "
+                "companion to ingest_lighthouse_report; saves the JSON for "
+                "re-ingest. See docs/web-app-rubric.md."
+            ),
+            input_schema=_schema(
+                {
+                    "url": _string(
+                        "URL to audit, e.g. http://localhost:8080 (serve a "
+                        "`flutter build web` first)."
+                    ),
+                    "output_path": _string(
+                        "Where to save the JSON report. Omit for a temp file "
+                        "(the path is returned for re-ingest)."
+                    ),
+                    "categories": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": (
+                            "Restrict to categories, e.g. "
+                            "['performance','accessibility']. Omit for all."
+                        ),
+                    },
+                    "preset": _enum(
+                        ["mobile", "desktop"],
+                        "Lighthouse preset. Default is mobile/throttled; use "
+                        "'desktop' for a desktop Flutter web build.",
+                    ),
+                    "perf_good_threshold": _number(
+                        "Perf score considered 'good'. Default 70 "
+                        "(CanvasKit-aware)."
+                    ),
+                    "timeout_s": _number(
+                        "Max seconds for the Lighthouse run. Default 180."
+                    ),
+                },
+                ["url"],
+            ),
+            build_params=_params_run_lighthouse,
+            invoke=_bind(uc.run_lighthouse, _params_run_lighthouse),
+            read_only=False,
+            open_world=True,
         ),
         ToolDescriptor(
             name="save_golden_image",

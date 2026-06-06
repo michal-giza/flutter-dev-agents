@@ -244,6 +244,8 @@ def default_annotations(tool_name: str) -> dict[str, bool]:
         "start_frame_profile", "stop_frame_profile",
         # v0.3.0 phase 5 — both touch a real device
         "test_deep_link", "audit_accessibility",
+        # v0.6.0 — runs the Lighthouse CLI (headless Chrome + network)
+        "run_lighthouse",
     )
     # Idempotent: repeated calls with the same args produce the same
     # result. Hosts MAY auto-retry on transient failure.

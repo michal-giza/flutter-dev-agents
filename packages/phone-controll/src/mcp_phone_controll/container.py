@@ -193,6 +193,7 @@ from .domain.usecases.propose_test_scenarios import ProposeTestScenarios
 from .domain.usecases.recall import IndexProject, Recall
 from .domain.usecases.recommend_test_path import RecommendTestPath
 from .domain.usecases.release_screenshot import CaptureReleaseScreenshot
+from .domain.usecases.run_lighthouse import RunLighthouse
 from .domain.usecases.set_agent_profile import SetAgentProfile
 from .domain.usecases.skill_library import (
     ListSkills,
@@ -239,6 +240,7 @@ from .infrastructure.android_emulator_cli import AndroidEmulatorCli
 from .infrastructure.dart_cli import DartCli, FlutterPubCli
 from .infrastructure.flutter_cli import FlutterCli
 from .infrastructure.ide_cli import IdeCli
+from .infrastructure.lighthouse_cli import LighthouseCli
 from .infrastructure.patrol_cli import PatrolCli
 from .infrastructure.process_runner import AsyncProcessRunner
 from .infrastructure.pymobiledevice3_cli import PyMobileDevice3Cli
@@ -352,6 +354,7 @@ def build_runtime(
     adb = AdbClient(runner)
     flutter = FlutterCli(runner)
     patrol = PatrolCli(runner)
+    lighthouse_cli = LighthouseCli(runner)
     pmd3 = PyMobileDevice3Cli(runner)
     simctl = SimctlClient(runner)
     emulator_cli = AndroidEmulatorCli(runner)
@@ -512,6 +515,10 @@ def build_runtime(
                     "input_schema": d.input_schema,
                 }
         return None
+
+    # Shared so the ingest tool and the run_lighthouse runner reuse the
+    # exact same Lighthouse parsing + CanvasKit-aware grading.
+    _ingest_lighthouse = IngestLighthouseReport()
 
     use_cases = UseCases(
         list_devices=ListDevices(devices_repo),
@@ -688,7 +695,9 @@ def build_runtime(
         # v0.5.0 phase 15 — Flutter web production-readiness audit
         audit_web_app=AuditWebApp(),
         # v0.5.0 phase 16 — Lighthouse report ingest (web vitals)
-        ingest_lighthouse_report=IngestLighthouseReport(),
+        ingest_lighthouse_report=_ingest_lighthouse,
+        # v0.6.0 — Lighthouse runner (run + ingest in one call)
+        run_lighthouse=RunLighthouse(lighthouse_cli, _ingest_lighthouse),
         new_session=NewSession(artifacts_repo),
         get_artifacts_dir=GetArtifactsDir(artifacts_repo),
         fetch_artifact=FetchArtifact(),

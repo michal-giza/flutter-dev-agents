@@ -99,6 +99,14 @@ class FilesystemFailure(Failure):
 
 
 @dataclass(frozen=True, slots=True)
+class LighthouseFailure(Failure):
+    """Running the Lighthouse CLI failed (not installed, Chrome missing,
+    bad URL, or a non-zero exit). The report ingest is separate
+    (`ingest_lighthouse_report`) — this is the runner half."""
+    pass
+
+
+@dataclass(frozen=True, slots=True)
 class VisionFailure(Failure):
     """AR / image processing failure (marker not seen, golden mismatch, etc.)."""
 

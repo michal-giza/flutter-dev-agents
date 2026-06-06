@@ -30,7 +30,7 @@
    │  └──────────────────────────────────────────────────────────┘  │
    │  ┌──────────────────────────────────────────────────────────┐  │
    │  │  mcp-phone-controll (us)           opinionated audit +   │  │
-   │  │  (139 tools)                       judgment + on-device  │  │
+   │  │  (140 tools)                       judgment + on-device  │  │
    │  │                                    ─────────────────     │  │
    │  │   • 9-vertical audit suite (+ web shell, v0.5.0)         │  │
    │  │   • senior-tester discipline (design + audit)            │  │
@@ -191,8 +191,10 @@ and well-maintained. Our seam is `audit_web_app` (static) +
 - **Parse Maestro reports**: `ingest_maestro_report` (v0.4.0)
 - **Audit the web shell**: `audit_web_app` (v0.5.0) — `web/`
   index.html + manifest + headers, 12 rules
-- **Parse Lighthouse reports**: `ingest_lighthouse_report`
-  (v0.5.0) — Core Web Vitals, CanvasKit-aware
+- **Run + parse Lighthouse**: `run_lighthouse` (v0.6.0) — runs the
+  lighthouse CLI headless, then parses it (Core Web Vitals)
+- **Parse an existing Lighthouse report**: `ingest_lighthouse_report`
+  (v0.5.0) — when CI already produced the JSON
 - **Composite verdict**: `audit_release_readiness`
 - **Plan tests with discipline**: `design_test_plan`
 - **Real-device UI driving**: `tap`, `swipe`, `take_screenshot`,
@@ -256,8 +258,7 @@ We grade the shell + vitals; Chrome MCP drives the browser.
 ```
 > phone-controll.audit_web_app project_path="./"        # static: web/ shell ready?
 > dart_mcp.pub  (flutter build web)                      # build
-> (you/CI run: lighthouse <url> --output=json ...)       # measure vitals
-> phone-controll.ingest_lighthouse_report report_path="./lighthouse.json"
+> phone-controll.run_lighthouse url="http://localhost:8080"  # run + parse vitals (v0.6.0)
 > chrome.navigate url="http://localhost:8080"            # ← official driver
 > chrome.computer  (click through the running app)        # ← official driver
 > phone-controll.audit_release_readiness \
