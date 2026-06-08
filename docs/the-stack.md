@@ -100,8 +100,13 @@ claude mcp add phone-controll -- python -m mcp_phone_controll
 # (Optional) Arenukvern's flutter-inspector
 # See https://github.com/Arenukvern/mcp_flutter for setup
 
-# (Optional, for Flutter web) the official Chrome MCP —
-# enable "Claude in Chrome" in your client; no command to add.
+# (Optional, for Flutter web) a model-agnostic browser MCP, routed by
+# purpose — works with Claude AND local/SLM models:
+#   visual / interaction (SLM-friendly, vision-free a11y tree):
+claude mcp add playwright --scope user -- npx -y @playwright/mcp@latest
+#   debugging / tooling (perf traces=frames, network=Firestore reads, console):
+claude mcp add chrome-devtools --scope user -- npx -y chrome-devtools-mcp@latest
+# (On Claude clients you can instead use the built-in "Claude in Chrome".)
 ```
 
 After adding, `claude mcp list` should show all of them. They
