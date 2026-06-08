@@ -55,18 +55,28 @@ different judgment + maintenance velocity:
 | **SDK plumbing** | Google | They own the Dart/Flutter SDK |
 | **Flow auth + execution** | Maestro | Cross-platform mobile testing is their product |
 | **Visual snapshots** | Arenukvern | Visual debugging is their niche |
-| **Browser driving** (web) | Chrome MCP (official) | Anthropic ships a DOM-aware browser driver; we don't re-build it |
+| **Browser driving** (web) | a browser MCP (official) | DOM-aware drivers exist for every model class; we don't re-build one |
 | **Opinionated audit + judgment** | Us | Encoding senior Flutter taste as 100+ rules requires real Flutter experience |
 
-> **We deliberately do not ship a browser driver.** For clicking
-> through a running Flutter **web** build, compose with the
-> official **Chrome MCP** (`mcp__claude-in-chrome__*`) or with
-> Maestro (which drives Flutter web flows). Our web layer is
-> **audit-grade and pure-compute**: `audit_web_app` grades the
-> `web/` shell statically, and `ingest_lighthouse_report` parses
-> the vitals you (or CI) measured. We grade; the official tools
-> drive. Re-shipping a browser driver would duplicate a
-> first-party, better-maintained tool for no differentiation. See
+> **We deliberately do not ship a browser driver.** For driving a
+> running Flutter **web** build, compose with a **model-agnostic
+> browser MCP** — and there's one for every model class, so this works
+> beyond Claude:
+> - **Chrome DevTools MCP** (`npx chrome-devtools-mcp`) — CDP-based;
+>   drive + performance traces (frames) + network (Firestore reads) +
+>   console. Best for full before/after.
+> - **Playwright MCP** (`npx @playwright/mcp`) — vision-free
+>   accessibility-tree snapshots (~200–400 tokens); best for **SLMs /
+>   local models** without vision.
+> - **Claude-in-Chrome** (`mcp__claude-in-chrome__*`) — the built-in
+>   option on Claude clients.
+>
+> Our web layer is **audit-grade and pure-compute**: `audit_web_app`
+> grades the `web/` shell, `run_lighthouse` measures vitals,
+> `ingest_lighthouse_report` parses them. We grade; the browser MCP
+> drives. Re-shipping a driver (CDP/Playwright) would duplicate
+> Chrome DevTools MCP — a first-party, model-agnostic, better-maintained
+> tool — for no differentiation, even for SLMs. See
 > `docs/web-app-rubric.md`.
 
 Trying to put all of this in one MCP would mean either huge

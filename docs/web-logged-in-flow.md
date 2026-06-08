@@ -1,32 +1,47 @@
-# Logged-in web before/after — Chrome MCP × phone-controll
+# Logged-in web before/after — browser MCP × phone-controll
 
 > The automated, **logged-in** before/after loop for a Flutter **web**
-> app (login → action → measure), composing the official **Chrome MCP**
-> (drive + observe) with phone-controll (grade). We don't ship a browser
-> driver — this is the seam where the two compose. See
+> app (login → action → measure), composing a **model-agnostic browser
+> MCP** (drive + observe) with phone-controll (grade). We don't ship a
+> browser driver — this is the seam where the two compose. Works with
+> Claude AND local/SLM models (see the browser-MCP table below). See
 > `docs/the-stack.md` for why.
 
 ## Who owns what
 
 | Layer | Tool | Does |
 |---|---|---|
-| Drive the DOM | `mcp__claude-in-chrome__*` | navigate, login, click, scroll, import |
-| Observe network | `mcp__claude-in-chrome__read_network_requests` | Firestore reads/latency/payload per action |
-| Observe console | `mcp__claude-in-chrome__read_console_messages` | runtime errors (RenderFlex, exceptions) |
-| Capture frames | Chrome trace via Chrome MCP / DevTools Performance | jank during scroll/virtualization |
+| Drive the DOM | a **browser MCP** (see below) | navigate, login, click, scroll, import |
+| Observe network | browser MCP's network tool | Firestore reads/latency/payload per action |
+| Observe console | browser MCP's console tool | runtime errors (RenderFlex, exceptions) |
+| Capture frames | browser MCP's performance trace | jank during scroll/virtualization |
 | Grade static shell | `phone-controll.audit_web_app` | index.html / manifest / headers |
 | Grade load vitals | `phone-controll.run_lighthouse` | LCP/CLS/TBT, CanvasKit-aware |
 
-phone-controll grades; Chrome MCP drives and observes. Neither
+phone-controll grades; the browser MCP drives and observes. Neither
 reimplements the other.
 
-## Prerequisite — connect Claude-in-Chrome (one time)
+## Prerequisite — connect a browser MCP (model-agnostic)
 
-The recurring blocker. In your client (Claude Desktop / Code), enable the
-**"Claude in Chrome"** connector/extension, open the app's tab, then the
-`mcp__claude-in-chrome__*` tools become available (`list_connected_browsers`
-should show the tab). Until then, `switch_browser` returns "none" and none
-of the web-drive steps below work.
+Pick the browser-driving MCP that fits your model and add it **alongside**
+phone-controll. All are model-agnostic (any MCP client) — this is the
+fix for the SLM gap: Claude-in-Chrome is Claude-only, but these work with
+local/open-source models too.
+
+| Browser MCP | Best for | Notes |
+|---|---|---|
+| **Chrome DevTools MCP** (`npx chrome-devtools-mcp`) | full before/after | CDP-based; Input/Navigation + **Performance traces** (frames) + **Network** (Firestore reads) + console + `lighthouse_audit`. Uses system Chrome; connects to a running Chrome via `--browser-url`. |
+| **Playwright MCP** (`npx @playwright/mcp`) | **SLMs / local models** | vision-free **accessibility-tree** snapshots (~200–400 tokens, deterministic refs) — drivable by small models without vision. Network + console + CDP-endpoint connect. |
+| **Claude-in-Chrome** | Claude clients | the built-in option when you're on Claude; same role. |
+
+> **We deliberately don't ship a web driver in phone-controll** — these
+> are official, maintained, model-agnostic browser MCPs. Building our own
+> (CDP/Playwright) would reinvent Chrome DevTools MCP. We compose; we
+> grade. Tool names below use a `browser.*` shorthand — substitute your
+> chosen server's actual tool names.
+
+Until a browser MCP is connected (its `list_*`/`tabs` tool shows your
+tab), the web-drive steps below can't run.
 
 ## Credentials — never commit them
 
@@ -43,38 +58,38 @@ audit_web_app(project_path="…")                  # shell readiness
 run_lighthouse(url="http://localhost:8080")      # load vitals (LCP/CLS/TBT)
 ```
 
-### 1. Log in — Chrome MCP
+### 1. Log in — browser MCP
 ```
-chrome.navigate(url="http://localhost:8080")
-chrome.find("email field")  →  chrome.form_input(<EMAIL_PLACEHOLDER>)
-chrome.find("password field") → chrome.form_input(<PASSWORD_PLACEHOLDER>)
-chrome.computer(click "Sign in")
-chrome.read_console_messages()                   # catch login-time errors
-```
-
-### 2. Reach the screen under test — Chrome MCP
-```
-chrome.find("Urządzenia")  →  chrome.computer(click)
-chrome.get_page_text()                           # confirm you're there
+browser.navigate(url="http://localhost:8080")
+browser.find("email field")  →  browser.form_input(<EMAIL_PLACEHOLDER>)
+browser.find("password field") → browser.form_input(<PASSWORD_PLACEHOLDER>)
+browser.computer(click "Sign in")
+browser.read_console_messages()                   # catch login-time errors
 ```
 
-### 3. "Before" snapshot — Chrome MCP observes
+### 2. Reach the screen under test — browser MCP
 ```
-chrome.read_network_requests()                   # baseline request set
+browser.find("Urządzenia")  →  browser.computer(click)
+browser.get_page_text()                           # confirm you're there
+```
+
+### 3. "Before" snapshot — browser MCP observes
+```
+browser.read_network_requests()                   # baseline request set
 # (start a performance trace if you'll measure frames — DevTools
-#  Performance record, or Chrome MCP's CDP tracing)
+#  Performance record, or the browser MCP's tracing)
 ```
 
-### 4. Perform the action (import / virtualization scroll) — Chrome MCP
+### 4. Perform the action (import / virtualization scroll) — browser MCP
 ```
-chrome.computer(click "Import")        # or scroll the virtualized list
+browser.computer(click "Import")        # or scroll the virtualized list
 # … let it complete …
 ```
 
-### 5. "After" — Chrome MCP observes
+### 5. "After" — browser MCP observes
 ```
-chrome.read_network_requests()                   # delta vs step 3
-chrome.read_console_messages()                   # errors during the action
+browser.read_network_requests()                   # delta vs step 3
+browser.read_console_messages()                   # errors during the action
 # stop + export the performance trace
 ```
 
@@ -101,8 +116,8 @@ chrome.read_console_messages()                   # errors during the action
 
 ## Want it graded, not eyeballed?
 
-The Network diff (step 6) and trace analysis are manual reads of Chrome
-MCP output today. If you want phone-controll to turn those raw exports
+The Network diff (step 6) and trace analysis are manual reads of the
+browser MCP's output today. If you want phone-controll to turn those raw exports
 into audit-grade verdicts, two in-lane tools are ready to build on
 request (pure-compute, "you capture, we grade"):
 
