@@ -76,6 +76,27 @@ class VmServiceClient:
     async def get_isolate(self, isolate_id: str) -> dict[str, Any]:
         return await self.call("getIsolate", {"isolateId": isolate_id})
 
+    async def first_isolate_id(self) -> str | None:
+        """The first isolate id from getVM (the Flutter UI/main isolate).
+        Web/DWDS exposes a single isolate; mobile's first is the UI isolate."""
+        vm = await self.get_vm()
+        isolates = (vm.get("result") or {}).get("isolates") or []
+        return isolates[0].get("id") if isolates else None
+
+    async def call_service_extension(
+        self, isolate_id: str, method: str,
+        args: dict[str, Any] | None = None, timeout_s: float = 30.0,
+    ) -> dict[str, Any]:
+        """Invoke a registered service extension (`ext.flutter.*`,
+        `ext.dart.*`) directly over the VM Service. The extension method
+        is the RPC name; isolateId + the extension args are the params.
+        This is the path that works on **web** (DWDS) where the flutter
+        daemon's `app.callServiceExtension` proxy does not."""
+        params: dict[str, Any] = {"isolateId": isolate_id}
+        if args:
+            params.update(args)
+        return await self.call(method, params, timeout_s=timeout_s)
+
     async def evaluate_in_frame(
         self, isolate_id: str, frame_index: int, expression: str
     ) -> dict[str, Any]:

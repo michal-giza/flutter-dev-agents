@@ -1475,10 +1475,10 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
                 "Boot `flutter run --machine` and wait for app.started. Requires "
                 "the device lock for real devices. For Flutter WEB pass "
                 "serial='chrome' (or 'web-server') — no lock needed; supports hot "
-                "reload/restart, logs and lifecycle, and captures the DWDS VM "
-                "Service URI (open it in DevTools). NOTE: daemon service "
-                "extensions (dump_widget_tree, frame/heap profiling) aren't "
-                "reliable on web yet."
+                "reload/restart, logs, lifecycle, and inspector tools "
+                "(dump_widget_tree/render_tree, toggle_inspector) via the direct "
+                "VM Service. NOTE: frame/heap timeline profiling isn't available "
+                "on web (DWDS has no getVMTimeline)."
             ),
             input_schema=_schema(
                 {
