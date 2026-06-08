@@ -90,11 +90,38 @@ if command -v claude >/dev/null 2>&1; then
     read -r reply
     if [ "${reply}" = "yes" ]; then
         claude mcp add phone-controll -- "${PACKAGE_DIR}/.venv/bin/python" -m mcp_phone_controll
-        echo "==> registered. Verify with: claude mcp list"
+        echo "==> registered phone-controll. Verify with: claude mcp list"
+    fi
+
+    # --- 8b. web browser MCPs (optional) ---
+    # phone-controll grades the web; a browser MCP drives + observes it.
+    # We DON'T ship a web driver — we compose with model-agnostic ones,
+    # routed by purpose (works with Claude AND local/SLM models):
+    #   - Playwright MCP     → visual / interaction (vision-free a11y tree,
+    #                          token-light; best for SLMs)
+    #   - Chrome DevTools MCP → debugging / tooling (CDP perf traces=frames,
+    #                          network=Firestore reads, console, lighthouse)
+    # See docs/web-logged-in-flow.md. Requires Node + system Chrome.
+    if command -v npx >/dev/null 2>&1; then
+        echo
+        echo "==> register web browser MCPs (Playwright + Chrome DevTools)? (yes/no)"
+        read -r web_reply
+        if [ "${web_reply}" = "yes" ]; then
+            claude mcp add playwright --scope user -- npx -y @playwright/mcp@latest
+            claude mcp add chrome-devtools --scope user -- npx -y chrome-devtools-mcp@latest
+            echo "==> registered playwright + chrome-devtools (user scope)."
+        fi
+    else
+        echo "==> 'npx' not found — install Node LTS to add the browser MCPs:"
+        echo "    claude mcp add playwright --scope user -- npx -y @playwright/mcp@latest"
+        echo "    claude mcp add chrome-devtools --scope user -- npx -y chrome-devtools-mcp@latest"
     fi
 else
     echo "==> 'claude' CLI not found. Manually register with:"
     echo "    claude mcp add phone-controll -- ${PACKAGE_DIR}/.venv/bin/python -m mcp_phone_controll"
+    echo "    # web (optional, model-agnostic browser drivers):"
+    echo "    claude mcp add playwright --scope user -- npx -y @playwright/mcp@latest"
+    echo "    claude mcp add chrome-devtools --scope user -- npx -y chrome-devtools-mcp@latest"
 fi
 
 echo
