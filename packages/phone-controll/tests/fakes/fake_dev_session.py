@@ -181,6 +181,7 @@ class FakeWdaSetupCli:
         udid,
         scheme="WebDriverAgentRunner",
         team_id: str | None = None,
+        is_simulator: bool = False,
         timeout_s: float = 1800.0,
     ):
         self.last_build_call = {
@@ -188,6 +189,7 @@ class FakeWdaSetupCli:
             "udid": udid,
             "scheme": scheme,
             "team_id": team_id,
+            "is_simulator": is_simulator,
         }
         if self._fail_with_signing_error:
             return ProcessResult(
@@ -201,3 +203,7 @@ class FakeWdaSetupCli:
                 ),
             )
         return ProcessResult(returncode=0, stdout="** TEST BUILD SUCCEEDED **", stderr="")
+
+    async def detect_is_simulator(self, udid, timeout_s: float = 15.0) -> bool:
+        # Tests set `simulator_udids` to control auto-detection.
+        return udid in getattr(self, "simulator_udids", set())

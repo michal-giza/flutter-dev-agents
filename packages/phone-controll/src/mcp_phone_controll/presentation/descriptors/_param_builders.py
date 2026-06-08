@@ -1381,6 +1381,7 @@ def _params_setup_wda(args: JsonDict) -> SetupWebDriverAgentParams:
         scheme=args.get("scheme", "WebDriverAgentRunner"),
         skip_if_built=bool(args.get("skip_if_built", True)),
         team_id=str(team_id).strip() if team_id else None,
+        is_simulator=args.get("is_simulator"),
     )
 
 
