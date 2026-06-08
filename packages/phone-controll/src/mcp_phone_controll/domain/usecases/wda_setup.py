@@ -48,8 +48,12 @@ class SetupWebDriverAgentParams:
     # with "Signing for 'WebDriverAgentRunner' requires a development
     # team". Fetch via `xcrun altool --list-providers` or from Xcode
     # → Account → Manage Certificates. Falls back to env var
-    # MCP_WDA_TEAM_ID if not provided here.
+    # MCP_WDA_TEAM_ID if not provided here. Ignored for simulators.
     team_id: str | None = None
+    # Whether the target udid is an iOS Simulator. None → auto-detect via
+    # `xcrun simctl list devices`. Simulators build with the simulator
+    # destination + signing disabled (no team needed).
+    is_simulator: bool | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -127,27 +131,39 @@ class SetupWebDriverAgent(BaseUseCase[SetupWebDriverAgentParams, WdaBuildResult]
             except OSError:
                 pass
 
-        # team_id resolution: explicit param wins, env fallback for ops
-        # who'd rather set MCP_WDA_TEAM_ID once than thread it through
-        # every plan. Missing team_id is allowed (so simulator code
-        # paths that share this CLI still work) — the surfaced error
-        # below tells the agent exactly what to pass next time.
+        # Resolve device-class: simulators build with the simulator
+        # destination + no signing; devices need a team. Auto-detect when
+        # the caller didn't say (so "it just works" like Android/adb).
+        is_simulator = params.is_simulator
+        if is_simulator is None:
+            is_simulator = False
+            with contextlib.suppress(Exception):
+                is_simulator = bool(
+                    await self._cli.detect_is_simulator(params.udid)
+                )
+
+        # team_id resolution (device only): explicit param wins, env
+        # fallback for ops who'd rather set MCP_WDA_TEAM_ID once. For
+        # simulators we never sign, so team_id stays None.
         import os as _os
-        team_id = params.team_id or _os.environ.get(
-            "MCP_WDA_TEAM_ID", ""
-        ).strip() or None
+        team_id = None
+        if not is_simulator:
+            team_id = params.team_id or _os.environ.get(
+                "MCP_WDA_TEAM_ID", ""
+            ).strip() or None
 
         build_res = await self._cli.build_for_testing(
             wda_dir=wda_dir,
             udid=params.udid,
             scheme=params.scheme,
             team_id=team_id,
+            is_simulator=is_simulator,
         )
         if not build_res.ok:
             stderr_tail = build_res.stderr[-2000:] if build_res.stderr else ""
             # Detect the most common failure mode and surface the
             # actionable next step instead of a generic "check_xcode_signing".
-            signing_hint = (
+            signing_hint = not is_simulator and (
                 "requires a development team" in stderr_tail
                 or "DEVELOPMENT_TEAM" in stderr_tail
                 or "Code signing is required" in stderr_tail
@@ -337,19 +353,22 @@ class StartWdaOnSimulator(BaseUseCase[
                     FlutterCliFailure(
                         message=(
                             "xcodebuild test-without-building exited before "
-                            f"WDA came up (returncode={proc.returncode})"
+                            f"WDA came up (returncode={proc.returncode}). Most "
+                            "likely the simulator hasn't been built yet — run "
+                            "setup_webdriveragent first (it now builds for the "
+                            "simulator destination, no signing needed)."
                         ),
-                        next_action="check_xcode_signing",
+                        next_action="setup_webdriveragent",
                         details={
                             "udid": params.udid,
                             "wda_dir": str(wda_dir),
                             "hint": (
-                                "run `xcodebuild test-without-building "
-                                "-project WebDriverAgent.xcodeproj "
-                                f"-scheme {params.scheme} -destination "
-                                f"'platform=iOS Simulator,id={params.udid}' "
-                                f"USE_PORT={params.port}` in a terminal to "
-                                "see the real error"
+                                "build once: `xcodebuild build-for-testing "
+                                "-project WebDriverAgent.xcodeproj -scheme "
+                                f"{params.scheme} -destination 'platform=iOS "
+                                f"Simulator,id={params.udid}' "
+                                "CODE_SIGNING_ALLOWED=NO`, then re-run "
+                                "start_wda_on_simulator"
                             ),
                         },
                     )

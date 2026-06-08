@@ -147,3 +147,51 @@ async def test_wda_setup_signing_failure_surfaces_actionable_envelope(
     assert "team_id" in res.failure.message.lower()
     assert "MCP_WDA_TEAM_ID" in res.failure.message
     assert res.failure.details["team_id_passed"] is False
+
+
+# ---- simulator builds (the iOS-simulator signing bug) -----------------
+
+
+@pytest.mark.asyncio
+async def test_wda_setup_simulator_builds_without_signing(tmp_path, monkeypatch):
+    """REGRESSION (field report): building WDA for a SIMULATOR used the
+    device destination (platform=iOS) and demanded code signing. With
+    is_simulator=True it must build for the simulator destination with NO
+    team — even if MCP_WDA_TEAM_ID is set."""
+    monkeypatch.setenv("MCP_WDA_TEAM_ID", "SHOULDNOTUSE")
+    cli = FakeWdaSetupCli()
+    uc = SetupWebDriverAgent(cli)
+    res = await uc(
+        SetupWebDriverAgentParams(
+            udid="SIM-UDID-123", wda_dir=tmp_path, is_simulator=True
+        )
+    )
+    assert isinstance(res, Ok)
+    assert cli.last_build_call["is_simulator"] is True
+    assert cli.last_build_call["team_id"] is None  # never sign a simulator
+
+
+@pytest.mark.asyncio
+async def test_wda_setup_auto_detects_simulator(tmp_path):
+    """is_simulator omitted → auto-detect via the CLI. A udid known to
+    simctl is treated as a simulator (no signing)."""
+    cli = FakeWdaSetupCli()
+    cli.simulator_udids = {"SIM-AUTO-9"}
+    uc = SetupWebDriverAgent(cli)
+    res = await uc(SetupWebDriverAgentParams(udid="SIM-AUTO-9", wda_dir=tmp_path))
+    assert isinstance(res, Ok)
+    assert cli.last_build_call["is_simulator"] is True
+    assert cli.last_build_call["team_id"] is None
+
+
+@pytest.mark.asyncio
+async def test_wda_setup_auto_detects_physical_device(tmp_path, monkeypatch):
+    """A udid NOT in simctl → physical device → device build + team."""
+    monkeypatch.setenv("MCP_WDA_TEAM_ID", "TEAM123456")
+    cli = FakeWdaSetupCli()
+    cli.simulator_udids = set()  # nothing is a simulator
+    uc = SetupWebDriverAgent(cli)
+    res = await uc(SetupWebDriverAgentParams(udid="00008030-PHYS", wda_dir=tmp_path))
+    assert isinstance(res, Ok)
+    assert cli.last_build_call["is_simulator"] is False
+    assert cli.last_build_call["team_id"] == "TEAM123456"

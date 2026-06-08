@@ -5,6 +5,41 @@ All notable changes to `flutter-dev-agents` / `mcp-phone-controll`.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.1] — 2026-06-08
+
+Bug fix — **WebDriverAgent couldn't build for an iOS Simulator**. Field
+report: `setup_webdriveragent` ran `xcodebuild build-for-testing` with
+the **device** destination (`platform=iOS,id=<udid>`) regardless of
+target, so against a simulator udid xcodebuild attempted a device build
+and failed demanding code signing ("Signing for 'WebDriverAgentRunner'
+requires a development team"). Simulator UI taps were impossible.
+
+### Fixed — simulator WDA build
+
+`setup_webdriveragent` now builds correctly for simulators:
+`-destination 'platform=iOS Simulator,id=<udid>'` with
+`CODE_SIGNING_ALLOWED=NO` (simulators never need a team). Device builds
+are unchanged (device destination + `DEVELOPMENT_TEAM`).
+
+- **Auto-detects** device class via `xcrun simctl list devices` — a udid
+  simctl knows is a simulator. Pass `is_simulator=true|false` to
+  override. So simulator WDA "just works" like Android/adb, no team.
+- `team_id` / `MCP_WDA_TEAM_ID` is ignored for simulators; the signing
+  hint only fires for device builds.
+- `start_wda_on_simulator`: when `test-without-building` exits early
+  (usually because the simulator wasn't built yet), the failure now
+  points at `setup_webdriveragent` instead of `check_xcode_signing`.
+
+### Tests
+
+- `test_wda_setup_cli.py` (new, 3) — simulator argv (sim destination +
+  `CODE_SIGNING_ALLOWED=NO`, no team), device argv (device dest + team),
+  `detect_is_simulator` via simctl.
+- `test_wda_setup.py` (+3) — simulator builds without signing even with
+  `MCP_WDA_TEAM_ID` set; auto-detect simulator vs physical device.
+- Contract refreshed (setup_webdriveragent gains `is_simulator`).
+- Full suite: **994 passed, 33 skipped.** ruff clean.
+
 ## [0.8.0] — 2026-06-08
 
 Completes the web debug story v0.7.0 started: the **inspector/service-

@@ -42,17 +42,23 @@ class WdaSetupCli:
         udid: str,
         scheme: str = "WebDriverAgentRunner",
         team_id: str | None = None,
+        is_simulator: bool = False,
         timeout_s: float = 1800.0,
     ) -> ProcessResult:
-        """Build WebDriverAgent for a physical iOS device.
+        """Build WebDriverAgent for a physical iOS device OR a simulator.
 
-        `team_id` is the Apple Developer Team ID (10-char alphanumeric)
-        used to sign the test runner. Without it, the WebDriverAgent
-        project ships with empty signing settings — xcodebuild fails
-        with "Signing for 'WebDriverAgentRunner' requires a development
-        team" on every physical device. Pass `DEVELOPMENT_TEAM=ABCDE12345`
-        to xcodebuild and it picks the matching team from the user's
-        keychain. Simulator builds don't need signing → omit.
+        **Device** (`is_simulator=False`): targets `platform=iOS,id=<udid>`
+        and needs code signing. `team_id` is the Apple Developer Team ID
+        (10-char alphanumeric); without it xcodebuild fails with "Signing
+        for 'WebDriverAgentRunner' requires a development team". We pass
+        `DEVELOPMENT_TEAM=...` so it picks the matching team.
+
+        **Simulator** (`is_simulator=True`): targets `platform=iOS
+        Simulator,id=<udid>` and disables signing
+        (`CODE_SIGNING_ALLOWED=NO`). Simulators never need a team — and
+        targeting the *device* destination (`platform=iOS`) for a
+        simulator udid is the bug this fixes: xcodebuild attempts a
+        device build and fails demanding a DEVELOPMENT_TEAM.
         """
         argv = [
             "xcodebuild",
@@ -61,15 +67,35 @@ class WdaSetupCli:
             "WebDriverAgent.xcodeproj",
             "-scheme",
             scheme,
-            "-destination",
-            f"platform=iOS,id={udid}",
         ]
-        if team_id:
-            argv.append(f"DEVELOPMENT_TEAM={team_id}")
-            # Force automatic signing — keeps the build resilient to
-            # whatever signing style the WDA project shipped with.
-            argv.append("CODE_SIGN_STYLE=Automatic")
+        if is_simulator:
+            argv += [
+                "-destination",
+                f"platform=iOS Simulator,id={udid}",
+                # Simulators don't need (and can't use) device signing.
+                "CODE_SIGNING_ALLOWED=NO",
+                "CODE_SIGNING_REQUIRED=NO",
+            ]
+        else:
+            argv += ["-destination", f"platform=iOS,id={udid}"]
+            if team_id:
+                argv.append(f"DEVELOPMENT_TEAM={team_id}")
+                # Force automatic signing — resilient to whatever signing
+                # style the WDA project shipped with.
+                argv.append("CODE_SIGN_STYLE=Automatic")
         return await self._runner.run(argv, cwd=wda_dir, timeout_s=timeout_s)
+
+    async def detect_is_simulator(
+        self, udid: str, timeout_s: float = 15.0
+    ) -> bool:
+        """True if `udid` is an iOS **Simulator** (it appears in
+        `xcrun simctl list devices`). Physical devices are never listed
+        there. Used to auto-pick the right build destination so callers
+        don't have to know the device class."""
+        res = await self._runner.run(
+            ["xcrun", "simctl", "list", "devices"], timeout_s=timeout_s
+        )
+        return bool(res.ok and udid and udid in (res.stdout or ""))
 
     async def test_without_building_for_sim(
         self,

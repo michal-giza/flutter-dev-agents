@@ -1695,10 +1695,11 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
         ToolDescriptor(
             name="setup_webdriveragent",
             description=(
-                "Build WebDriverAgent for an iOS device (one-time per device). "
-                "Clones the repo if needed, runs `xcodebuild build-for-testing`. "
-                "Physical devices need team_id (or MCP_WDA_TEAM_ID env). "
-                "Short-circuits if a previous successful build is recorded "
+                "Build WebDriverAgent for an iOS device OR simulator (one-time "
+                "per udid). Clones the repo if needed, runs `xcodebuild "
+                "build-for-testing`. Simulators auto-detected (no signing); "
+                "physical devices need team_id (or MCP_WDA_TEAM_ID env). "
+                "Short-circuits if a previous build is recorded "
                 "(unless skip_if_built=false)."
             ),
             input_schema=_schema(
@@ -1711,7 +1712,13 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
                     "team_id": _string(
                         "Apple Developer Team ID (10-char alphanumeric) for "
                         "signing the WDA test runner. Required on physical "
-                        "devices. Falls back to MCP_WDA_TEAM_ID env var."
+                        "devices. Falls back to MCP_WDA_TEAM_ID env var. "
+                        "Ignored for simulators."
+                    ),
+                    "is_simulator": _bool(
+                        "Target is an iOS Simulator (builds with the simulator "
+                        "destination, no signing). Omit to auto-detect via "
+                        "`xcrun simctl`."
                     ),
                 },
                 ["udid"],
