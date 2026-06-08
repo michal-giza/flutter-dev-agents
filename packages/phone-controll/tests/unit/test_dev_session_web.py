@@ -48,11 +48,13 @@ class _FakeMachineClient:
     async def start(
         self, project_path, device_serial, mode="debug",
         flavor=None, target=None, startup_timeout_s=120.0,
+        await_vm_service=False, vm_service_timeout_s=60.0,
     ) -> None:
         self.started_with = {
             "project_path": project_path,
             "device_serial": device_serial,
             "mode": mode,
+            "await_vm_service": await_vm_service,
         }
         # Simulate a successful app.started + app.debugPort (DWDS for web).
         self.app_id = "app-web-1"

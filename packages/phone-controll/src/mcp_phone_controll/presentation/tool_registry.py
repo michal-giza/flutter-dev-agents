@@ -1472,12 +1472,13 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
         ToolDescriptor(
             name="start_debug_session",
             description=(
-                "Boot `flutter run --machine` against the selected device and wait "
-                "for app.started, exposing the VM Service for profiling/inspector "
-                "tools. Requires the device lock for real devices. For Flutter "
-                "WEB, pass serial='chrome' (or 'web-server') — no lock needed; "
-                "unlocks frame/heap profiling, widget/render tree + service "
-                "extensions on web via DWDS."
+                "Boot `flutter run --machine` and wait for app.started. Requires "
+                "the device lock for real devices. For Flutter WEB pass "
+                "serial='chrome' (or 'web-server') — no lock needed; supports hot "
+                "reload/restart, logs and lifecycle, and captures the DWDS VM "
+                "Service URI (open it in DevTools). NOTE: daemon service "
+                "extensions (dump_widget_tree, frame/heap profiling) aren't "
+                "reliable on web yet."
             ),
             input_schema=_schema(
                 {

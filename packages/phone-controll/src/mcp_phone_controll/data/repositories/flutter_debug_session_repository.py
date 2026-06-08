@@ -103,6 +103,9 @@ class FlutterDebugSessionRepository(DebugSessionRepository):
                 mode=mode.value,
                 flavor=flavor,
                 target=target,
+                # Web (DWDS) connects its debug service after app.started —
+                # wait for the VM Service URI so the session is attachable.
+                await_vm_service=is_web,
             )
         except FileNotFoundError as e:
             return err(

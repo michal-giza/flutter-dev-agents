@@ -22,40 +22,52 @@ live debug session.
 start_debug_session(project_path="…", serial="chrome")   # or "web-server"
 ```
 
-`flutter run -d chrome --machine` launches a browser + DWDS and speaks
-the **same daemon protocol** as a phone — so the *entire* debug-session
-stack (hot reload/restart, service extensions, logs, frame & heap
-profiling, widget/render tree) works on web with **no per-tool change**.
-The VM Service URI the profiler tools attach to is the DWDS endpoint
-(daemon `app.debugPort` → `wsUri`, already parsed).
+**Live-verified against `flutter run -d chrome` (2026-06-08, on
+bike_news_room + a stock app).** What works on web:
 
-### Why this approach (not raw `attach_debug_session`)
+- ✅ Session boot — **lock-free** (no physical device to contend on).
+- ✅ Captures the **DWDS VM Service URI** — on web, `app.debugPort`
+  (`wsUri`) fires *after* `app.started`, so start() now waits for it
+  (the fix below). Paste the URI into DevTools for the inspector.
+- ✅ **Hot reload + hot restart** (`restart_debug_session`).
+- ✅ `read_debug_log`, `list_debug_sessions`, clean `stop`.
 
-The whole stack routes through the Flutter daemon
-(`app.callServiceExtension`), not a raw VM Service socket. Targeting a
-web *device* reuses all of it; implementing a parallel raw-VM-Service
-attach path would have duplicated it. `attach_debug_session` stays a
-documented no-op for now.
+This is the Edit → Hot Reload → Observe loop + logs + lifecycle for web.
+
+### Known limitation — daemon service extensions on web
+
+`dump_widget_tree`, `dump_render_tree`, `toggle_inspector` and the
+frame/heap profilers route through the Flutter daemon's
+`app.callServiceExtension`. On web that needs the daemon's *debug-service
+connection*, which doesn't complete for an automated Chrome launch
+(stuck on "Waiting for connection from debug service on Chrome…"), so
+they return "method not available". **These tools are mobile-only for
+now.** The robust web path is the **direct VM Service WebSocket** (the
+`wsUri` we now capture) — planned as a follow-up. `attach_debug_session`
+stays a documented no-op.
+
+### Fixed — web VM Service URI timing
+
+`FlutterMachineClient.start(await_vm_service=True)` waits (bounded) for
+`app.debugPort` after `app.started`, so web sessions report a populated
+`vm_service_uri` instead of `null`. Mobile is unchanged. Tolerates
+absence (release mode) rather than hanging.
 
 ### Changed
 
-- The repo skips the **adb device-lock** for web ids — there's no
-  physical device to contend on, and multiple web sessions can coexist
-  (each keyed by its own session id). Real devices still require the
-  lock (unchanged).
+- The repo skips the **adb device-lock** for web ids — real devices
+  still require the lock (regression-guarded).
 - `FlutterDebugSessionRepository` gained an injectable `client_factory`
   (testability; default unchanged).
 
 ### Tests
 
-- `test_dev_session_web.py` (5 new) — chrome/web-server skip the lock and
-  boot with the VM Service URI; profile mode passes through; real devices
-  still require the lock (regression guard).
-- Contract snapshot refreshed (start_debug_session description).
-- Full suite: **980 passed, 33 skipped.** ruff clean.
-
-> Shipped after live verification against a real `flutter run -d chrome`
-> host (DWDS `app.started`/`app.debugPort` shape confirmed).
+- `test_dev_session_web.py` (5) — web ids skip the lock + pass
+  `await_vm_service`; real devices still require the lock.
+- `test_flutter_machine_client_extended.py` (+3) — web debug-port timing:
+  start() waits for the late `app.debugPort`, tolerates its absence,
+  mobile doesn't wait.
+- Contract refreshed. Full suite: **983 passed, 33 skipped.** ruff clean.
 
 ## [0.6.0] — 2026-06-06
 

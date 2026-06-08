@@ -1377,7 +1377,7 @@ wheels = [
 
 [[package]]
 name = "mcp-phone-controll"
-version = "0.6.0"
+version = "0.7.0"
 source = { editable = "packages/phone-controll" }
 dependencies = [
     { name = "anyio" },

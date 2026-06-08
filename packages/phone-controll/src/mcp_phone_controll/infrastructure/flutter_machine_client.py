@@ -13,6 +13,7 @@ The daemon protocol over stdio:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 from collections import deque
 from pathlib import Path
@@ -56,6 +57,10 @@ class FlutterMachineClient:
         self._app_id: str | None = None
         self._vm_service_uri: str | None = None
         self._started_event = asyncio.Event()
+        # Set when the VM Service URI is captured (daemon `app.debugPort`
+        # carries `wsUri`). On web (DWDS) this fires AFTER `app.started`,
+        # so start() can opt to wait for it.
+        self._debug_uri_event = asyncio.Event()
 
     @property
     def app_id(self) -> str | None:
@@ -81,8 +86,18 @@ class FlutterMachineClient:
         flavor: str | None = None,
         target: str | None = None,
         startup_timeout_s: float = 120.0,
+        await_vm_service: bool = False,
+        vm_service_timeout_s: float = 60.0,
     ) -> None:
-        """Spawn the subprocess and wait for app.started to fire."""
+        """Spawn the subprocess and wait for app.started to fire.
+
+        `await_vm_service`: also wait (bounded) for the VM Service URI
+        (`app.debugPort`). Required for **web** — DWDS connects the debug
+        service AFTER `app.started`, so without this the session reports a
+        null vm_service_uri and service-extension / profiler calls race
+        the connection. Mobile leaves this off (the URI lands with/around
+        app.started). If the URI never arrives (e.g. release mode, no VM
+        service), we proceed without it rather than hang."""
         argv = [
             self._flutter._flutter,
             "run",
@@ -109,6 +124,15 @@ class FlutterMachineClient:
         except TimeoutError:
             await self.stop()
             raise
+        # Web (DWDS): the debug service connects after app.started, so the
+        # VM Service URI (`app.debugPort`/`wsUri`) arrives a beat later.
+        # Wait for it so the session is actually attachable; tolerate its
+        # absence (release mode) rather than hang.
+        if await_vm_service and self._vm_service_uri is None:
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(
+                    self._debug_uri_event.wait(), timeout=vm_service_timeout_s
+                )
 
     async def stop(self) -> None:
         """Send app.stop, then terminate the subprocess if still alive."""
@@ -206,3 +230,4 @@ class FlutterMachineClient:
             uri = vm_service_uri_from_started(obj)
             if uri:
                 self._vm_service_uri = uri
+                self._debug_uri_event.set()
