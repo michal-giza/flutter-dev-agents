@@ -311,6 +311,9 @@ extension when you need it.
 - `docs/web-app-rubric.md` — the web layer: `audit_web_app` 12
   rules, CanvasKit threshold, and why we compose with Chrome MCP
   instead of shipping a browser driver
+- `docs/web-logged-in-flow.md` — the logged-in before/after playbook:
+  Chrome MCP drives (login/scroll/import) + observes (Network/console/
+  trace), phone-controll grades
 - `docs/senior-tester-discipline.md` — the 8 principles encoded
   by `design_test_plan` + `audit_test_quality`
 - `docs/release-readiness-rubric.md` — composite verdict logic
