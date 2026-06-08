@@ -33,6 +33,14 @@ from ...domain.result import Err, Result, err, ok
 from ...infrastructure.flutter_cli import FlutterCli
 from ...infrastructure.flutter_machine_client import FlutterMachineClient
 
+# Flutter "web" device ids (`flutter run -d <id>`). These aren't physical
+# devices we lock — `flutter run -d chrome --machine` launches a browser +
+# DWDS, speaking the SAME daemon protocol as a phone, so the whole
+# debug-session stack (hot reload, service extensions, logs, frame/heap
+# profiling) works unchanged. We just skip the adb device-lock for them:
+# there's nothing to contend on, and multiple web sessions can coexist.
+_WEB_DEVICE_IDS = frozenset({"chrome", "web-server"})
+
 
 class FlutterDebugSessionRepository(DebugSessionRepository):
     def __init__(
@@ -40,6 +48,7 @@ class FlutterDebugSessionRepository(DebugSessionRepository):
         flutter: FlutterCli,
         locks: DeviceLockRepository,
         session_id: str,
+        client_factory=None,
     ) -> None:
         self._flutter = flutter
         self._locks = locks
@@ -47,6 +56,8 @@ class FlutterDebugSessionRepository(DebugSessionRepository):
         self._sessions: dict[str, _Active] = {}
         self._most_recent: str | None = None
         self._mutex = asyncio.Lock()
+        # Injectable for tests; defaults to a real FlutterMachineClient.
+        self._client_factory = client_factory or (lambda f: FlutterMachineClient(f))
 
     # ----- start / stop / restart ------------------------------------
 
@@ -58,29 +69,33 @@ class FlutterDebugSessionRepository(DebugSessionRepository):
         flavor: str | None = None,
         target: str | None = None,
     ) -> Result[DebugSession]:
-        # Enforce that this MCP session owns the device lock.
-        lock_res = await self._locks.lock_for(device_serial)
-        if isinstance(lock_res, Err):
-            return lock_res
-        lock = lock_res.value
-        if lock is None or lock.session_id != self._session_id:
-            holder = lock.session_id if lock else "no one"
-            return err(
-                DeviceBusyFailure(
-                    message=(
-                        f"start_debug_session requires this session to hold the lock "
-                        f"on {device_serial} (held by {holder})"
-                    ),
-                    details={
-                        "serial": device_serial,
-                        "this_session_id": self._session_id,
-                        "holder_session_id": lock.session_id if lock else None,
-                    },
-                    next_action="select_device_first",
+        # Web targets (chrome / web-server) aren't lockable physical
+        # devices — skip the lock entirely. For real devices, enforce that
+        # this MCP session owns the lock.
+        is_web = device_serial in _WEB_DEVICE_IDS
+        if not is_web:
+            lock_res = await self._locks.lock_for(device_serial)
+            if isinstance(lock_res, Err):
+                return lock_res
+            lock = lock_res.value
+            if lock is None or lock.session_id != self._session_id:
+                holder = lock.session_id if lock else "no one"
+                return err(
+                    DeviceBusyFailure(
+                        message=(
+                            f"start_debug_session requires this session to hold the lock "
+                            f"on {device_serial} (held by {holder})"
+                        ),
+                        details={
+                            "serial": device_serial,
+                            "this_session_id": self._session_id,
+                            "holder_session_id": lock.session_id if lock else None,
+                        },
+                        next_action="select_device_first",
+                    )
                 )
-            )
 
-        client = FlutterMachineClient(self._flutter)
+        client = self._client_factory(self._flutter)
         try:
             await client.start(
                 project_path=project_path,

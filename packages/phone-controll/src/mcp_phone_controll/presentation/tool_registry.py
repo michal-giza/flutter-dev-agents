@@ -1473,7 +1473,11 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             name="start_debug_session",
             description=(
                 "Boot `flutter run --machine` against the selected device and wait "
-                "for app.started. Requires this session to hold the device lock."
+                "for app.started, exposing the VM Service for profiling/inspector "
+                "tools. Requires the device lock for real devices. For Flutter "
+                "WEB, pass serial='chrome' (or 'web-server') — no lock needed; "
+                "unlocks frame/heap profiling, widget/render tree + service "
+                "extensions on web via DWDS."
             ),
             input_schema=_schema(
                 {
@@ -1481,7 +1485,10 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
                     "mode": _enum(["debug", "profile", "release"]),
                     "flavor": _string(""),
                     "target": _string("Optional entry-point dart file."),
-                    "serial": _string("Defaults to selected device."),
+                    "serial": _string(
+                        "Defaults to selected device. Pass 'chrome' or "
+                        "'web-server' for Flutter web (no device lock needed)."
+                    ),
                 },
                 ["project_path"],
             ),

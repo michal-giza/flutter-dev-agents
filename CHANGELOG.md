@@ -5,6 +5,58 @@ All notable changes to `flutter-dev-agents` / `mcp-phone-controll`.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] — 2026-06-06
+
+Field report (web capabilities) #2: the live-session profiling tools
+(`start_frame_profile`, `take_heap_snapshot`, `vm_evaluate`,
+`dump_widget_tree`, `call_service_extension`, `read_debug_log`, …) were
+device-coupled, so a Flutter **web** app couldn't be driven through a
+live debug session.
+
+### Added — web debug sessions (`start_debug_session(serial="chrome")`)
+
+`start_debug_session` now accepts the Flutter **web** device ids
+`chrome` and `web-server`:
+
+```python
+start_debug_session(project_path="…", serial="chrome")   # or "web-server"
+```
+
+`flutter run -d chrome --machine` launches a browser + DWDS and speaks
+the **same daemon protocol** as a phone — so the *entire* debug-session
+stack (hot reload/restart, service extensions, logs, frame & heap
+profiling, widget/render tree) works on web with **no per-tool change**.
+The VM Service URI the profiler tools attach to is the DWDS endpoint
+(daemon `app.debugPort` → `wsUri`, already parsed).
+
+### Why this approach (not raw `attach_debug_session`)
+
+The whole stack routes through the Flutter daemon
+(`app.callServiceExtension`), not a raw VM Service socket. Targeting a
+web *device* reuses all of it; implementing a parallel raw-VM-Service
+attach path would have duplicated it. `attach_debug_session` stays a
+documented no-op for now.
+
+### Changed
+
+- The repo skips the **adb device-lock** for web ids — there's no
+  physical device to contend on, and multiple web sessions can coexist
+  (each keyed by its own session id). Real devices still require the
+  lock (unchanged).
+- `FlutterDebugSessionRepository` gained an injectable `client_factory`
+  (testability; default unchanged).
+
+### Tests
+
+- `test_dev_session_web.py` (5 new) — chrome/web-server skip the lock and
+  boot with the VM Service URI; profile mode passes through; real devices
+  still require the lock (regression guard).
+- Contract snapshot refreshed (start_debug_session description).
+- Full suite: **980 passed, 33 skipped.** ruff clean.
+
+> Shipped after live verification against a real `flutter run -d chrome`
+> host (DWDS `app.started`/`app.debugPort` shape confirmed).
+
 ## [0.6.0] — 2026-06-06
 
 Field report (web capabilities): "MCP has `ingest_lighthouse_report`
