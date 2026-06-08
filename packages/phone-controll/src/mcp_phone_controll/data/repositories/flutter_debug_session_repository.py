@@ -277,6 +277,12 @@ class FlutterDebugSessionRepository(DebugSessionRepository):
                     next_action="start_debug_session",
                 )
             )
+        # Web (DWDS): the flutter daemon's app.callServiceExtension proxy
+        # doesn't reach the app's isolate, but the direct VM Service does.
+        # The ext.flutter.* extensions register a few seconds after the web
+        # app loads, so we retry on -32601 (method-not-found) until ready.
+        if active.device_serial in _WEB_DEVICE_IDS:
+            return await self._call_service_extension_web(active, method, args)
         if not active.client.app_id:
             return err(
                 ServiceExtensionFailure(
@@ -306,6 +312,92 @@ class FlutterDebugSessionRepository(DebugSessionRepository):
                 elapsed_ms=elapsed_ms,
             )
         )
+
+    async def _call_service_extension_web(
+        self,
+        active: _Active,
+        method: str,
+        args: dict | None,
+        ext_timeout_s: float = 20.0,
+    ) -> Result[ServiceExtensionResult]:
+        uri = active.client.vm_service_uri
+        if not uri:
+            return err(
+                ServiceExtensionFailure(
+                    message="web session has no vm_service_uri yet",
+                    next_action="check_debug_session",
+                )
+            )
+        from ...infrastructure.vm_service_client import VmServiceClient
+
+        loop = asyncio.get_event_loop()
+        started = loop.time()
+        client = VmServiceClient(uri)
+        try:
+            try:
+                await client.connect()
+            except ImportError as e:
+                return err(
+                    ServiceExtensionFailure(
+                        message=str(e), next_action="install_debug_extras"
+                    )
+                )
+            isolate_id = await client.first_isolate_id()
+            if not isolate_id:
+                return err(
+                    ServiceExtensionFailure(
+                        message="no isolate on the web VM service"
+                    )
+                )
+            deadline = loop.time() + ext_timeout_s
+            while True:
+                resp = await client.call_service_extension(isolate_id, method, args)
+                if "result" in resp:
+                    elapsed_ms = int((loop.time() - started) * 1000)
+                    return ok(
+                        ServiceExtensionResult(
+                            method=method,
+                            result=resp.get("result") or {},
+                            elapsed_ms=elapsed_ms,
+                        )
+                    )
+                error = resp.get("error") or {}
+                # -32601 = method not found: ext.flutter.* register a few
+                # seconds after the web app boots — retry until they do.
+                if error.get("code") == -32601:
+                    if loop.time() < deadline:
+                        await asyncio.sleep(1.0)
+                        continue
+                    # Still unregistered after the window — the app likely
+                    # never reached its first frame (e.g. it's waiting on a
+                    # backend, or threw before runApp). Not a plumbing bug.
+                    return err(
+                        ServiceExtensionFailure(
+                            message=(
+                                f"service extension {method} not registered after "
+                                f"{ext_timeout_s:.0f}s — the web app hasn't reached "
+                                "its first frame (ext.flutter.* register on "
+                                "WidgetsBinding init). Confirm the app actually "
+                                "renders in the browser (deps/backend up?)."
+                            ),
+                            details={"method": method, "response": resp},
+                            next_action="check_debug_session",
+                        )
+                    )
+                return err(
+                    ServiceExtensionFailure(
+                        message=str(error.get("message", error)),
+                        details={"method": method, "response": resp},
+                    )
+                )
+        except Exception as e:
+            return err(
+                ServiceExtensionFailure(
+                    message=f"web service extension call failed: {e}"
+                )
+            )
+        finally:
+            await client.close()
 
     # ----- helpers --------------------------------------------------
 

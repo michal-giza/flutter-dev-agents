@@ -5,6 +5,56 @@ All notable changes to `flutter-dev-agents` / `mcp-phone-controll`.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] — 2026-06-08
+
+Completes the web debug story v0.7.0 started: the **inspector/service-
+extension tools now work on Flutter web**, routed through the direct VM
+Service WebSocket. **Live-verified** against a stock Flutter app
+(`dump_widget_tree` returned a 7,912-char tree on web).
+
+### Fixed — service extensions on web (via direct VM Service)
+
+`dump_widget_tree`, `dump_render_tree`, `toggle_inspector` and generic
+`call_service_extension` failed on web because they routed through the
+Flutter daemon's `app.callServiceExtension`, whose debug-service
+connection doesn't complete for an automated Chrome launch. They now go
+through the **direct VM Service WebSocket** (the DWDS `wsUri` v0.7.0
+captures) when the session is web — `getVM` → isolate →
+`callServiceExtension`.
+
+**Readiness handling:** Flutter's `ext.flutter.*` extensions register a
+few seconds *after* the web app loads (measured: ~3s, 61 extensions).
+The web path **retries on `-32601` (method-not-found)** until they
+register (≤20s), so the first call after start doesn't race the app.
+
+If the extensions never register, the failure now says so precisely
+(`service extension … not registered after 20s — the web app hasn't
+reached its first frame…`) instead of a bare "Unknown method". Verified
+against `bike_news_room`, whose frontend doesn't render without its
+backend — the stock app working in the same run proves it's app-state,
+not our plumbing.
+
+### Still not available on web (platform limit)
+
+**Frame/heap timeline profiling** — `start_frame_profile` /
+`stop_frame_profile` need `getVMTimeline`, which **DWDS does not
+implement** (`-32601 Unknown method "getVMTimeline"`). This is a
+dart2js/DWDS limitation, not fixable here; those tools stay mobile-only.
+
+### Added — `VmServiceClient` helpers
+
+`first_isolate_id()` and `call_service_extension(isolate_id, method,
+args)` — the direct-VM-Service service-extension primitives, reusable by
+any tool.
+
+### Tests
+
+- `test_dev_session_web.py` (+5) — web path retries to registration,
+  succeeds first-try, surfaces real errors, handles missing
+  `websockets` (`install_debug_extras`) and no-isolate.
+- Contract refreshed (start_debug_session description).
+- Full suite: **988 passed, 33 skipped.** ruff clean.
+
 ## [0.7.0] — 2026-06-06
 
 Field report (web capabilities) #2: the live-session profiling tools

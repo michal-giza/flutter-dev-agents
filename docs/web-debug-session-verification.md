@@ -9,26 +9,38 @@
 | Capability | Web (`serial="chrome"`) | Notes |
 |---|---|---|
 | Session boot, lock-free | ✅ | no device lock required |
-| `vm_service_uri` captured | ✅ | DWDS `app.debugPort`/`wsUri`, after the timing fix |
+| `vm_service_uri` captured | ✅ | DWDS `app.debugPort`/`wsUri` (v0.7.0 timing fix) |
 | Hot reload / hot restart | ✅ | `restart_debug_session` |
 | `read_debug_log` / `list` / `stop` | ✅ | full lifecycle |
-| `dump_widget_tree` / inspector | ❌ | daemon service extension — see limitation |
-| frame / heap profiling | ❌ | same daemon path |
+| `dump_widget_tree` / `dump_render_tree` | ✅ (v0.8.0) | direct VM Service + readiness retry |
+| `toggle_inspector` / `call_service_extension` | ✅ (v0.8.0) | direct VM Service |
+| frame / heap timeline profiling | ❌ | DWDS lacks `getVMTimeline` (platform limit) |
 
-## The limitation (why service extensions fail on web)
+## v0.8.0 — service extensions on web (direct VM Service)
 
-`dump_widget_tree`, `toggle_inspector`, frame/heap profilers call the
-Flutter daemon's `app.callServiceExtension`. On web that requires the
-daemon's **debug-service connection** to the running app, which never
-completed for our automated Chrome launch — the daemon log stayed on
-`"Waiting for connection from debug service on Chrome..."` and the call
-returned `method not available: ext.flutter.debugDumpApp` even on a
-stock app that renders immediately. So it's **not app-specific** and not
-a timing-of-first-frame issue.
+The daemon's `app.callServiceExtension` proxy doesn't reach the app on
+web (its debug-service connection never completes for an automated Chrome
+launch — `"Waiting for connection from debug service on Chrome..."`). So
+v0.8.0 routes service extensions through the **direct VM Service
+WebSocket** (the `wsUri`) instead: `getVM` → isolate →
+`callServiceExtension`.
 
-The robust fix is to talk to the **direct VM Service WebSocket** (the
-`wsUri` we now capture via DWDS) using `vm_service_client.py`, instead
-of the daemon proxy. That's the planned **v0.8.0 follow-up**.
+**Empirically measured** (stock app): `ext.flutter.*` register ~3s after
+the web app loads (t+0s: 1 extension → t+3s: 61, `debugDumpApp` works,
+74,497-char tree). The web path retries on `-32601` until they register
+(≤20s). Live-verified: `dump_widget_tree`, `dump_render_tree`,
+`toggle_inspector`, generic `call_service_extension` all return on web.
+
+`bike_news_room` returns "not registered after 20s" — its frontend
+doesn't reach first frame without its backend, so `ext.flutter.*` never
+register. The stock app working in the same run proves this is
+app-state, not plumbing.
+
+## Frame/heap timeline — not possible on web
+
+`start_frame_profile`/`stop_frame_profile` need `getVMTimeline`, which
+**DWDS doesn't implement** (`-32601 Unknown method "getVMTimeline"`).
+dart2js/DWDS platform limit; mobile-only.
 
 ## Original verification recipe (kept for re-runs)
 
