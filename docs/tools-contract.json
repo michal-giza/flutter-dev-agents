@@ -3651,7 +3651,7 @@
       "openWorldHint": true,
       "readOnlyHint": false
     },
-    "description": "Boot `flutter run --machine` against the selected device and wait for app.started, exposing the VM Service for profiling/inspector tools. Requires the device lock for real devices. For Flutter WEB, pass serial='chrome' (or 'web-server') \u2014 no lock needed; unlocks frame/heap profiling, widget/render tree + service extensions on web via DWDS.",
+    "description": "Boot `flutter run --machine` and wait for app.started. Requires the device lock for real devices. For Flutter WEB pass serial='chrome' (or 'web-server') \u2014 no lock needed; supports hot reload/restart, logs and lifecycle, and captures the DWDS VM Service URI (open it in DevTools). NOTE: daemon service extensions (dump_widget_tree, frame/heap profiling) aren't reliable on web yet.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {

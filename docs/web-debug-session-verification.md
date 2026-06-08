@@ -1,10 +1,36 @@
-# Verifying web debug sessions (v0.7.0)
+# Web debug sessions — verification results (v0.7.0)
 
-> This feature is **pending live verification**. The unit tests pin the
-> repo contract (lock skip, VM Service URI plumbing), but the real
-> `flutter run -d chrome --machine` daemon shape can only be confirmed on
-> a host with Flutter + Chrome. Run this once against a real web app
-> (e.g. `flow_meter`); if it passes, the release ships.
+> **Status: live-verified 2026-06-08** against `flutter run -d chrome`
+> on `bike_news_room/frontend` and a stock `flutter create` app
+> (Flutter 3.41.7, Chrome 148).
+
+## Results matrix
+
+| Capability | Web (`serial="chrome"`) | Notes |
+|---|---|---|
+| Session boot, lock-free | ✅ | no device lock required |
+| `vm_service_uri` captured | ✅ | DWDS `app.debugPort`/`wsUri`, after the timing fix |
+| Hot reload / hot restart | ✅ | `restart_debug_session` |
+| `read_debug_log` / `list` / `stop` | ✅ | full lifecycle |
+| `dump_widget_tree` / inspector | ❌ | daemon service extension — see limitation |
+| frame / heap profiling | ❌ | same daemon path |
+
+## The limitation (why service extensions fail on web)
+
+`dump_widget_tree`, `toggle_inspector`, frame/heap profilers call the
+Flutter daemon's `app.callServiceExtension`. On web that requires the
+daemon's **debug-service connection** to the running app, which never
+completed for our automated Chrome launch — the daemon log stayed on
+`"Waiting for connection from debug service on Chrome..."` and the call
+returned `method not available: ext.flutter.debugDumpApp` even on a
+stock app that renders immediately. So it's **not app-specific** and not
+a timing-of-first-frame issue.
+
+The robust fix is to talk to the **direct VM Service WebSocket** (the
+`wsUri` we now capture via DWDS) using `vm_service_client.py`, instead
+of the daemon proxy. That's the planned **v0.8.0 follow-up**.
+
+## Original verification recipe (kept for re-runs)
 
 ## Why this needs a human-in-the-loop
 

@@ -235,9 +235,119 @@ async def test_send_correlates_response_by_id(tmp_path: Path):
         sent = fake.stdin.lines[0].decode()
         assert '"method": "app.restart"' in sent
         assert '"id": 1' in sent
-
         fake.stdin.auto_respond = True  # restore so stop() doesn't hang
         await client.stop()
+
+
+# ---- web (DWDS) debug-port timing (v0.7.0) -----------------------------
+
+
+def _frame_debug_port(app_id: str, ws_uri: str) -> str:
+    return json.dumps(
+        [{"event": "app.debugPort", "params": {"appId": app_id, "wsUri": ws_uri}}]
+    )
+
+
+@pytest.mark.asyncio
+async def test_web_start_waits_for_debug_port(tmp_path: Path):
+    """REGRESSION/live-confirmed (2026-06-08): on web, `app.started` fires
+    WITHOUT the VM Service URI; `app.debugPort` (wsUri) lands a beat later
+    once DWDS connects. With await_vm_service=True, start() must wait for
+    it so the session is actually attachable (service extensions + the
+    profiler tools race the connection otherwise)."""
+    fake = _FakeFlutterProc()
+    ws = "ws://127.0.0.1:61712/XbJETZOzY24=/ws"
+
+    async def _fake_spawn(*argv, **kwargs):
+        # app.started first — NO wsUri (exactly like the real web daemon).
+        fake.stdout.push_line(
+            json.dumps([{"event": "app.started", "params": {"appId": "app-W"}}])
+        )
+
+        async def _debug_port_later():
+            await asyncio.sleep(0.05)
+            fake.stdout.push_line(_frame_debug_port("app-W", ws))
+
+        # Store the reference so it isn't GC'd mid-flight (RUF006).
+        fake._debug_task = asyncio.create_task(_debug_port_later())
+        return fake
+
+    cli = FlutterCli(runner=None)  # type: ignore[arg-type]
+    client = FlutterMachineClient(cli)
+    with patch(
+        "mcp_phone_controll.infrastructure.flutter_machine_client.asyncio.create_subprocess_exec",
+        new=_fake_spawn,
+    ):
+        await client.start(
+            project_path=tmp_path,
+            device_serial="chrome",
+            await_vm_service=True,
+            startup_timeout_s=2.0,
+            vm_service_timeout_s=2.0,
+        )
+
+    assert client.app_id == "app-W"
+    assert client.vm_service_uri == ws  # captured from the LATER debugPort
+    await client.stop()
+
+
+@pytest.mark.asyncio
+async def test_web_start_tolerates_missing_debug_port(tmp_path: Path):
+    """If the VM Service URI never arrives (e.g. release mode), start()
+    must NOT hang — it returns after vm_service_timeout_s with a null uri."""
+    fake = _FakeFlutterProc()
+
+    async def _fake_spawn(*argv, **kwargs):
+        fake.stdout.push_line(
+            json.dumps([{"event": "app.started", "params": {"appId": "app-W"}}])
+        )
+        return fake  # never push debugPort
+
+    cli = FlutterCli(runner=None)  # type: ignore[arg-type]
+    client = FlutterMachineClient(cli)
+    with patch(
+        "mcp_phone_controll.infrastructure.flutter_machine_client.asyncio.create_subprocess_exec",
+        new=_fake_spawn,
+    ):
+        await client.start(
+            project_path=tmp_path,
+            device_serial="chrome",
+            await_vm_service=True,
+            startup_timeout_s=2.0,
+            vm_service_timeout_s=0.2,  # short — we expect it to elapse
+        )
+
+    assert client.app_id == "app-W"
+    assert client.vm_service_uri is None  # absent, but no hang
+    await client.stop()
+
+
+@pytest.mark.asyncio
+async def test_mobile_start_does_not_wait_for_debug_port(tmp_path: Path):
+    """Mobile (await_vm_service=False) returns at app.started — the URI is
+    captured if present in that frame, no extra wait. Guards against
+    regressing the phone path."""
+    fake = _FakeFlutterProc()
+
+    async def _fake_spawn(*argv, **kwargs):
+        fake.stdout.push_line(_frame_started("app-M", "ws://127.0.0.1:5000/ws"))
+        return fake
+
+    cli = FlutterCli(runner=None)  # type: ignore[arg-type]
+    client = FlutterMachineClient(cli)
+    with patch(
+        "mcp_phone_controll.infrastructure.flutter_machine_client.asyncio.create_subprocess_exec",
+        new=_fake_spawn,
+    ):
+        await client.start(
+            project_path=tmp_path,
+            device_serial="emulator-5554",
+            startup_timeout_s=2.0,
+        )
+
+    assert client.app_id == "app-M"
+    assert client.vm_service_uri == "ws://127.0.0.1:5000/ws"
+    await client.stop()
 
 
 @pytest.mark.asyncio
