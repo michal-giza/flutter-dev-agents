@@ -105,6 +105,23 @@ browser.read_console_messages()                   # errors during the action
 - **Correctness**: `run_unit_tests(platform="chrome")` /
   `run_widget_test(platform="chrome")` for the logic behind the action.
 
+## Driving caveat — CanvasKit scroll (field-verified 2026-06-08)
+
+On a **CanvasKit** Flutter web build, the virtualized list does **not**
+respond to synthetic mouse-wheel **or** keyboard (Page Down) input from
+Claude-in-Chrome — the Flutter `ScrollView` doesn't consume those DOM
+events. Verified live on bike_news_room: 3 wheel scrolls + 5 Page Downs
+produced byte-identical frames and **no pagination fetch**.
+
+Route scroll / virtualization driving to:
+- **Chrome DevTools MCP** — CDP `Input.dispatchMouseEvent` wheel events
+  reach the canvas; pairs with its performance trace for the frame data.
+- **Playwright MCP** — `mouse.wheel` / programmatic scroll.
+
+Onboarding clicks, form fills, and navigation work fine via any of them
+(verified). It's specifically wheel/keyboard *scroll* over the canvas
+that needs the CDP/Playwright path.
+
 ## What's NOT achievable on web (platform limits)
 
 - **VM-timeline frame profiling** (`start_frame_profile`) — DWDS has no

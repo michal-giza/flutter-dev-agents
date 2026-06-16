@@ -10,7 +10,7 @@
    │  Your Claude Code / Claude Desktop / Cursor session            │
    │                                                                │
    │  ┌──────────────────────────────────────────────────────────┐  │
-   │  │  Google's dart_mcp_server          SDK plumbing          │  │
+   │  │  Google's dart mcp-server          SDK plumbing          │  │
    │  │  (24 tools)                        — pub, dart_fix,      │  │
    │  │                                      hot_reload, lsp     │  │
    │  └──────────────────────────────────────────────────────────┘  │
@@ -88,8 +88,9 @@ keeps each focused.
 ### Claude Code (CLI)
 
 ```bash
-# Google's official Dart/Flutter MCP
-claude mcp add dart_mcp -- dart pub global run dart_mcp_server
+# Google's official Dart/Flutter MCP — now BUILT INTO the SDK (Dart 3.9+);
+# the old `dart pub global run dart_mcp_server` package is superseded.
+claude mcp add dart -- dart mcp-server
 
 # Maestro MCP (mobile.dev)
 claude mcp add maestro -- maestro mcp
@@ -153,7 +154,13 @@ That's the full loop. Each step belongs to the right tool.
 
 ## Per-layer guidance
 
-### When to invoke Google's `dart_mcp_server`
+### When to invoke Google's `dart mcp-server`
+
+> Now **built into the Dart SDK** (3.9+) — run as `dart mcp-server`
+> (register: `claude mcp add dart -- dart mcp-server`). The old
+> `dart_mcp_server` pub package is superseded. Tool names shown below as
+> `dart_mcp.*` are illustrative; the prefix follows your `claude mcp add`
+> alias.
 
 - **Type / syntax errors**: `dart_mcp.analyze_files`
 - **Auto-fix lint issues**: `dart_mcp.dart_fix`

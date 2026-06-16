@@ -35,9 +35,12 @@
 
 ## The official Dart/Flutter MCP Server
 
-Maintained by Google's Dart/Flutter team at
-`dart-lang/ai/pkgs/dart_mcp_server`. **24 tools** (as of
-2026-05-22). Categories:
+Maintained by Google's Dart/Flutter team. **Now built into the Dart
+SDK** (3.9+) — run as `dart mcp-server`; the standalone
+`dart-lang/ai/pkgs/dart_mcp_server` pub package is superseded.
+**~24 tools** (verified 2026-06-08 against Dart 3.11.5). Still **no
+performance / frame / animation tooling** — that gap is ours.
+Categories:
 
 | Category | Tools |
 |---|---|
