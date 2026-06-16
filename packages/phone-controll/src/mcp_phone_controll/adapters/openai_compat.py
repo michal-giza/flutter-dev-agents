@@ -90,11 +90,32 @@ def create_app(dispatcher=None, *, allow_agent_proxy: bool = True):
 
     @app.get("/tools")
     async def list_tools(
-        strict: bool | None = None, _auth: None = Depends(_require_auth)
+        strict: bool | None = None,
+        tier: str | None = None,
+        _auth: None = Depends(_require_auth),
     ) -> list[dict[str, Any]]:
         # `?strict=true` opts into structured-output mode at the OpenAI
         # function level — see adapters/schemas.py docstring.
-        return to_openai_functions(dispatcher.descriptors, strict=strict)
+        #
+        # `?tier=basic|intermediate|expert` (or the MCP_TOOL_TIER env var)
+        # scopes the advertised surface — the SLM/local-model lever. Small
+        # models choke on 140+ tool schemas; `tier=basic` (~26) keeps the
+        # list reasoning-sized and routes the long tail through
+        # describe_capabilities. Default (expert/unset) returns everything,
+        # so existing agents are unaffected. Mirrors the stdio server's
+        # MCP_TOOL_TIER so both transports behave the same.
+        from ..domain.tool_levels import tools_for_level
+
+        descriptors = dispatcher.descriptors
+        effective = (
+            tier or os.environ.get("MCP_TOOL_TIER", "") or "expert"
+        ).strip().lower()
+        if effective in ("basic", "intermediate"):
+            allowed = set(
+                tools_for_level(effective, tuple(d.name for d in descriptors))
+            )
+            descriptors = [d for d in descriptors if d.name in allowed]
+        return to_openai_functions(descriptors, strict=strict)
 
     @app.post("/tools/{name}")
     async def call_tool(

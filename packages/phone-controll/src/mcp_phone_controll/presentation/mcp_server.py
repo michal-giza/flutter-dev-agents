@@ -2,19 +2,21 @@
 
 `MCP_TOOL_TIER` env var (May 2026 hardening): some MCP hosts apply a
 tool-count ceiling on `tools/list` — Cursor caps at 40; Claude
-Desktop's UI silently drops the inventory when our 109-tool surface
-arrives. Setting `MCP_TOOL_TIER=basic` (recommended for Claude
-Desktop) advertises only the 24 BASIC tools and routes the long
-tail through `describe_capabilities` for agents that need it.
+Desktop's UI silently drops the inventory when our 140+-tool surface
+arrives; and **small / local models (SLMs) reason poorly over that many
+tool schemas**. Setting `MCP_TOOL_TIER=basic` advertises only the BASIC
+tools and routes the long tail through `describe_capabilities`.
 
 Values:
-  - `basic`        (default for Claude Desktop) — 24 tools
-  - `intermediate` — BASIC + INTERMEDIATE
-  - `expert` or unset — all 109 (original behaviour)
+  - `basic`        (recommended for Claude Desktop + SLMs) — ~26 tools
+  - `intermediate` — BASIC + INTERMEDIATE (~59 tools)
+  - `expert` or unset — all (~143; original behaviour)
 
 The full dispatcher is always wired; the filter only affects what's
 advertised via `tools/list`. Calling a non-advertised tool by name
-still works for clients that know it.
+still works for clients that know it. The OpenAI-compat HTTP adapter
+honours the same env var (and a `?tier=` query param) on GET /tools —
+see `docs/slm-setup.md`.
 """
 
 from __future__ import annotations

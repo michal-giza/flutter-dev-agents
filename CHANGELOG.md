@@ -5,6 +5,48 @@ All notable changes to `flutter-dev-agents` / `mcp-phone-controll`.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] — 2026-06-16
+
+SLM / local-model hardening. The composed stack is model-agnostic, but
+small models choke on a 140+-tool surface — and the OpenAI-compat HTTP
+adapter (the usual SLM entry point) had **no tool-tier scoping**, so it
+always served all tools. Fixed.
+
+### Added — tool-tier scoping on the HTTP adapter
+
+`GET /tools` now honours a **`?tier=basic|intermediate|expert`** query
+param **and** the `MCP_TOOL_TIER` env var (parity with the stdio
+server): `basic` → ~26 tools, `intermediate` → ~59, `expert`/unset →
+all (~143, unchanged default). Small/local models can now be handed a
+reasoning-sized surface and pull in the long tail on demand via
+`describe_capabilities(level=…)`.
+
+### Docs — `docs/slm-setup.md` (new)
+
+How phone-controll + the composed stack adapt to SLMs (Ollama / vLLM /
+LM Studio / llama.cpp):
+- Budget the tool surface (`MCP_TOOL_TIER` / `?tier=`).
+- Compose only the MCP a task needs — Playwright MCP (vision-free,
+  token-light) for web driving on SLMs; Chrome DevTools MCP only when
+  you need traces/network.
+- `dart mcp-server --force-roots-fallback` for SLM clients without MCP
+  roots support; use its verbose tools surgically.
+- The **commodity-tool fallback**: a lone SLM on the HTTP adapter (no
+  `dart mcp-server` composed) still gets SDK plumbing via our
+  `dart_analyze`/`dart_fix`/`dart_format`/`flutter_pub_*` — that's why
+  we kept them after the commodity deprecation.
+- Why the audit layer is the SLM sweet spot (pure-compute, concise,
+  judgment offloaded to the rubric).
+
+Linked from README + the-stack.md. Stale `MCP_TOOL_TIER` docstring
+counts refreshed (24→26, 109→143).
+
+### Tests
+
+- `test_openai_adapter.py` (+2) — `?tier=basic`/`intermediate` scope the
+  HTTP surface; `MCP_TOOL_TIER` env parity.
+- Full suite: **1036 passed, 33 skipped.** ruff clean.
+
 ## [0.10.0] — 2026-06-16
 
 Two runtime-ingest tools — the "you capture, we grade" complements to
