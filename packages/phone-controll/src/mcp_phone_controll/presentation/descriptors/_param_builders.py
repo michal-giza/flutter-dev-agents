@@ -40,6 +40,9 @@ from ...domain.usecases.audit_localization import (
 from ...domain.usecases.audit_maestro_flow import (
     AuditMaestroFlowParams,
 )
+from ...domain.usecases.audit_performance import (
+    AuditPerformanceParams,
+)
 from ...domain.usecases.audit_release_readiness import (
     AuditReleaseReadinessParams,
 )
@@ -1246,6 +1249,16 @@ def _params_audit_security(args: JsonDict) -> AuditSecurityParams:
         project_path=Path(args["project_path"]).expanduser(),
         paths=tuple(str(p) for p in paths),
         min_severity=str(args.get("min_severity", "medium")),
+        max_findings=int(args.get("max_findings", 200)),
+    )
+
+
+def _params_audit_performance(args: JsonDict) -> AuditPerformanceParams:
+    paths = args.get("paths") or ()
+    return AuditPerformanceParams(
+        project_path=Path(args["project_path"]).expanduser(),
+        paths=tuple(str(p) for p in paths),
+        min_severity=str(args.get("min_severity", "low")),
         max_findings=int(args.get("max_findings", 200)),
     )
 

@@ -140,6 +140,8 @@ def default_annotations(tool_name: str) -> dict[str, bool]:
         "audit_code_seniority",
         # v0.3.0 phase 8 — read-only security scan
         "audit_security",
+        # v0.9.0 — read-only performance/jank source scan
+        "audit_performance",
         # v0.3.0 phase 9 — read-only i18n source + arb scan
         "audit_localization",
         # v0.3.0 phase 10 — read-only pubspec + lock scan

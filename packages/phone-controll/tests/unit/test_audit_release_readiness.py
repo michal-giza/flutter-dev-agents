@@ -72,6 +72,35 @@ async def _run(project: Path, **kwargs) -> Ok | Err:
     )
 
 
+@pytest.mark.asyncio
+async def test_performance_domain_default_on_and_flags_jank(tmp_path: Path):
+    """performance is a default-on composite domain (v0.9.0); a non-lazy
+    list drags its grade below smooth."""
+    proj = _project(tmp_path)
+    _write(
+        proj / "pubspec.yaml",
+        "name: app\nenvironment:\n  sdk: '>=3.0.0 <4.0.0'\n"
+        "dependencies:\n  flutter:\n    sdk: flutter\n",
+    )
+    _write(
+        proj / "lib" / "feed.dart",
+        "Widget build(BuildContext c) =>\n"
+        "    ListView(children: items.map((i) => Tile(i)).toList());\n",
+    )
+    res = await _run(
+        proj,
+        include_seniority=False, include_security=False,
+        include_localization=False, include_dependencies=False,
+        include_test_quality=False, include_web_app=False,
+    )
+    assert isinstance(res, Ok)
+    perf = next(
+        (d for d in res.value.domains if d.domain == "performance"), None
+    )
+    assert perf is not None
+    assert perf.grade in ("janky", "severe")
+
+
 # ---- error handling ----------------------------------------------------
 
 
@@ -92,6 +121,7 @@ async def test_all_domains_disabled_returns_failure(tmp_path: Path):
         include_localization=False,
         include_dependencies=False,
         include_test_quality=False,
+        include_performance=False,
         include_web_app=False,
     )
     assert isinstance(res, Err)
@@ -205,7 +235,10 @@ async def test_mid_tier_smells_only_triggers_hold(tmp_path: Path):
             for i in range(15)
         ]),
     )
-    res = await _run(proj)
+    # Disable performance — this project has no jank smells, so a
+    # perfect performance=smooth(100) would lift the composite out of
+    # the mid-tier 'hold' band this test exercises.
+    res = await _run(proj, include_performance=False)
     assert isinstance(res, Ok)
     # No blockers, but composite low → hold
     assert res.value.total_blockers == 0
@@ -265,6 +298,7 @@ async def test_single_domain_run(tmp_path: Path):
         include_localization=False,
         include_dependencies=True,  # only deps
         include_test_quality=False,
+        include_performance=False,
         include_web_app=False,
     )
     assert isinstance(res, Ok)

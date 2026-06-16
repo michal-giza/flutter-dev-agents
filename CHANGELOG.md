@@ -5,6 +5,52 @@ All notable changes to `flutter-dev-agents` / `mcp-phone-controll`.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] — 2026-06-08
+
+New tool — **`audit_performance`**: static Flutter jank audit. Fills the
+gap no first-party MCP covers (verified against Dart 3.11.5 — Google's
+built-in `dart mcp-server` has analyze/fix/inspector but **no
+performance/animation tooling**). Tool count: **140 → 141**.
+
+### Added — `audit_performance`
+
+Pure-compute seniority-rubric auditor (like `audit_security`) over
+`lib/` — no device, no VM, model-agnostic. **10 rules / 3 severities**
+across the three things that drop frames:
+
+- **Animations:** `setstate_in_animation` (setState in an animation
+  listener), `controller_not_disposed`, `opacity_animated` (animated
+  `Opacity` → use `FadeTransition`), `missing_repaint_boundary`,
+  `implicit_anim_zero`.
+- **Scroll / virtualization:** `non_lazy_list` (`ListView(children:)`
+  vs `.builder`), `shrinkwrap_list`, `nested_scroll_column`.
+- **Rebuild cost:** `heavy_work_in_build`, `image_no_cache_size`.
+
+Grade `smooth / acceptable / janky / severe` (weighted findings/KLOC).
+Folds into `audit_release_readiness` as a default-on **performance**
+domain (`weight_performance=1.5`). Docs: `docs/performance-rubric.md`.
+
+**Field-calibrated** on bike_news_room/frontend: 111 files / ~21k LOC →
+`janky` (17 findings, ≈0.8/KLOC) — real scroll/rebuild work surfaced,
+no noise.
+
+### Docs (toolchain currency)
+
+- `dart mcp-server` is now built into the SDK (3.9+); updated
+  the-stack.md / flutter-mcp-comparison.md (the `dart_mcp_server` pub
+  package is superseded).
+- Registered + documented **Playwright MCP** (visual/SLM) and **Chrome
+  DevTools MCP** (debug/tooling) as the model-agnostic browser-driving
+  layer; added the logged-in web before/after playbook + the
+  field-verified CanvasKit synthetic-scroll caveat.
+
+### Tests
+
+- `test_audit_performance.py` (24) — every rule + grade + filters +
+  generated/test-file skip.
+- `test_audit_release_readiness.py` (+1) — performance default-on domain.
+- Contract refreshed. Full suite: **1014 passed, 33 skipped.** ruff clean.
+
 ## [0.8.1] — 2026-06-08
 
 Bug fix — **WebDriverAgent couldn't build for an iOS Simulator**. Field

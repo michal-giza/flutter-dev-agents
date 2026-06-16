@@ -38,6 +38,9 @@ from mcp_phone_controll.domain.usecases.audit_localization import (
 from mcp_phone_controll.domain.usecases.audit_maestro_flow import (
     AuditMaestroFlow,
 )
+from mcp_phone_controll.domain.usecases.audit_performance import (
+    AuditPerformance,
+)
 from mcp_phone_controll.domain.usecases.audit_release_readiness import (
     AuditReleaseReadiness,
 )
@@ -454,6 +457,7 @@ def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:
         recommend_test_path=RecommendTestPath(),
         audit_code_seniority=AuditCodeSeniority(),
         audit_security=AuditSecurity(),
+        audit_performance=AuditPerformance(),
         audit_localization=AuditLocalization(),
         audit_dependencies=AuditDependencies(),
         audit_release_readiness=AuditReleaseReadiness(),
@@ -710,6 +714,7 @@ async def test_registry_covers_all_use_case_fields(tmp_path: Path):
         "audit_code_seniority",
         # v0.3.0 phase 8 (security audit — OWASP MASVS)
         "audit_security",
+        "audit_performance",
         # v0.3.0 phase 9 (localization / i18n hygiene audit)
         "audit_localization",
         # v0.3.0 phase 10 (dependencies / supply chain audit)
