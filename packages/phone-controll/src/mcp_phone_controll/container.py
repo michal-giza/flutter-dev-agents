@@ -146,6 +146,8 @@ from .domain.usecases.ide import (
     OpenProjectInIde,
     WriteVscodeLaunchConfig,
 )
+from .domain.usecases.ingest_frame_timeline import IngestFrameTimeline
+from .domain.usecases.ingest_har import IngestHar
 from .domain.usecases.ingest_lighthouse_report import IngestLighthouseReport
 from .domain.usecases.ingest_maestro_report import IngestMaestroReport
 from .domain.usecases.inspect_image_safety import InspectImageSafety
@@ -699,6 +701,10 @@ def build_runtime(
         audit_web_app=AuditWebApp(),
         # v0.5.0 phase 16 — Lighthouse report ingest (web vitals)
         ingest_lighthouse_report=_ingest_lighthouse,
+        # v0.10.0 — HAR ingest (per-action network / backend cost)
+        ingest_har=IngestHar(),
+        # v0.10.0 — frame-timeline ingest (jank score)
+        ingest_frame_timeline=IngestFrameTimeline(),
         # v0.6.0 — Lighthouse runner (run + ingest in one call)
         run_lighthouse=RunLighthouse(lighthouse_cli, _ingest_lighthouse),
         new_session=NewSession(artifacts_repo),

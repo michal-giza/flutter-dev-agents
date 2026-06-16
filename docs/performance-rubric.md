@@ -70,6 +70,29 @@ drives the grade.
   `ListView(children:)` is fine; we can't measure length statically, so
   treat HIGH here as "confirm this list is bounded," not "always wrong."
 
+## Runtime complements (v0.10.0)
+
+`audit_performance` flags jank-prone *patterns* statically. To measure
+*actual* runtime cost, pair it with two ingest tools (you capture via a
+profiler / browser MCP, we grade — same posture as
+`ingest_lighthouse_report`):
+
+- **`ingest_frame_timeline`** — grades a captured frame timeline into a
+  jank score: frame count, % janky (over the `fps` budget, default
+  16.7ms @60fps), worst frame, p50/p90/p99, build-vs-raster split, grade
+  `smooth/acceptable/janky/severe`. Accepts a Trace Event Format file
+  (Flutter VM Timeline from `start/stop_frame_profile`, or a Chrome
+  DevTools web trace) or a `frames_ms` list. This is the **"is the
+  animation/scroll actually smooth?"** verdict that `audit_performance`
+  can only guess at statically.
+- **`ingest_har`** — grades a Network-panel HAR export: per-host
+  reads/writes, p50/p95 latency, payload, errors, with a backend host
+  highlighted. The **per-action data-cost** half (e.g. Firestore reads
+  per screen).
+
+Static (pre-run) → `audit_performance`. Runtime (post-capture) →
+`ingest_frame_timeline` + `ingest_har`.
+
 ## Field calibration (bike_news_room/frontend)
 
 111 files / ~21k LOC → grade `janky` (score 2.0), 17 findings:

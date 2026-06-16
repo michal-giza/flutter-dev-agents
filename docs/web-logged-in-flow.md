@@ -95,10 +95,12 @@ browser.read_console_messages()                   # errors during the action
 
 ### 6. Grade
 
-- **Firestore cost/latency**: diff the `read_network_requests` sets from
-  steps 3 and 5; filter `firestore.googleapis.com` — count reads/writes,
-  sum latency + payload. (This is the per-action telemetry your report
-  asked for — it comes straight from the Network panel.)
+- **Firestore cost/latency**: export the Network panel as a **HAR** and
+  run **`ingest_har`** (v0.10.0) — it grades per-host reads/writes,
+  p50/p95 latency, payload, and errors with your backend host
+  highlighted (`backend_host="firestore.googleapis.com"` or your REST
+  API). Or read it ad-hoc by diffing the `read_network_requests` sets
+  from steps 3 and 5.
 - **Frames/jank**: read the trace's long tasks (>50ms) and dropped
   frames during the scroll/import window.
 - **Load vitals**: `run_lighthouse` (step 0) for LCP/CLS/TBT.
@@ -133,15 +135,15 @@ that needs the CDP/Playwright path.
 
 ## Want it graded, not eyeballed?
 
-The Network diff (step 6) and trace analysis are manual reads of the
-browser MCP's output today. If you want phone-controll to turn those raw exports
-into audit-grade verdicts, two in-lane tools are ready to build on
-request (pure-compute, "you capture, we grade"):
+phone-controll turns the raw browser-MCP exports into audit-grade
+verdicts (pure-compute, "you capture, we grade"):
 
-- `ingest_har` — Firestore reads/writes + latency + payload per action
-  from a Network-panel HAR export.
-- `ingest_chrome_trace` — long tasks / main-thread blocking / dropped
-  frames from a DevTools performance trace.
+- **`ingest_har`** (v0.10.0) — per-host reads/writes + p50/p95 latency +
+  payload + errors from a Network-panel **HAR** export, backend host
+  highlighted.
+- **`ingest_frame_timeline`** (v0.10.x) — % janky frames / worst frame /
+  build-vs-raster from a captured frame timeline (mobile VM Timeline or
+  a Chrome DevTools web trace).
 
 Both follow the `ingest_maestro_report` / `ingest_lighthouse_report`
-posture. Say the word.
+posture.

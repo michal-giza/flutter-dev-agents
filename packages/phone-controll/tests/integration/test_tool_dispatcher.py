@@ -112,6 +112,12 @@ from mcp_phone_controll.domain.usecases.ide import (
     OpenProjectInIde,
     WriteVscodeLaunchConfig,
 )
+from mcp_phone_controll.domain.usecases.ingest_frame_timeline import (
+    IngestFrameTimeline,
+)
+from mcp_phone_controll.domain.usecases.ingest_har import (
+    IngestHar,
+)
 from mcp_phone_controll.domain.usecases.ingest_lighthouse_report import (
     IngestLighthouseReport,
 )
@@ -467,6 +473,8 @@ def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:
         ingest_maestro_report=IngestMaestroReport(),
         audit_web_app=AuditWebApp(),
         ingest_lighthouse_report=IngestLighthouseReport(),
+        ingest_har=IngestHar(),
+        ingest_frame_timeline=IngestFrameTimeline(),
         run_lighthouse=RunLighthouse(
             LighthouseCli(AsyncProcessRunner()), IngestLighthouseReport()
         ),
@@ -733,6 +741,10 @@ async def test_registry_covers_all_use_case_fields(tmp_path: Path):
         "audit_web_app",
         # v0.5.0 phase 16 (Lighthouse report ingest)
         "ingest_lighthouse_report",
+        # v0.10.0 (HAR ingest)
+        "ingest_har",
+        # v0.10.0 (frame-timeline ingest)
+        "ingest_frame_timeline",
         # v0.6.0 (Lighthouse runner)
         "run_lighthouse",
     }
