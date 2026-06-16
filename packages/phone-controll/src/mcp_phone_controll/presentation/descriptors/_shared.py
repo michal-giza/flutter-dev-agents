@@ -160,6 +160,10 @@ def default_annotations(tool_name: str) -> dict[str, bool]:
         "audit_web_app",
         # v0.5.0 phase 16 — parses external Lighthouse JSON, no writes
         "ingest_lighthouse_report",
+        # v0.10.0 — parses an external HAR file, no writes
+        "ingest_har",
+        # v0.10.0 — parses a captured frame timeline, no writes
+        "ingest_frame_timeline",
     )
     # Destructive tools — touch device state, install/launch/stop apps,
     # write files in arbitrary places, modify project source.

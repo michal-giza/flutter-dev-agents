@@ -1805,6 +1805,64 @@
       "destructiveHint": false,
       "readOnlyHint": true
     },
+    "description": "Grade a captured frame timeline into a jank score \u2014 the runtime complement to audit_performance. Accepts a Trace Event Format file (Flutter VM Timeline from start/stop_frame_profile, or a Chrome DevTools web trace) or a frames_ms list. Returns frame count, % janky (over the fps budget), worst frame, p50/p90/p99, build-vs-raster, and a grade (smooth/acceptable/janky/severe). Pure compute. See docs/performance-rubric.md.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "fps": {
+          "description": "Target FPS; frame budget = 1000/fps. Default 60 (pass 120 for ProMotion).",
+          "type": "number"
+        },
+        "severe_factor": {
+          "description": "A frame this many times over budget is 'severe'. Default 2.0.",
+          "type": "number"
+        },
+        "timeline_path": {
+          "description": "Path to a trace/timeline JSON (or a directory).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "timeline_path"
+      ],
+      "type": "object"
+    },
+    "name": "ingest_frame_timeline"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Parse a HAR (Network-panel export from a browser MCP) into a per-action network-cost report: per-host request counts, reads vs writes, latency p50/p95, payload bytes, errors, and the slowest calls \u2014 with one backend host highlighted (e.g. firestore.googleapis.com or a REST API). Grade (good/needs_improvement/poor/blocked). Pure compute \u2014 you capture, we grade. See docs/web-logged-in-flow.md.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "backend_host": {
+          "description": "Highlight this backend host (substring match). Omit to auto-pick the busiest non-CDN host.",
+          "type": "string"
+        },
+        "har_path": {
+          "description": "Path to a .har file (or a directory containing one).",
+          "type": "string"
+        },
+        "slow_ms": {
+          "description": "Threshold (ms) for the slowest-calls list. Default 1000.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "har_path"
+      ],
+      "type": "object"
+    },
+    "name": "ingest_har"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "readOnlyHint": true
+    },
     "description": "Parse a Lighthouse JSON report. Returns category scores (performance/accessibility/seo/pwa), Core Web Vitals (LCP/CLS/TBT/FCP/TTI), top opportunities, and a grade (good/needs_improvement/poor/blocked). CanvasKit-aware perf threshold (default 70). Pure compute \u2014 you run lighthouse, we parse it. See docs/web-app-rubric.md.",
     "inputSchema": {
       "additionalProperties": false,

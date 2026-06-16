@@ -97,6 +97,8 @@ from ..domain.usecases.ide import (
     OpenProjectInIde,
     WriteVscodeLaunchConfig,
 )
+from ..domain.usecases.ingest_frame_timeline import IngestFrameTimeline
+from ..domain.usecases.ingest_har import IngestHar
 from ..domain.usecases.ingest_lighthouse_report import IngestLighthouseReport
 from ..domain.usecases.ingest_maestro_report import IngestMaestroReport
 from ..domain.usecases.inspect_image_safety import (
@@ -285,6 +287,8 @@ from .descriptors._param_builders import (
     _params_grep_logs,
     _params_index_project,
     _params_infer_pose,
+    _params_ingest_frame_timeline,
+    _params_ingest_har,
     _params_ingest_lighthouse_report,
     _params_ingest_maestro_report,
     _params_inspect_image_safety,
@@ -547,6 +551,10 @@ class UseCases:
     audit_web_app: AuditWebApp
     # v0.5.0 phase 16 — Lighthouse report ingest (web vitals)
     ingest_lighthouse_report: IngestLighthouseReport
+    # v0.10.0 — HAR ingest (per-action network / backend cost)
+    ingest_har: IngestHar
+    # v0.10.0 — frame-timeline ingest (jank score)
+    ingest_frame_timeline: IngestFrameTimeline
     # v0.6.0 — Lighthouse runner (run + ingest in one call)
     run_lighthouse: RunLighthouse
     new_session: NewSession
@@ -3233,6 +3241,68 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
                 uc.ingest_lighthouse_report,
                 _params_ingest_lighthouse_report,
             ),
+        ),
+        # ---- v0.10.0 — HAR ingest (per-action network cost) ----
+        ToolDescriptor(
+            name="ingest_har",
+            description=(
+                "Parse a HAR (Network-panel export from a browser MCP) into "
+                "a per-action network-cost report: per-host request counts, "
+                "reads vs writes, latency p50/p95, payload bytes, errors, and "
+                "the slowest calls — with one backend host highlighted "
+                "(e.g. firestore.googleapis.com or a REST API). Grade "
+                "(good/needs_improvement/poor/blocked). Pure compute — you "
+                "capture, we grade. See docs/web-logged-in-flow.md."
+            ),
+            input_schema=_schema(
+                {
+                    "har_path": _string(
+                        "Path to a .har file (or a directory containing one)."
+                    ),
+                    "backend_host": _string(
+                        "Highlight this backend host (substring match). "
+                        "Omit to auto-pick the busiest non-CDN host."
+                    ),
+                    "slow_ms": _number(
+                        "Threshold (ms) for the slowest-calls list. Default 1000."
+                    ),
+                },
+                ["har_path"],
+            ),
+            build_params=_params_ingest_har,
+            invoke=_bind(uc.ingest_har, _params_ingest_har),
+        ),
+        # ---- v0.10.0 — frame-timeline ingest (jank score) ----
+        ToolDescriptor(
+            name="ingest_frame_timeline",
+            description=(
+                "Grade a captured frame timeline into a jank score — the "
+                "runtime complement to audit_performance. Accepts a Trace "
+                "Event Format file (Flutter VM Timeline from "
+                "start/stop_frame_profile, or a Chrome DevTools web trace) "
+                "or a frames_ms list. Returns frame count, % janky (over the "
+                "fps budget), worst frame, p50/p90/p99, build-vs-raster, and "
+                "a grade (smooth/acceptable/janky/severe). Pure compute. "
+                "See docs/performance-rubric.md."
+            ),
+            input_schema=_schema(
+                {
+                    "timeline_path": _string(
+                        "Path to a trace/timeline JSON (or a directory)."
+                    ),
+                    "fps": _number(
+                        "Target FPS; frame budget = 1000/fps. Default 60 "
+                        "(pass 120 for ProMotion)."
+                    ),
+                    "severe_factor": _number(
+                        "A frame this many times over budget is 'severe'. "
+                        "Default 2.0."
+                    ),
+                },
+                ["timeline_path"],
+            ),
+            build_params=_params_ingest_frame_timeline,
+            invoke=_bind(uc.ingest_frame_timeline, _params_ingest_frame_timeline),
         ),
         # ---- v0.6.0 — Lighthouse runner (run + ingest) ----
         ToolDescriptor(

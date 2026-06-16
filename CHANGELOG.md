@@ -5,6 +5,49 @@ All notable changes to `flutter-dev-agents` / `mcp-phone-controll`.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] — 2026-06-16
+
+Two runtime-ingest tools — the "you capture, we grade" complements to
+the static audits. Tool count: **141 → 143**.
+
+### Added — `ingest_har`
+
+Parse a Network-panel **HAR** export (from a browser MCP) into a
+per-action network-cost report: per-host request counts, reads vs
+writes, p50/p95 latency, payload bytes, errors, and the slowest calls —
+with one **backend host** highlighted (`backend_host=`, or auto-picked
+as the busiest non-CDN host). Grade
+`good/needs_improvement/poor/blocked`. The per-action data-cost
+telemetry the field reports asked for (e.g. Firestore reads per screen),
+validated against the bike_news_room run's `/api/*` reads.
+
+### Added — `ingest_frame_timeline`
+
+Grade a captured frame timeline into a **jank score** — the runtime
+complement to `audit_performance` (static). Accepts a Trace Event Format
+file (Flutter VM Timeline from `start/stop_frame_profile`, or a Chrome
+DevTools web trace) or a `frames_ms` list. Returns frame count, % janky
+(over the `fps` budget; `fps=120` for ProMotion), worst frame,
+p50/p90/p99, build-vs-raster split, grade `smooth/acceptable/janky/
+severe`. For web traces with no Flutter frame events it falls back to
+top-level long tasks as the jank proxy.
+
+Both are pure-compute (stdlib JSON), read-only, model-agnostic.
+
+### Docs
+
+- `docs/performance-rubric.md` — runtime-complements section (static
+  `audit_performance` → runtime `ingest_frame_timeline` + `ingest_har`).
+- `docs/web-logged-in-flow.md` — `ingest_har` wired into the before/after
+  loop's grade step.
+
+### Tests
+
+- `test_ingest_har.py` (12) + `test_ingest_frame_timeline.py` (11) —
+  parsing, grading bands, percentiles, trace + frames-list modes,
+  failure paths.
+- Contract refreshed. Full suite: **1034 passed, 33 skipped.** ruff clean.
+
 ## [0.9.0] — 2026-06-08
 
 New tool — **`audit_performance`**: static Flutter jank audit. Fills the

@@ -110,6 +110,12 @@ from ...domain.usecases.ide import (
     OpenProjectInIdeParams,
     WriteVscodeLaunchConfigParams,
 )
+from ...domain.usecases.ingest_frame_timeline import (
+    IngestFrameTimelineParams,
+)
+from ...domain.usecases.ingest_har import (
+    IngestHarParams,
+)
 from ...domain.usecases.ingest_lighthouse_report import (
     IngestLighthouseReportParams,
 )
@@ -1088,6 +1094,22 @@ def _params_audit_dependencies(args: JsonDict) -> AuditDependenciesParams:
 
 
 # ---- v0.5.0 phase 16 — Lighthouse report ingest ------------------------
+
+
+def _params_ingest_har(args: JsonDict) -> IngestHarParams:
+    return IngestHarParams(
+        har_path=Path(args["har_path"]).expanduser(),
+        backend_host=args.get("backend_host"),
+        slow_ms=float(args.get("slow_ms", 1000.0)),
+    )
+
+
+def _params_ingest_frame_timeline(args: JsonDict) -> IngestFrameTimelineParams:
+    return IngestFrameTimelineParams(
+        timeline_path=Path(args["timeline_path"]).expanduser(),
+        fps=int(args.get("fps", 60)),
+        severe_factor=float(args.get("severe_factor", 2.0)),
+    )
 
 
 def _params_ingest_lighthouse_report(
