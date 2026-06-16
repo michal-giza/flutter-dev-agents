@@ -63,6 +63,10 @@ from .audit_localization import (
     AuditLocalization,
     AuditLocalizationParams,
 )
+from .audit_performance import (
+    AuditPerformance,
+    AuditPerformanceParams,
+)
 from .audit_security import (
     AuditSecurity,
     AuditSecurityParams,
@@ -116,6 +120,9 @@ class AuditReleaseReadinessParams:
     include_localization: bool = True
     include_dependencies: bool = True
     include_test_quality: bool = True
+    # Performance / jank audit (animation + scroll + rebuild). Static,
+    # no device — safe to leave on.
+    include_performance: bool = True
     # Flutter-web audit (web/index.html + manifest). Opt-in —
     # only runs if the project has a web/ directory anyway, so
     # safe to leave on; returns not_web_app (excluded) otherwise.
@@ -137,6 +144,7 @@ class AuditReleaseReadinessParams:
     # localization.
     weight_seniority: float = 1.0
     weight_security: float = 2.0
+    weight_performance: float = 1.5
     weight_localization: float = 1.0
     weight_dependencies: float = 1.5
     weight_test_quality: float = 1.5
@@ -172,6 +180,9 @@ _SENIORITY_GRADE_SCORES = {
 }
 _SECURITY_GRADE_SCORES = {
     "secure": 100, "acceptable": 75, "at_risk": 40, "critical": 0,
+}
+_PERFORMANCE_GRADE_SCORES = {
+    "smooth": 100, "acceptable": 80, "janky": 45, "severe": 15,
 }
 _LOCALIZATION_GRADE_SCORES = {
     "well_localized": 100, "acceptable": 75,
@@ -250,6 +261,19 @@ class AuditReleaseReadiness(
                 ),
             ))
             weights["security"] = params.weight_security
+
+        if params.include_performance:
+            domain_tasks.append((
+                "performance",
+                asyncio.create_task(
+                    AuditPerformance()(
+                        AuditPerformanceParams(
+                            project_path=params.project_path,
+                        )
+                    )
+                ),
+            ))
+            weights["performance"] = params.weight_performance
 
         if params.include_localization:
             domain_tasks.append((
@@ -529,6 +553,7 @@ def _score_for_domain(domain: str, grade: str | None) -> float:
     table = {
         "seniority": _SENIORITY_GRADE_SCORES,
         "security": _SECURITY_GRADE_SCORES,
+        "performance": _PERFORMANCE_GRADE_SCORES,
         "localization": _LOCALIZATION_GRADE_SCORES,
         "dependencies": _DEPENDENCIES_GRADE_SCORES,
         "test_quality": _TEST_QUALITY_GRADE_SCORES,

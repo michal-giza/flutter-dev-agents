@@ -30,6 +30,7 @@ from ..domain.usecases.audit_code_seniority import AuditCodeSeniority
 from ..domain.usecases.audit_dependencies import AuditDependencies
 from ..domain.usecases.audit_localization import AuditLocalization
 from ..domain.usecases.audit_maestro_flow import AuditMaestroFlow
+from ..domain.usecases.audit_performance import AuditPerformance
 from ..domain.usecases.audit_release_readiness import AuditReleaseReadiness
 from ..domain.usecases.audit_security import AuditSecurity
 from ..domain.usecases.audit_test_quality import AuditTestQuality
@@ -247,6 +248,7 @@ from .descriptors._param_builders import (
     _params_audit_dependencies,
     _params_audit_localization,
     _params_audit_maestro_flow,
+    _params_audit_performance,
     _params_audit_release_readiness,
     _params_audit_security,
     _params_audit_test_quality,
@@ -525,6 +527,8 @@ class UseCases:
     audit_code_seniority: AuditCodeSeniority
     # v0.3.0 phase 8 — security audit (OWASP MASVS)
     audit_security: AuditSecurity
+    # v0.9.0 — performance / jank audit (animation + scroll + rebuild)
+    audit_performance: AuditPerformance
     # v0.3.0 phase 9 — localization audit (i18n hygiene)
     audit_localization: AuditLocalization
     # v0.3.0 phase 10 — dependencies / supply chain audit
@@ -2797,6 +2801,45 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             ),
             build_params=_params_audit_security,
             invoke=_bind(uc.audit_security, _params_audit_security),
+        ),
+        # ---- v0.9.0 — performance / jank audit ----
+        ToolDescriptor(
+            name="audit_performance",
+            description=(
+                "Flutter jank audit (the gap Google's dart mcp-server "
+                "doesn't cover). 10 rules across 3 severities over lib/: "
+                "non-lazy ListView/GridView, setState in animation "
+                "listeners, undisposed AnimationController, animated "
+                "Opacity, shrinkWrap lists, Column-in-ScrollView lists, "
+                "Image without cacheWidth, heavy work in build(), missing "
+                "RepaintBoundary, zero-duration implicit animations. "
+                "Returns per-file findings + grade "
+                "(smooth/acceptable/janky/severe). Pure compute, no "
+                "device. See docs/performance-rubric.md."
+            ),
+            input_schema=_schema(
+                {
+                    "project_path": _string("Project root."),
+                    "paths": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": (
+                            "Optional subset of paths to scan. "
+                            "Default: whole project."
+                        ),
+                    },
+                    "min_severity": _enum(
+                        ["high", "medium", "low"],
+                        "Minimum severity to report.",
+                    ),
+                    "max_findings": _number(
+                        "Cap on findings returned. Default 200."
+                    ),
+                },
+                ["project_path"],
+            ),
+            build_params=_params_audit_performance,
+            invoke=_bind(uc.audit_performance, _params_audit_performance),
         ),
         # ---- v0.3.0 phase 9 — localization (i18n) audit ----
         ToolDescriptor(

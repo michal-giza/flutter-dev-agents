@@ -428,6 +428,47 @@
       "destructiveHint": false,
       "readOnlyHint": true
     },
+    "description": "Flutter jank audit (the gap Google's dart mcp-server doesn't cover). 10 rules across 3 severities over lib/: non-lazy ListView/GridView, setState in animation listeners, undisposed AnimationController, animated Opacity, shrinkWrap lists, Column-in-ScrollView lists, Image without cacheWidth, heavy work in build(), missing RepaintBoundary, zero-duration implicit animations. Returns per-file findings + grade (smooth/acceptable/janky/severe). Pure compute, no device. See docs/performance-rubric.md.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "max_findings": {
+          "description": "Cap on findings returned. Default 200.",
+          "type": "number"
+        },
+        "min_severity": {
+          "description": "Minimum severity to report.",
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ],
+          "type": "string"
+        },
+        "paths": {
+          "description": "Optional subset of paths to scan. Default: whole project.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "project_path": {
+          "description": "Project root.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_path"
+      ],
+      "type": "object"
+    },
+    "name": "audit_performance"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "readOnlyHint": true
+    },
     "description": "Release-readiness gate. Composes the 4 v0.3.0 audit verticals (seniority, security, localization, dependencies) concurrently into one ship/hold/block verdict. Returns composite letter grade A-F, per-domain breakdown, cross-domain top_actions, and a paste-ready release-PR summary. Pure compute. Sub-second. See docs/release-readiness-rubric.md.",
     "inputSchema": {
       "additionalProperties": false,

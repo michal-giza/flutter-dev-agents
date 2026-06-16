@@ -88,6 +88,7 @@ from .domain.usecases.audit_code_seniority import AuditCodeSeniority
 from .domain.usecases.audit_dependencies import AuditDependencies
 from .domain.usecases.audit_localization import AuditLocalization
 from .domain.usecases.audit_maestro_flow import AuditMaestroFlow
+from .domain.usecases.audit_performance import AuditPerformance
 from .domain.usecases.audit_release_readiness import AuditReleaseReadiness
 from .domain.usecases.audit_security import AuditSecurity
 from .domain.usecases.audit_test_quality import AuditTestQuality
@@ -678,6 +679,8 @@ def build_runtime(
         audit_code_seniority=AuditCodeSeniority(),
         # v0.3.0 phase 8 — security audit (OWASP MASVS)
         audit_security=AuditSecurity(),
+        # v0.9.0 — performance / jank audit (animation + scroll + rebuild)
+        audit_performance=AuditPerformance(),
         # v0.3.0 phase 9 — localization / i18n hygiene audit
         audit_localization=AuditLocalization(),
         # v0.3.0 phase 10 — dependency / supply chain audit
