@@ -85,6 +85,7 @@ from ..domain.usecases.discovery import (
     ToolUsageReportUseCase,
 )
 from ..domain.usecases.doctor import CheckEnvironment
+from ..domain.usecases.estimate_tokens import EstimateTokens
 from ..domain.usecases.frame_profile import (
     StartFrameProfile,
     StopFrameProfile,
@@ -274,6 +275,7 @@ from .descriptors._param_builders import (
     _params_detect_undisposed_controllers,
     _params_dump_ui,
     _params_dump_widget_tree,
+    _params_estimate_tokens,
     _params_extract_ui_graph,
     _params_fetch_artifact,
     _params_find,
@@ -555,6 +557,8 @@ class UseCases:
     ingest_har: IngestHar
     # v0.10.0 — frame-timeline ingest (jank score)
     ingest_frame_timeline: IngestFrameTimeline
+    # v0.12.0 — token counter / budget predictor (SLM context guard)
+    estimate_tokens: EstimateTokens
     # v0.6.0 — Lighthouse runner (run + ingest in one call)
     run_lighthouse: RunLighthouse
     new_session: NewSession
@@ -3303,6 +3307,39 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             ),
             build_params=_params_ingest_frame_timeline,
             invoke=_bind(uc.ingest_frame_timeline, _params_ingest_frame_timeline),
+        ),
+        # ---- v0.12.0 — token counter / budget predictor (SLM guard) ----
+        ToolDescriptor(
+            name="estimate_tokens",
+            description=(
+                "Estimate token cost of text or a file before ingesting "
+                "it. Returns chars, tokens (low–high band), and "
+                "size_class. Pass budget_tokens for a fits/headroom "
+                "verdict and a recommendation (proceed/caution/flush). "
+                "Pure compute. SLM context guard."
+            ),
+            input_schema=_schema(
+                {
+                    "text": _string(
+                        "Text to estimate. Provide this OR `path`."
+                    ),
+                    "path": _string(
+                        "Path to a file to estimate. Provide this OR "
+                        "`text`. Files over 25 MB are estimated from byte "
+                        "size without loading."
+                    ),
+                    "budget_tokens": _number(
+                        "Your remaining context budget. When set, the "
+                        "result reports fits/headroom and a recommendation."
+                    ),
+                    "chars_per_token": _number(
+                        "Heuristic avg chars/token. ~4 for prose, ~3.3 for "
+                        "code/JSON. Default 4.0. Ignored when tiktoken runs."
+                    ),
+                },
+            ),
+            build_params=_params_estimate_tokens,
+            invoke=_bind(uc.estimate_tokens, _params_estimate_tokens),
         ),
         # ---- v0.6.0 — Lighthouse runner (run + ingest) ----
         ToolDescriptor(

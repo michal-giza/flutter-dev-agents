@@ -99,6 +99,7 @@ from ...domain.usecases.discovery import (
     SessionSummaryParams,
     ToolUsageReportParams,
 )
+from ...domain.usecases.estimate_tokens import EstimateTokensParams
 from ...domain.usecases.frame_profile import (
     StartFrameProfileParams,
     StopFrameProfileParams,
@@ -1109,6 +1110,17 @@ def _params_ingest_frame_timeline(args: JsonDict) -> IngestFrameTimelineParams:
         timeline_path=Path(args["timeline_path"]).expanduser(),
         fps=int(args.get("fps", 60)),
         severe_factor=float(args.get("severe_factor", 2.0)),
+    )
+
+
+def _params_estimate_tokens(args: JsonDict) -> EstimateTokensParams:
+    path = args.get("path")
+    budget = args.get("budget_tokens")
+    return EstimateTokensParams(
+        text=args.get("text"),
+        path=Path(path).expanduser() if path else None,
+        budget_tokens=int(budget) if budget is not None else None,
+        chars_per_token=float(args.get("chars_per_token", 4.0)),
     )
 
 

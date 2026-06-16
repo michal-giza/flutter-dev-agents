@@ -5,6 +5,47 @@ All notable changes to `flutter-dev-agents` / `mcp-phone-controll`.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] — 2026-06-17
+
+A context-budget guard for ingesting large payloads — built primarily
+for **small / local models**, where a 74k-char widget tree or an
+MB-scale HAR/Lighthouse/trace file silently overflows the window. Tool
+count: **143 → 144**.
+
+### Added — `estimate_tokens` (BASIC tier)
+
+The text/payload analog of `inspect_image_safety` ("will this PNG blow
+the API limit?") — *"will this string/file fit my context, or do I need
+to scope or compact first?"* Pure compute, no network.
+
+- **Count** — estimate tokens of a string or a file (chars, words,
+  estimated tokens with a low–high band, a `size_class` of
+  small/medium/large/huge). Files over 25 MB are estimated from byte
+  size without loading.
+- **Predict** — size a file *before* you ingest it (e.g. "is this HAR
+  safe to `ingest_har`?").
+- **Validate** — pass `budget_tokens` (your remaining context) to get
+  `fits` / `headroom_tokens` and a **recommendation**: `proceed` /
+  `proceed_with_caution` (<20% headroom) / `flush_context` (overflow).
+
+Uses **`tiktoken`** (cl100k_base) when installed for an exact count;
+otherwise a calibrated chars/words heuristic (override
+`chars_per_token` — ~4 for prose, ~3.3 for code/JSON). Placed in the
+**BASIC** tier because SLMs are exactly who needs the overflow guard.
+
+Honest scope: a server-side MCP **cannot** see the model's live
+remaining context or trigger a flush — compaction is the host's job
+(Claude Code auto-compacts; a local agent clears its own history). This
+tool gives the signal via `recommendation`; the host acts.
+
+### Tests
+
+- `test_estimate_tokens.py` (+14) — counting, size classes, budget
+  fits/tight/overflow verdicts, file vs text, heuristic knobs, error
+  paths.
+- Full suite: **1083 passed, 6 skipped.** ruff clean. Contract snapshot
+  refreshed.
+
 ## [0.11.0] — 2026-06-16
 
 SLM / local-model hardening. The composed stack is model-agnostic, but

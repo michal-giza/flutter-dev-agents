@@ -1387,6 +1387,37 @@
   {
     "annotations": {
       "destructiveHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Estimate token cost of text or a file before ingesting it. Returns chars, tokens (low\u2013high band), and size_class. Pass budget_tokens for a fits/headroom verdict and a recommendation (proceed/caution/flush). Pure compute. SLM context guard.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "budget_tokens": {
+          "description": "Your remaining context budget. When set, the result reports fits/headroom and a recommendation.",
+          "type": "number"
+        },
+        "chars_per_token": {
+          "description": "Heuristic avg chars/token. ~4 for prose, ~3.3 for code/JSON. Default 4.0. Ignored when tiktoken runs.",
+          "type": "number"
+        },
+        "path": {
+          "description": "Path to a file to estimate. Provide this OR `text`. Files over 25 MB are estimated from byte size without loading.",
+          "type": "string"
+        },
+        "text": {
+          "description": "Text to estimate. Provide this OR `path`.",
+          "type": "string"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "estimate_tokens"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
       "idempotentHint": true,
       "openWorldHint": true,
       "readOnlyHint": true

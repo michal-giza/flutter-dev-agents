@@ -8,9 +8,9 @@ tool schemas**. Setting `MCP_TOOL_TIER=basic` advertises only the BASIC
 tools and routes the long tail through `describe_capabilities`.
 
 Values:
-  - `basic`        (recommended for Claude Desktop + SLMs) — ~26 tools
-  - `intermediate` — BASIC + INTERMEDIATE (~59 tools)
-  - `expert` or unset — all (~143; original behaviour)
+  - `basic`        (recommended for Claude Desktop + SLMs) — ~27 tools
+  - `intermediate` — BASIC + INTERMEDIATE (~60 tools)
+  - `expert` or unset — all (~144; original behaviour)
 
 The full dispatcher is always wired; the filter only affects what's
 advertised via `tools/list`. Calling a non-advertised tool by name

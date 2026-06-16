@@ -20,8 +20,8 @@ phone-controll has a built-in tiering lever on **both** transports:
 | **stdio** (Cline, Continue, LM Studio, Claude Desktop) | `MCP_TOOL_TIER=basic` env on the server process |
 | **OpenAI-compat HTTP adapter** (the usual SLM path) | `GET /tools?tier=basic` query param, **or** the `MCP_TOOL_TIER` env |
 
-Tiers: **`basic`** (~26 tools — discovery + device control + the audit
-entry points), **`intermediate`** (~59), **`expert`/unset** (all ~143).
+Tiers: **`basic`** (~27 tools — discovery + device control + the audit
+entry points), **`intermediate`** (~60), **`expert`/unset** (all ~144).
 The full dispatcher is always wired — a tool not in the advertised list
 still dispatches if the agent names it. The long tail is reachable
 on-demand via **`describe_capabilities(level="basic"|"intermediate"|
@@ -31,6 +31,28 @@ universal discovery entry point that works on every transport.
 **Recommendation:** start an SLM at `tier=basic`, let it call
 `describe_capabilities` to pull in more tools only when a task needs
 them.
+
+## The other SLM rule: budget the *payload*, not just the surface
+
+A small window overflows on a single oversized tool result — a 74k-char
+widget tree, an MB-scale HAR/Lighthouse/trace file — long before the
+tool *count* is the problem. **`estimate_tokens`** (BASIC tier) is the
+preflight guard: estimate a string or file, and pass `budget_tokens`
+(your remaining context) to get a `fits`/`headroom` verdict and a
+recommendation — `proceed`, `proceed_with_caution` (<20% headroom), or
+`flush_context`. It uses `tiktoken` when installed, else a calibrated
+char heuristic with a low–high band.
+
+```bash
+# "is this HAR safe to ingest, or will it blow my 32k window?"
+POST /tools/estimate_tokens  {"path": "net.har", "budget_tokens": 32000}
+# → {"estimated_tokens": 41996, "fits": false, "recommendation": "flush_context"}
+```
+
+It's the text analog of `inspect_image_safety` (the pre-Read PNG check).
+Honest limit: a server-side MCP **cannot** see your live remaining
+context or trigger a flush — it returns the signal; your host compacts
+(Claude Code auto-compacts; a local agent clears its own history).
 
 ## Composing other MCPs with an SLM
 
@@ -77,7 +99,7 @@ device control — no composition required.
 
 The audit + ingest tools (`audit_code_seniority`, `audit_security`,
 `audit_performance`, `audit_release_readiness`, `ingest_har`,
-`ingest_frame_timeline`, …) are:
+`ingest_frame_timeline`, `estimate_tokens`, …) are:
 
 - **pure-compute** — no device, no VM, deterministic;
 - **concise** — they return a grade + a bounded findings list, not raw
@@ -96,8 +118,8 @@ senior reviewer — they call a tool that already is one.
 MCP_TOOL_TIER=basic <your-mcp-launch-command>
 
 # HTTP adapter (vLLM / Ollama / llama.cpp agent frameworks):
-GET /tools?tier=basic            # 26 tools
-GET /tools?tier=intermediate     # 59 tools
+GET /tools?tier=basic            # 27 tools
+GET /tools?tier=intermediate     # 60 tools
 # then, on demand:
 POST /tools/describe_capabilities  {"level": "intermediate"}
 

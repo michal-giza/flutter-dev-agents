@@ -134,6 +134,7 @@ from .domain.usecases.discovery import (
     ToolUsageReportUseCase,
 )
 from .domain.usecases.doctor import CheckEnvironment
+from .domain.usecases.estimate_tokens import EstimateTokens
 from .domain.usecases.frame_profile import (
     StartFrameProfile,
     StopFrameProfile,
@@ -705,6 +706,8 @@ def build_runtime(
         ingest_har=IngestHar(),
         # v0.10.0 — frame-timeline ingest (jank score)
         ingest_frame_timeline=IngestFrameTimeline(),
+        # v0.12.0 — token counter / budget predictor (SLM context guard)
+        estimate_tokens=EstimateTokens(),
         # v0.6.0 — Lighthouse runner (run + ingest in one call)
         run_lighthouse=RunLighthouse(lighthouse_cli, _ingest_lighthouse),
         new_session=NewSession(artifacts_repo),

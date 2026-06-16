@@ -52,6 +52,11 @@ BASIC_TOOLS: tuple[str, ...] = (
     # to compress_png — together they close the agent-discipline loop
     # for images produced outside our cap pipeline.
     "inspect_image_safety",
+    # The text/payload analog of inspect_image_safety: "will this
+    # string/file fit my context, or do I need to scope/flush first?"
+    # Pure-compute token counter + budget validator. In BASIC because
+    # SLMs are exactly who needs the context-overflow guard most.
+    "estimate_tokens",
     # Verify-after-action flow discipline (Tier A)
     "tap_and_verify",
     "assert_no_errors_since",

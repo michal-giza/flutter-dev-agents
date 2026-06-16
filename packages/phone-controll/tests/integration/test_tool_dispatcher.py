@@ -100,6 +100,7 @@ from mcp_phone_controll.domain.usecases.discovery import (
     ToolUsageReportUseCase,
 )
 from mcp_phone_controll.domain.usecases.doctor import CheckEnvironment
+from mcp_phone_controll.domain.usecases.estimate_tokens import EstimateTokens
 from mcp_phone_controll.domain.usecases.frame_profile import (
     StartFrameProfile,
     StopFrameProfile,
@@ -475,6 +476,7 @@ def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:
         ingest_lighthouse_report=IngestLighthouseReport(),
         ingest_har=IngestHar(),
         ingest_frame_timeline=IngestFrameTimeline(),
+        estimate_tokens=EstimateTokens(),
         run_lighthouse=RunLighthouse(
             LighthouseCli(AsyncProcessRunner()), IngestLighthouseReport()
         ),
@@ -745,6 +747,8 @@ async def test_registry_covers_all_use_case_fields(tmp_path: Path):
         "ingest_har",
         # v0.10.0 (frame-timeline ingest)
         "ingest_frame_timeline",
+        # v0.12.0 (token counter / budget predictor)
+        "estimate_tokens",
         # v0.6.0 (Lighthouse runner)
         "run_lighthouse",
     }
