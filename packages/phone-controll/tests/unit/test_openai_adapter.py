@@ -72,6 +72,29 @@ def test_list_tools_returns_openai_function_schemas(tmp_path):
         assert fn["parameters"].get("type") == "object"
 
 
+def test_tools_tier_basic_scopes_surface_for_slms(tmp_path):
+    """The SLM lever: GET /tools?tier=basic returns the small BASIC subset
+    so small/local models aren't handed 140+ schemas."""
+    client = _client(tmp_path)
+    full = client.get("/tools").json()
+    basic = client.get("/tools?tier=basic").json()
+    inter = client.get("/tools?tier=intermediate").json()
+    assert len(basic) < len(inter) < len(full)
+    names = {t["function"]["name"] for t in basic}
+    # BASIC must include the discovery entry-point + core device tools.
+    assert "describe_capabilities" in names
+    assert "select_device" in names
+
+
+def test_tools_tier_env_var_default(tmp_path, monkeypatch):
+    """MCP_TOOL_TIER env scopes the HTTP surface too (parity with stdio)."""
+    monkeypatch.setenv("MCP_TOOL_TIER", "basic")
+    client = _client(tmp_path)
+    scoped = client.get("/tools").json()           # no query param → env applies
+    full = client.get("/tools?tier=expert").json()  # explicit expert overrides
+    assert len(scoped) < len(full)
+
+
 def test_call_tool_returns_envelope(tmp_path):
     client = _client(tmp_path)
     r = client.post("/tools/list_devices", json={})

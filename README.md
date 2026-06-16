@@ -30,7 +30,7 @@ claude mcp add playwright      --scope user -- npx -y @playwright/mcp@latest
 
 Then call `describe_capabilities` from your agent. Full setup (venv-pinned, device prereqs): **[First 15 minutes](docs/GETTING-STARTED.md)**.
 
-→ **[The Stack](docs/the-stack.md)** · **[Performance rubric](docs/performance-rubric.md)** · **[Senior-tester discipline](docs/senior-tester-discipline.md)** · **[Comparison vs other MCPs](docs/flutter-mcp-comparison.md)** · **[Web before/after playbook](docs/web-logged-in-flow.md)** · **[FAQ](docs/FAQ.md)** · **[Configuration](docs/CONFIGURATION.md)** · **[Tools by category](docs/tools-by-category.md)** · **[Architecture](docs/architecture.md)**
+→ **[The Stack](docs/the-stack.md)** · **[Performance rubric](docs/performance-rubric.md)** · **[SLM / local-model setup](docs/slm-setup.md)** · **[Senior-tester discipline](docs/senior-tester-discipline.md)** · **[Comparison vs other MCPs](docs/flutter-mcp-comparison.md)** · **[Web before/after playbook](docs/web-logged-in-flow.md)** · **[FAQ](docs/FAQ.md)** · **[Configuration](docs/CONFIGURATION.md)** · **[Tools by category](docs/tools-by-category.md)** · **[Architecture](docs/architecture.md)**
 
 ## What's new in v0.10.0 (June 2026)
 

@@ -336,6 +336,10 @@ extension when you need it.
 - `docs/web-logged-in-flow.md` — the logged-in before/after playbook:
   Chrome MCP drives (login/scroll/import) + observes (Network/console/
   trace), phone-controll grades
+- `docs/slm-setup.md` — running the stack with small / local models:
+  tool-surface budgeting (`MCP_TOOL_TIER` / `?tier=`), `dart mcp-server
+  --force-roots-fallback`, the commodity-tool fallback, and which MCP to
+  compose per task
 - `docs/senior-tester-discipline.md` — the 8 principles encoded
   by `design_test_plan` + `audit_test_quality`
 - `docs/release-readiness-rubric.md` — composite verdict logic
