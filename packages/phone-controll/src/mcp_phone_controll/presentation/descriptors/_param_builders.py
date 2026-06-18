@@ -312,7 +312,18 @@ def _params_grant(args: JsonDict) -> GrantPermissionParams:
 
 
 def _params_tap(args: JsonDict) -> TapParams:
-    return TapParams(x=int(args["x"]), y=int(args["y"]), serial=args.get("serial"))
+    x = args.get("x")
+    y = args.get("y")
+    return TapParams(
+        x=int(x) if x is not None else None,
+        y=int(y) if y is not None else None,
+        text=args.get("text"),
+        resource_id=args.get("resource_id"),
+        class_name=args.get("class_name"),
+        exact=bool(args.get("exact", False)),
+        timeout_s=float(args.get("timeout_s", 5.0)),
+        serial=args.get("serial"),
+    )
 
 
 def _params_tap_text(args: JsonDict) -> TapTextParams:

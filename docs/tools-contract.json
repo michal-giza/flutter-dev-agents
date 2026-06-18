@@ -4239,27 +4239,44 @@
       "openWorldHint": true,
       "readOnlyHint": false
     },
-    "description": "Tap at absolute screen coordinates.",
+    "description": "Tap an element by SELECTOR (preferred) or by absolute coordinates. Pass resource_id / class_name (or text) and the element is resolved and tapped server-side in one call \u2014 no screenshot, no pixel reasoning, no x,y math. Get selectors from extract_ui_graph. Fall back to x,y only for targets no selector can address. (text routes through the same hardened matcher as tap_text.)",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
+        "class_name": {
+          "description": "Resolve+tap by widget class name.",
+          "type": "string"
+        },
+        "exact": {
+          "description": "Text match is exact rather than contains.",
+          "type": "boolean"
+        },
+        "resource_id": {
+          "description": "Resolve+tap by resource-id (Android) / accessibility id. The most stable selector.",
+          "type": "string"
+        },
         "serial": {
           "description": "Device serial. Defaults to the selected device.",
           "type": "string"
         },
+        "text": {
+          "description": "Resolve+tap by visible text (hardened matcher: NFC / NBSP / dump-scan fallback).",
+          "type": "string"
+        },
+        "timeout_s": {
+          "description": "Selector resolve timeout (default 5.0).",
+          "type": "number"
+        },
         "x": {
-          "description": "",
+          "description": "Absolute x. Provide with y, OR use a selector.",
           "type": "integer"
         },
         "y": {
-          "description": "",
+          "description": "Absolute y. Provide with x, OR use a selector.",
           "type": "integer"
         }
       },
-      "required": [
-        "x",
-        "y"
-      ],
+      "required": [],
       "type": "object"
     },
     "name": "tap"

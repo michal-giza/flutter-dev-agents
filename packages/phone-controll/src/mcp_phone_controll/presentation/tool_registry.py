@@ -985,9 +985,34 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
         ),
         ToolDescriptor(
             name="tap",
-            description="Tap at absolute screen coordinates.",
+            description=(
+                "Tap an element by SELECTOR (preferred) or by absolute "
+                "coordinates. Pass resource_id / class_name (or text) and "
+                "the element is resolved and tapped server-side in one "
+                "call — no screenshot, no pixel reasoning, no x,y math. "
+                "Get selectors from extract_ui_graph. Fall back to x,y "
+                "only for targets no selector can address. (text routes "
+                "through the same hardened matcher as tap_text.)"
+            ),
             input_schema=_schema(
-                {"x": _int(""), "y": _int(""), **serial_prop}, ["x", "y"]
+                {
+                    "x": _int("Absolute x. Provide with y, OR use a selector."),
+                    "y": _int("Absolute y. Provide with x, OR use a selector."),
+                    "resource_id": _string(
+                        "Resolve+tap by resource-id (Android) / accessibility "
+                        "id. The most stable selector."
+                    ),
+                    "text": _string(
+                        "Resolve+tap by visible text (hardened matcher: "
+                        "NFC / NBSP / dump-scan fallback)."
+                    ),
+                    "class_name": _string("Resolve+tap by widget class name."),
+                    "exact": _bool("Text match is exact rather than contains."),
+                    "timeout_s": _number(
+                        "Selector resolve timeout (default 5.0)."
+                    ),
+                    **serial_prop,
+                },
             ),
             build_params=_params_tap,
             invoke=_bind(uc.tap, _params_tap),

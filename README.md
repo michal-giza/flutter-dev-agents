@@ -2,7 +2,7 @@
 
 **Audit-grade Flutter testing for AI agents — drive real iPhones, Androids & the web, then grade what ships.**
 
-[![tests](https://img.shields.io/badge/tests-1084_passing-A6E22E?style=flat-square)](packages/phone-controll/tests)
+[![tests](https://img.shields.io/badge/tests-1102_passing-A6E22E?style=flat-square)](packages/phone-controll/tests)
 [![license](https://img.shields.io/badge/license-Apache_2.0-F76C28?style=flat-square)](LICENSE)
 [![MCP spec](https://img.shields.io/badge/MCP-2025--06--18-F76C28?style=flat-square)](https://modelcontextprotocol.io)
 [![python](https://img.shields.io/badge/python-3.11+-3B4252?style=flat-square)](pyproject.toml)
@@ -30,13 +30,15 @@ claude mcp add playwright      --scope user -- npx -y @playwright/mcp@latest
 
 Then call `describe_capabilities` from your agent. Full setup (venv-pinned, device prereqs): **[First 15 minutes](docs/GETTING-STARTED.md)**.
 
-→ **[The Stack](docs/the-stack.md)** · **[Performance rubric](docs/performance-rubric.md)** · **[SLM / local-model setup](docs/slm-setup.md)** · **[Senior-tester discipline](docs/senior-tester-discipline.md)** · **[Comparison vs other MCPs](docs/flutter-mcp-comparison.md)** · **[Web before/after playbook](docs/web-logged-in-flow.md)** · **[FAQ](docs/FAQ.md)** · **[Configuration](docs/CONFIGURATION.md)** · **[Tools by category](docs/tools-by-category.md)** · **[Architecture](docs/architecture.md)**
+→ **[The Stack](docs/the-stack.md)** · **[Navigation latency](docs/agent-navigation-latency.md)** · **[Performance rubric](docs/performance-rubric.md)** · **[SLM / local-model setup](docs/slm-setup.md)** · **[Senior-tester discipline](docs/senior-tester-discipline.md)** · **[Comparison vs other MCPs](docs/flutter-mcp-comparison.md)** · **[Web before/after playbook](docs/web-logged-in-flow.md)** · **[FAQ](docs/FAQ.md)** · **[Configuration](docs/CONFIGURATION.md)** · **[Tools by category](docs/tools-by-category.md)** · **[Architecture](docs/architecture.md)**
 
-## What's new in v0.12.0 (June 2026)
+## What's new in v0.13.0 (June 2026)
 
-The **SLM / context-discipline** arc. The composed stack is model-agnostic, but small/local models choke on a 140+-tool surface *and* on a single oversized tool result — both are now first-class concerns.
+The **navigation-latency** arc. For device agents, the slow default is *screenshot → reason over pixels → compute x,y → tap → screenshot to confirm* — ~1–2k image tokens and a vision round-trip per step. v0.13.0 makes the structured (no-vision) path the easy default for any work that isn't a visual check.
 
-- 🆕 **`estimate_tokens`** (v0.12.0) — a context-budget guard: estimate a string or file, pass `budget_tokens`, and get a `fits`/`headroom` verdict + a recommendation (`proceed` / `proceed_with_caution` / `flush_context`). The text analog of the image-cap check, for the "will this HAR/widget-tree fit my window?" question. tiktoken when installed, else a calibrated heuristic. → [SLM guide](docs/slm-setup.md)
+- 🆕 **`tap` by selector** (v0.13.0) — `tap(resource_id=… | text=… | class_name=…)` resolves and taps **server-side in one call**: no screenshot, no pixel reasoning, no coordinate math. Get selectors from `extract_ui_graph`; `x,y` becomes the fallback. A miss fails with `capture_diagnostics` rather than tapping a guess. → [Navigation latency](docs/agent-navigation-latency.md)
+- 🆕 **Optional UI-hierarchy cache** (v0.13.0) — `MCP_UI_CACHE_TTL_MS` caches the read-only dump on a stable screen so repeated `extract_ui_graph`/`dump_ui` don't re-hit the device. Off by default; only observations are cached (taps always resolve live), so it can never cause a wrong tap.
+- 🆕 **`estimate_tokens`** (v0.12.0) — a context-budget guard: estimate a string or file, pass `budget_tokens`, and get a `fits`/`headroom` verdict + a recommendation (`proceed` / `proceed_with_caution` / `flush_context`). tiktoken when installed, else a calibrated heuristic. → [SLM guide](docs/slm-setup.md)
 - 🆕 **Tool-tier scoping on the HTTP adapter** (v0.11.0) — `GET /tools?tier=basic|intermediate|expert` (and `MCP_TOOL_TIER`) so a 4B-class local LLM gets a reasoning-sized surface and pulls in the long tail on demand via `describe_capabilities`.
 - 🆕 **`audit_performance`** (v0.9.0) — static jank audit: animation anti-patterns (controller-in-build, setState-in-listener, animated Opacity), scroll/virtualization (`ListView(children:)` vs `.builder`), rebuild cost. → [rubric](docs/performance-rubric.md)
 - 🆕 **`ingest_frame_timeline`** + **`ingest_har`** (v0.10.0) — runtime graders: jank score from a captured frame timeline; per-action network/Firestore cost from a HAR.
@@ -114,7 +116,7 @@ Run `check_environment` from any Claude Code session — it returns a structured
 
 ## Status
 
-- **`packages/phone-controll/` v0.12.0** — **144 tools** live on PyPI, **1084 hermetic unit tests** + real-device tests (gated on `MCP_REAL_DEVICE=1`). Field-tested across real Flutter projects (`docs/v030-field-test.md`); web debug + WDA-simulator + `audit_performance` live-verified on bike_news_room.
+- **`packages/phone-controll/` v0.13.0** — **144 tools** live on PyPI, **1102 hermetic unit tests** + real-device tests (gated on `MCP_REAL_DEVICE=1`). Field-tested across real Flutter projects (`docs/v030-field-test.md`); web debug + WDA-simulator + `audit_performance` live-verified on bike_news_room.
 - **First-real-device patch release shipped May 2026** — fixed iOS 17+ `--rsd` routing, WDA team_id signing, Polish NBSP `tap_text`, raw-`adb screencap` recovery loop. See [`CHANGELOG.md`](CHANGELOG.md).
 - Multi-window VS Code orchestration + debug sessions + WDA setup + cross-session device locks all in place.
 

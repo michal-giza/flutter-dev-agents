@@ -5,6 +5,59 @@ All notable changes to `flutter-dev-agents` / `mcp-phone-controll`.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] — 2026-06-18
+
+**Agent navigation latency.** The slow default for device agents is
+*screenshot → reason over pixels → compute x,y → tap → screenshot to
+confirm* — ~1–2k image tokens and a vision round-trip per step. This
+release makes the structured (no-vision) path the easy default for any
+work that isn't a visual check. Tool count unchanged (144); `tap` gains
+selector resolution.
+
+### Added — `tap` by selector (resolve + tap server-side)
+
+`tap` now accepts **`resource_id` / `text` / `class_name`** in addition
+to `x`/`y`. A selector is resolved and tapped **in one call** — no
+screenshot, no pixel reasoning, no coordinate math. Resolution order:
+explicit `(x, y)` → `text` (routes through the hardened `tap_text`
+matcher: NFC / NBSP / dump-scan fallback / Samsung adb-tap) →
+`resource_id`/`class_name` (`find` → tap the element's centre). A
+selector that matches nothing fails with `next_action:
+capture_diagnostics` — it never taps a guessed coordinate. Get selectors
+from `extract_ui_graph`. `x`/`y` is now the fallback for targets no
+selector can address. Implemented at the use-case layer, so it works on
+both Android (uiautomator2) and iOS (WDA).
+
+### Added — optional UI-hierarchy cache (`MCP_UI_CACHE_TTL_MS`)
+
+A short-TTL, action-invalidated cache for the read-only UI dump, so
+repeated `extract_ui_graph`/`dump_ui` on a stable screen don't re-hit
+the device. **Off by default** (`ttl_ms <= 0` = pure pass-through).
+Safety by construction: only `dump_ui` is cached; every action
+(`tap`/`swipe`/`type_text`/`press_key`) clears the entry, and
+`find`/`tap_text` always resolve against the **live** device — so the
+cache can never decide where a tap lands, only serve an observation
+that's at most `ttl_ms` stale and never across an action you just took.
+
+### Docs — `docs/agent-navigation-latency.md` (new)
+
+"Drive structurally, verify visually." The cost of the vision loop, the
+step-by-step structured replacements (`extract_ui_graph` → selector-tap
+→ `wait_for_element`/`tap_and_verify`, plus `test_deep_link` and
+`replay_skill`), when you genuinely need pixels, and the cache knob. The
+`mcp-phone-controll-testing` skill gains a matching discipline rule.
+
+### Tests
+
+- `test_tap_selector.py` (+8) — coordinate/text/resource_id/class_name
+  paths, not-found → capture_diagnostics, no-target → fix_arguments,
+  coordinate precedence, lone-x rejection.
+- `test_caching_ui_repository.py` (+10) — disabled-by-default,
+  hit-within-TTL, expiry, action-invalidation (parametrized over all 5
+  actions), per-serial isolation, find-always-live.
+- Full suite: **1102 passed, 6 skipped.** ruff clean. Contract snapshot
+  refreshed (`tap` schema).
+
 ## [0.12.0] — 2026-06-17
 
 A context-budget guard for ingesting large payloads — built primarily

@@ -413,6 +413,20 @@ def build_runtime(
     devices_repo = CompositeDeviceRepository(android_devices, ios_devices, resolver)
     lifecycle_repo = CompositeLifecycleRepository(android_lifecycle, ios_lifecycle, resolver)
     ui_repo = CompositeUiRepository(android_ui, ios_ui, resolver)
+    # v0.13.0 — optional short-TTL cache for the read-only UI dump,
+    # invalidated on every action. Off unless MCP_UI_CACHE_TTL_MS > 0.
+    # Speeds up repeated extract_ui_graph/dump_ui on a stable screen for
+    # the `navigation` discipline; taps always resolve live (see the
+    # decorator's safety note). Wraps the composite so it covers both
+    # platforms.
+    try:
+        _ui_cache_ttl = int(os.environ.get("MCP_UI_CACHE_TTL_MS", "0"))
+    except ValueError:
+        _ui_cache_ttl = 0
+    if _ui_cache_ttl > 0:
+        from .data.repositories.caching_ui_repository import CachingUiRepository
+
+        ui_repo = CachingUiRepository(ui_repo, ttl_ms=_ui_cache_ttl)
     observation_repo = CompositeObservationRepository(
         android_observation, ios_observation, resolver
     )
