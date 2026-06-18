@@ -30,7 +30,12 @@ from mcp_phone_controll.infrastructure.wda_factory import (
 
 
 class _FakeSession:
-    pass
+    def __init__(self) -> None:
+        self.settings: list[dict] = []
+
+    def appium_settings(self, value):
+        self.settings.append(value)
+        return value
 
 
 class _FakeClient:
@@ -174,6 +179,43 @@ async def test_repository_translates_unreachable_to_structured_failure():
     assert res.failure.next_action == "start_wda_on_simulator"
     assert "fix_command" in res.failure.details
     assert "xcodebuild" in res.failure.details["fix_command"]
+
+
+@pytest.mark.asyncio
+async def test_invalidate_forces_fresh_handshake():
+    """v0.14.0 #1: invalidate(udid) drops the cached session so the next
+    get() rebuilds — the hook the repo uses to recover a dead session."""
+    record: list[tuple[str, object]] = []
+
+    async def is_sim(_udid):
+        return False
+
+    factory = CachingWdaFactory(
+        is_simulator=is_sim, wda_module=_fake_wda_module(record)
+    )
+    s1 = await factory.get("UDID-A")
+    await factory.invalidate("UDID-A")
+    s2 = await factory.get("UDID-A")
+    assert s1 is not s2                       # rebuilt, not the cached one
+    assert record == [("USBClient", "UDID-A"), ("USBClient", "UDID-A")]
+    await factory.invalidate("UNKNOWN")       # no-op, must not raise
+
+
+@pytest.mark.asyncio
+async def test_snapshot_max_depth_applied_at_session_init():
+    """v0.14.0 #3: raise WDA snapshot depth so deep trees don't abort
+    actions with `call depth exceed N`."""
+    record: list[tuple[str, object]] = []
+
+    async def is_sim(_udid):
+        return False
+
+    factory = CachingWdaFactory(
+        is_simulator=is_sim, wda_module=_fake_wda_module(record)
+    )
+    session = await factory.get("UDID-A")
+    assert session.settings, "snapshotMaxDepth should be set at init"
+    assert session.settings[0].get("snapshotMaxDepth", 0) >= 10
 
 
 def test_port_override_via_env_var(monkeypatch):

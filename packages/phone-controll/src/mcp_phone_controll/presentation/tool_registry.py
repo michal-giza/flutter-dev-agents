@@ -129,6 +129,7 @@ from ..domain.usecases.observation import (
     StopRecording,
     TailLogs,
     TakeScreenshot,
+    ZoomScreenshot,
 )
 from ..domain.usecases.ocr import (
     OcrScreenshot,
@@ -372,6 +373,7 @@ from .descriptors._param_builders import (
     _params_wait_for_ar_session_ready,
     _params_wait_for_marker,
     _params_write_vscode_launch_config,
+    _params_zoom_screenshot,
 )
 from .descriptors._shared import (
     JsonDict,
@@ -433,6 +435,7 @@ class UseCases:
     extract_ui_graph: ExtractUiGraph
     ocr_screenshot: OcrScreenshot
     take_screenshot: TakeScreenshot
+    zoom_screenshot: ZoomScreenshot
     start_recording: StartRecording
     stop_recording: StopRecording
     read_logs: ReadLogs
@@ -1007,6 +1010,11 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
                         "NFC / NBSP / dump-scan fallback)."
                     ),
                     "class_name": _string("Resolve+tap by widget class name."),
+                    "bounds": _string(
+                        "Tap the centre of a bounds rect — `[x1,y1][x2,y2]` "
+                        "(dump_ui form) or [x1,y1,x2,y2]. The fallback for "
+                        "an element with no stable selector."
+                    ),
                     "exact": _bool("Text match is exact rather than contains."),
                     "timeout_s": _number(
                         "Selector resolve timeout (default 5.0)."
@@ -1032,13 +1040,18 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
         ),
         ToolDescriptor(
             name="swipe",
-            description="Swipe between two points.",
+            description=(
+                "Swipe between two points. Coordinates are DEVICE PIXELS — "
+                "the same space as dump_ui `bounds` (e.g. a 1080x2340 "
+                "screen), not logical/dp points. (`startX/startY/endX/endY` "
+                "are accepted as aliases for x1/y1/x2/y2.)"
+            ),
             input_schema=_schema(
                 {
-                    "x1": _int(""),
-                    "y1": _int(""),
-                    "x2": _int(""),
-                    "y2": _int(""),
+                    "x1": _int("Start x (device pixels). Alias: startX."),
+                    "y1": _int("Start y (device pixels). Alias: startY."),
+                    "x2": _int("End x (device pixels). Alias: endX."),
+                    "y2": _int("End y (device pixels). Alias: endY."),
                     "duration_ms": _int(""),
                     **serial_prop,
                 },
@@ -1092,7 +1105,16 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
         ),
         ToolDescriptor(
             name="dump_ui",
-            description="Return the current UI hierarchy as XML.",
+            description=(
+                "Dump the UI hierarchy. Returns {xml, byte_size, "
+                "node_count, artifact_path}. When the tree is large the "
+                "inline xml is truncated but the FULL XML is written to "
+                "artifact_path (fetch_artifact). To target an element, "
+                "prefer find_element / extract_ui_graph — they search the "
+                "full tree server-side with no truncation. (External "
+                "`uiautomator dump` won't work while connected — the MCP "
+                "holds the device's UiAutomation; use this instead.)"
+            ),
             input_schema=_schema(serial_prop),
             build_params=_params_dump_ui,
             invoke=_bind(uc.dump_ui, _params_dump_ui),
@@ -1203,6 +1225,37 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             ),
             build_params=_params_screenshot,
             invoke=_bind(uc.take_screenshot, _params_screenshot),
+        ),
+        ToolDescriptor(
+            name="zoom_screenshot",
+            description=(
+                "Magnify a region of the screen — for reading small UI "
+                "(tiny picker thumbnails, dense labels) that's illegible in "
+                "the full frame. Captures a full-res frame, crops the region "
+                "(device pixels, same space as dump_ui bounds), upscales, "
+                "and caps the crop for vision safety. Pass `path` to zoom an "
+                "existing screenshot instead of capturing fresh."
+            ),
+            input_schema=_schema(
+                {
+                    "region": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "minItems": 4,
+                        "maxItems": 4,
+                        "description": "[x1, y1, x2, y2] in device pixels.",
+                    },
+                    "scale": _number("Upscale factor for the crop (default 2.0)."),
+                    "path": _string(
+                        "Existing screenshot to crop. Omit to capture fresh."
+                    ),
+                    "label": _string("Optional artifact label."),
+                    **serial_prop,
+                },
+                ["region"],
+            ),
+            build_params=_params_zoom_screenshot,
+            invoke=_bind(uc.zoom_screenshot, _params_zoom_screenshot),
         ),
         ToolDescriptor(
             name="capture_release_screenshot",

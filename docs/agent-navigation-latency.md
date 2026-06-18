@@ -67,8 +67,16 @@ tap {"text": "Sign in"}            // routes through the hardened text matcher
 tap {"class_name": "android.widget.Button"}
 
 // fallback — only for targets no selector can address:
+tap {"bounds": "[480,1160][600,1240]"}   // tap the centre of a bounds rect from dump_ui
 tap {"x": 540, "y": 1200}
 ```
+
+`bounds` (v0.14.0) is the path for an element with **no** stable
+selector — e.g. a Compose photo cell with empty `content-desc`: read its
+rect from `dump_ui`/`extract_ui_graph` and tap the centre without doing
+the maths yourself. (Note: some Compose surfaces ignore *all* injected
+coordinate taps regardless of source — that's a platform accessibility
+quirk, not a coordinate error.)
 
 If a selector matches nothing it fails with `next_action:
 capture_diagnostics` — it never taps a guessed coordinate. `text` reuses the

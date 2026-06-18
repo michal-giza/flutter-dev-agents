@@ -9,6 +9,44 @@ from ...domain.failures import TimeoutFailure, UiElementNotFoundFailure, UiFailu
 from ...domain.repositories import UiRepository
 from ...domain.result import Result, err, ok
 from ...infrastructure.wda_factory import WdaFactory, WdaUnreachable
+from ...observability import emit
+
+# Substrings (lowercased) that mark a WDA error as a STALE/DEAD session
+# rather than a genuine app-level failure. When we see one we drop the
+# cached session and re-handshake once. `Unhandled endpoint` is the
+# symptom the field hit: facebook-wda's tap() tries the modern
+# `/wda/tap` first, and when that fails against a dead session id it
+# falls back to the removed `/wda/tap/0`, whose "Unhandled endpoint:
+# /session/<dead-id>/wda/tap/0" message is what surfaces.
+_STALE_SESSION_MARKERS = (
+    "invalid session",
+    "session does not exist",
+    "unknown session",
+    "unhandled endpoint",
+    "unknown command",
+    "possibly crashed",
+    "bad gateway",
+    "session id",
+)
+_STALE_SESSION_EXC_NAMES = frozenset(
+    {
+        "WDAInvalidSessionIdError",
+        "WDAPossiblyCrashedError",
+        "WDABadGateway",
+        "WDAEmptyResponseError",
+    }
+)
+
+
+def _is_recoverable_session_error(exc: BaseException) -> bool:
+    """True if `exc` looks like a dead/stale WDA session we can recover by
+    re-handshaking (vs a genuine element-not-found / app error we should
+    surface). Matches both facebook-wda's typed errors and the raw message
+    so it's robust across wda versions and against fakes in tests."""
+    if type(exc).__name__ in _STALE_SESSION_EXC_NAMES:
+        return True
+    msg = str(exc).lower()
+    return any(marker in msg for marker in _STALE_SESSION_MARKERS)
 
 
 def _bounds_from_rect(rect: dict | None) -> Bounds:
@@ -76,10 +114,32 @@ class WdaUiRepository(UiRepository):
             # exception so every action wrapper below catches uniformly.
             raise _WdaUnreachableSentinel(e) from e
 
+    async def _run(self, serial: str, op):
+        """Run `op(session)` (sync, in a thread). If it fails with a
+        recoverable session error — a dead/stale WDA session from a device
+        reboot or WDA restart — drop the cached session, re-handshake, and
+        retry ONCE. This is the self-healing path that fixes "tap pinned to
+        a dead session that never refreshes": nothing in the tool surface
+        had to force a re-handshake before; now any action does it lazily."""
+        s = await self._session(serial)
+        try:
+            return await asyncio.to_thread(op, s)
+        except Exception as e:
+            if not _is_recoverable_session_error(e):
+                raise
+            emit(
+                "wda_session_refresh",
+                level="warn",
+                serial=serial,
+                reason=type(e).__name__,
+            )
+            await self._factory.invalidate(serial)
+            s2 = await self._session(serial)  # fresh handshake
+            return await asyncio.to_thread(op, s2)
+
     async def tap(self, serial: str, x: int, y: int) -> Result[None]:
         try:
-            s = await self._session(serial)
-            await asyncio.to_thread(s.tap, x, y)
+            await self._run(serial, lambda s: s.tap(x, y))
             return ok(None)
         except _WdaUnreachableSentinel as e:
             return _wda_unreachable_err(e, "tap")
@@ -87,13 +147,17 @@ class WdaUiRepository(UiRepository):
             return err(UiFailure(message=f"tap failed: {e}"))
 
     async def tap_text(self, serial: str, text: str, exact: bool = False) -> Result[None]:
-        try:
-            s = await self._session(serial)
+        def op(s):
             elem = s(label=text) if exact else s(labelContains=text)
-            exists = await asyncio.to_thread(lambda: elem.exists)
-            if not exists:
+            if not elem.exists:
+                return "not_found"
+            elem.tap()
+            return "ok"
+
+        try:
+            status = await self._run(serial, op)
+            if status == "not_found":
                 return err(UiElementNotFoundFailure(message=f"label not found: {text!r}"))
-            await asyncio.to_thread(elem.tap)
             return ok(None)
         except _WdaUnreachableSentinel as e:
             return _wda_unreachable_err(e, "tap_text")
@@ -104,8 +168,7 @@ class WdaUiRepository(UiRepository):
         self, serial: str, x1: int, y1: int, x2: int, y2: int, duration_ms: int = 300
     ) -> Result[None]:
         try:
-            s = await self._session(serial)
-            await asyncio.to_thread(s.swipe, x1, y1, x2, y2, duration_ms / 1000.0)
+            await self._run(serial, lambda s: s.swipe(x1, y1, x2, y2, duration_ms / 1000.0))
             return ok(None)
         except _WdaUnreachableSentinel as e:
             return _wda_unreachable_err(e, "swipe")
@@ -114,8 +177,7 @@ class WdaUiRepository(UiRepository):
 
     async def type_text(self, serial: str, text: str) -> Result[None]:
         try:
-            s = await self._session(serial)
-            await asyncio.to_thread(s.send_keys, text)
+            await self._run(serial, lambda s: s.send_keys(text))
             return ok(None)
         except _WdaUnreachableSentinel as e:
             return _wda_unreachable_err(e, "type_text")
@@ -123,11 +185,10 @@ class WdaUiRepository(UiRepository):
             return err(UiFailure(message=f"type_text failed: {e}"))
 
     async def press_key(self, serial: str, keycode: str) -> Result[None]:
+        mapping = {"home": "home", "volumeup": "volumeUp", "volumedown": "volumeDown"}
+        key = mapping.get(keycode.lower(), keycode.lower())
         try:
-            s = await self._session(serial)
-            mapping = {"home": "home", "volumeup": "volumeUp", "volumedown": "volumeDown"}
-            key = mapping.get(keycode.lower(), keycode.lower())
-            await asyncio.to_thread(s.press, key)
+            await self._run(serial, lambda s: s.press(key))
             return ok(None)
         except _WdaUnreachableSentinel as e:
             return _wda_unreachable_err(e, "press_key")
@@ -142,22 +203,25 @@ class WdaUiRepository(UiRepository):
         class_name: str | None = None,
         timeout_s: float = 5.0,
     ) -> Result[UiElement | None]:
-        try:
-            s = await self._session(serial)
-            kwargs: dict = {}
-            if text is not None:
-                kwargs["labelContains"] = text
-            if resource_id is not None:
-                kwargs["name"] = resource_id
-            if class_name is not None:
-                kwargs["className"] = class_name
-            if not kwargs:
-                return err(UiFailure(message="find requires at least one selector"))
+        kwargs: dict = {}
+        if text is not None:
+            kwargs["labelContains"] = text
+        if resource_id is not None:
+            kwargs["name"] = resource_id
+        if class_name is not None:
+            kwargs["className"] = class_name
+        if not kwargs:
+            return err(UiFailure(message="find requires at least one selector"))
+
+        def op(s):
             elem = s(**kwargs)
-            exists = await asyncio.to_thread(elem.wait, timeout_s)
-            if not exists:
-                return ok(None)
-            return ok(_element_from_wda(elem))
+            if not elem.wait(timeout_s):
+                return None
+            return _element_from_wda(elem)
+
+        try:
+            element = await self._run(serial, op)
+            return ok(element)
         except _WdaUnreachableSentinel as e:
             return _wda_unreachable_err(e, "find")
         except Exception as e:

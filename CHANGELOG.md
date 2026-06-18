@@ -5,6 +5,73 @@ All notable changes to `flutter-dev-agents` / `mcp-phone-controll`.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] — 2026-06-18
+
+**Action-primitive hardening**, all from real-device field feedback
+(iPhone 17 Pro sim / WDA 13, Galaxy S25 / Android 16). The action tools
+(`tap`/`swipe`/`tap_text`) failed on the two screens that mattered;
+these fixes target each cause. Tool count: 144 → 145 (`zoom_screenshot`).
+
+### Fixed — iOS `tap` pinned to a dead WDA session (P0)
+
+`tap` failed forever against the same dead session id — surviving WDA
+restart, reselect, and a full sim reboot — because the factory cached
+the session object and nothing forced a re-handshake. Now any action
+that hits a **recoverable session error** (invalid/unknown session,
+"Unhandled endpoint", possibly-crashed, bad-gateway) drops the cached
+session and **retries once with a fresh handshake**
+(`CachingWdaFactory.invalidate` + a repo-level retry wrapper). This also
+resolves the `/wda/tap/0` "unknown command" symptom: facebook-wda's
+`tap()` already tries the modern `/wda/tap` first and only fell back to
+the removed `/wda/tap/0` *because the session was dead* — with a live
+session the modern endpoint works on WDA 13.
+
+### Fixed — actions abort with `call depth exceed 10` on deep trees (P0)
+
+Deep Flutter/Compose trees aborted `tap`/`swipe`/`tap_text` even though
+`dump_ui` read them fine. We now raise WDA's element-snapshot traversal
+depth at session creation via `appium_settings({"snapshotMaxDepth": …})`
+(default 60; override `MCP_IOS_WDA_SNAPSHOT_DEPTH`).
+
+### Added — `tap` by `bounds`; `dump_ui` spills full XML to an artifact
+
+- `tap` gains a **`bounds`** selector (`[x1,y1][x2,y2]` dump_ui form or
+  `[x1,y1,x2,y2]`) — taps the centre. The fallback for an element with
+  no stable selector (e.g. a Compose photo cell with empty content-desc).
+- **`dump_ui`** now returns `{xml, byte_size, node_count, artifact_path}`
+  and, when the tree exceeds the inline cap, writes the **full XML to an
+  artifact** and returns its path — so the truncation's "fetch the full
+  artifact" hint is finally actionable. Points at `find_element` /
+  `extract_ui_graph`, which search the full tree server-side with no
+  truncation. (Also documents that external `uiautomator dump` can't run
+  while the MCP holds the device's UiAutomation.)
+
+### Added — `zoom_screenshot(region)`
+
+Crop + upscale a screen region for reading small UI (tiny picker
+thumbnails, dense labels). Captures a full-res frame so the region maps
+to true device pixels (dump_ui bounds), crops, upscales, and caps the
+crop for vision safety. Pass `path` to zoom an existing screenshot.
+
+### Ergonomics
+
+- Param aliases for common guesses: `swipe` accepts
+  `startX/startY/endX/endY`; `press_key` accepts `key` for `keycode`.
+- `swipe`/`tap` docs now state coordinates are **device pixels**, the
+  same space as `dump_ui` bounds.
+
+### Still needs on-device confirmation
+The Android Compose photo-picker no-op (coordinate taps don't register
+even at correct device pixels) is a platform-specific accessibility
+issue; `tap(bounds=…)` gives a path, but a true `ACTION_CLICK` fix
+needs verification on a real device.
+
+### Tests
+- `test_wda_session_refresh.py` (+6), `test_wda_factory.py` (+2),
+  `test_dump_ui_spill.py` (+4), `test_zoom_screenshot.py` (+4),
+  `test_param_aliases.py` (+7), `test_tap_selector.py` (+1).
+- Full suite: **1126 passed, 6 skipped.** ruff clean. Contract refreshed.
+
 ## [0.13.0] — 2026-06-18
 
 **Agent navigation latency.** The slow default for device agents is

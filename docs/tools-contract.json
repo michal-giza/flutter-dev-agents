@@ -1349,7 +1349,7 @@
       "openWorldHint": true,
       "readOnlyHint": true
     },
-    "description": "Return the current UI hierarchy as XML.",
+    "description": "Dump the UI hierarchy. Returns {xml, byte_size, node_count, artifact_path}. When the tree is large the inline xml is truncated but the FULL XML is written to artifact_path (fetch_artifact). To target an element, prefer find_element / extract_ui_graph \u2014 they search the full tree server-side with no truncation. (External `uiautomator dump` won't work while connected \u2014 the MCP holds the device's UiAutomation; use this instead.)",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -4075,7 +4075,7 @@
       "openWorldHint": true,
       "readOnlyHint": false
     },
-    "description": "Swipe between two points.",
+    "description": "Swipe between two points. Coordinates are DEVICE PIXELS \u2014 the same space as dump_ui `bounds` (e.g. a 1080x2340 screen), not logical/dp points. (`startX/startY/endX/endY` are accepted as aliases for x1/y1/x2/y2.)",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -4088,19 +4088,19 @@
           "type": "string"
         },
         "x1": {
-          "description": "",
+          "description": "Start x (device pixels). Alias: startX.",
           "type": "integer"
         },
         "x2": {
-          "description": "",
+          "description": "End x (device pixels). Alias: endX.",
           "type": "integer"
         },
         "y1": {
-          "description": "",
+          "description": "Start y (device pixels). Alias: startY.",
           "type": "integer"
         },
         "y2": {
-          "description": "",
+          "description": "End y (device pixels). Alias: endY.",
           "type": "integer"
         }
       },
@@ -4243,6 +4243,10 @@
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
+        "bounds": {
+          "description": "Tap the centre of a bounds rect \u2014 `[x1,y1][x2,y2]` (dump_ui form) or [x1,y1,x2,y2]. The fallback for an element with no stable selector.",
+          "type": "string"
+        },
         "class_name": {
           "description": "Resolve+tap by widget class name.",
           "type": "string"
@@ -4788,5 +4792,48 @@
       "type": "object"
     },
     "name": "write_vscode_launch_config"
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Magnify a region of the screen \u2014 for reading small UI (tiny picker thumbnails, dense labels) that's illegible in the full frame. Captures a full-res frame, crops the region (device pixels, same space as dump_ui bounds), upscales, and caps the crop for vision safety. Pass `path` to zoom an existing screenshot instead of capturing fresh.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "description": "Optional artifact label.",
+          "type": "string"
+        },
+        "path": {
+          "description": "Existing screenshot to crop. Omit to capture fresh.",
+          "type": "string"
+        },
+        "region": {
+          "description": "[x1, y1, x2, y2] in device pixels.",
+          "items": {
+            "type": "integer"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "type": "array"
+        },
+        "scale": {
+          "description": "Upscale factor for the crop (default 2.0).",
+          "type": "number"
+        },
+        "serial": {
+          "description": "Device serial. Defaults to the selected device.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "region"
+      ],
+      "type": "object"
+    },
+    "name": "zoom_screenshot"
   }
 ]

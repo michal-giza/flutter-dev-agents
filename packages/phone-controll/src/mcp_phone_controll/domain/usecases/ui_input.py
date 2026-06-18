@@ -24,6 +24,11 @@ class TapParams:
     text: str | None = None
     resource_id: str | None = None
     class_name: str | None = None
+    # Tap the centre of an explicit bounds rect, as (x1, y1, x2, y2) — the
+    # form `dump_ui`/`extract_ui_graph` report. The fallback for an element
+    # with no stable selector (e.g. a Compose photo cell with empty
+    # content-desc): read its bounds from the dump, tap the centre here.
+    bounds: tuple[int, int, int, int] | None = None
     exact: bool = False
     timeout_s: float = 5.0
     serial: str | None = None
@@ -52,6 +57,11 @@ class Tap(BaseUseCase[TapParams, None]):
         # 1) Explicit coordinates win — the unambiguous fallback path.
         if params.x is not None and params.y is not None:
             return await self._ui.tap(serial, params.x, params.y)
+
+        # 1b) Bounds rect → tap its centre (no need to compute it agent-side).
+        if params.bounds is not None:
+            x1, y1, x2, y2 = params.bounds
+            return await self._ui.tap(serial, (x1 + x2) // 2, (y1 + y2) // 2)
 
         # 2) Text selector → the hardened tap_text path (NFC / NBSP /
         #    dump-scan fallback / Samsung adb-tap all live there).

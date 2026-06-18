@@ -16,6 +16,7 @@ registry file stops being a 2900-LOC god-module.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from ...domain.entities import AnalyzerSeverity as _AnalyzerSeverity
@@ -145,6 +146,7 @@ from ...domain.usecases.observation import (
     StopRecordingParams,
     TailLogsParams,
     TakeScreenshotParams,
+    ZoomScreenshotParams,
 )
 from ...domain.usecases.ocr import OcrScreenshotParams
 from ...domain.usecases.patch_safe import PatchApplySafeParams
@@ -311,6 +313,23 @@ def _params_grant(args: JsonDict) -> GrantPermissionParams:
 # ---- UI input / verification -------------------------------------------
 
 
+_BOUNDS_RE = re.compile(r"-?\d+")
+
+
+def _parse_bounds(raw) -> tuple[int, int, int, int] | None:
+    """Accept the two forms an agent has on hand: the `[x1,y1][x2,y2]`
+    string from dump_ui, or a [x1,y1,x2,y2] list. None if unparseable."""
+    if raw is None:
+        return None
+    if isinstance(raw, (list, tuple)) and len(raw) == 4:
+        return tuple(int(v) for v in raw)  # type: ignore[return-value]
+    if isinstance(raw, str):
+        nums = [int(n) for n in _BOUNDS_RE.findall(raw)]
+        if len(nums) == 4:
+            return (nums[0], nums[1], nums[2], nums[3])
+    return None
+
+
 def _params_tap(args: JsonDict) -> TapParams:
     x = args.get("x")
     y = args.get("y")
@@ -320,6 +339,7 @@ def _params_tap(args: JsonDict) -> TapParams:
         text=args.get("text"),
         resource_id=args.get("resource_id"),
         class_name=args.get("class_name"),
+        bounds=_parse_bounds(args.get("bounds")),
         exact=bool(args.get("exact", False)),
         timeout_s=float(args.get("timeout_s", 5.0)),
         serial=args.get("serial"),
@@ -333,11 +353,19 @@ def _params_tap_text(args: JsonDict) -> TapTextParams:
 
 
 def _params_swipe(args: JsonDict) -> SwipeParams:
+    # Accept startX/startY/endX/endY as aliases — a common guess that used
+    # to hard-fail despite the good error message.
+    def _coord(*names):
+        for n in names:
+            if args.get(n) is not None:
+                return int(args[n])
+        raise KeyError(names[0])
+
     return SwipeParams(
-        x1=int(args["x1"]),
-        y1=int(args["y1"]),
-        x2=int(args["x2"]),
-        y2=int(args["y2"]),
+        x1=_coord("x1", "startX"),
+        y1=_coord("y1", "startY"),
+        x2=_coord("x2", "endX"),
+        y2=_coord("y2", "endY"),
         duration_ms=int(args.get("duration_ms", 300)),
         serial=args.get("serial"),
     )
@@ -348,7 +376,13 @@ def _params_type_text(args: JsonDict) -> TypeTextParams:
 
 
 def _params_press_key(args: JsonDict) -> PressKeyParams:
-    return PressKeyParams(keycode=args["keycode"], serial=args.get("serial"))
+    # Accept `key` as an alias for `keycode` — the other common guess.
+    keycode = args.get("keycode")
+    if keycode is None:
+        keycode = args.get("key")
+    if keycode is None:
+        raise KeyError("keycode")
+    return PressKeyParams(keycode=keycode, serial=args.get("serial"))
 
 
 def _params_find(args: JsonDict) -> FindElementParams:
@@ -422,6 +456,18 @@ def _params_assert_no_errors(args: JsonDict) -> AssertNoErrorsSinceParams:
 
 def _params_screenshot(args: JsonDict) -> TakeScreenshotParams:
     return TakeScreenshotParams(label=args.get("label"), serial=args.get("serial"))
+
+
+def _params_zoom_screenshot(args: JsonDict) -> ZoomScreenshotParams:
+    region = args["region"]
+    path = args.get("path")
+    return ZoomScreenshotParams(
+        region=tuple(int(v) for v in region),  # type: ignore[arg-type]
+        path=Path(path).expanduser() if path else None,
+        scale=float(args.get("scale", 2.0)),
+        label=args.get("label"),
+        serial=args.get("serial"),
+    )
 
 
 def _params_start_recording(args: JsonDict) -> StartRecordingParams:

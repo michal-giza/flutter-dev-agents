@@ -103,3 +103,13 @@ async def test_only_x_without_y_falls_through_to_selector_or_error():
     assert isinstance(res, Err)
     assert res.failure.next_action == "fix_arguments"
     assert ui.taps == []
+
+
+@pytest.mark.asyncio
+async def test_bounds_taps_center():
+    """v0.14.0 #6: tap the centre of a bounds rect (the fallback for an
+    element with no stable selector, e.g. a Compose photo cell)."""
+    uc, ui = _tap()
+    res = await uc(TapParams(bounds=(100, 200, 300, 400)))
+    assert isinstance(res, Ok)
+    assert ui.taps == [("fake", "tap", _SERIAL, 200, 300)]  # centre of the rect

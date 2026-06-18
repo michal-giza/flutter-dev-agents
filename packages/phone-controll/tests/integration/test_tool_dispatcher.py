@@ -148,6 +148,7 @@ from mcp_phone_controll.domain.usecases.observation import (
     StopRecording,
     TailLogs,
     TakeScreenshot,
+    ZoomScreenshot,
 )
 from mcp_phone_controll.domain.usecases.ocr import OcrScreenshot
 from mcp_phone_controll.domain.usecases.patch_safe import PatchApplySafe
@@ -348,13 +349,14 @@ def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:
         press_key=PressKey(ui, state),
         find_element=FindElement(ui, state),
         wait_for_element=WaitForElement(ui, state),
-        dump_ui=DumpUi(ui, state),
+        dump_ui=DumpUi(ui, state, artifacts),
         assert_visible=AssertVisible(ui, state),
         tap_and_verify=TapAndVerify(ui, state),
         assert_no_errors_since=AssertNoErrorsSince(observation, state),
         extract_ui_graph=ExtractUiGraph(ui, state),
         ocr_screenshot=OcrScreenshot(),
         take_screenshot=TakeScreenshot(observation, artifacts, state),
+        zoom_screenshot=ZoomScreenshot(observation, artifacts, state),
         start_recording=StartRecording(observation, artifacts, state),
         stop_recording=StopRecording(observation, artifacts, state),
         read_logs=ReadLogs(observation, state),
@@ -627,6 +629,7 @@ async def test_registry_covers_all_use_case_fields(tmp_path: Path):
         "extract_ui_graph",
         "ocr_screenshot",
         "take_screenshot",
+        "zoom_screenshot",
         "start_recording",
         "stop_recording",
         "read_logs",

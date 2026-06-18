@@ -196,6 +196,7 @@ def default_annotations(tool_name: str) -> dict[str, bool]:
         "run_unit_tests", "run_integration_tests",
         "capture_release_screenshot",
         "take_screenshot",  # writes to disk; idempotent in effect though
+        "zoom_screenshot",  # captures + crops to disk; idempotent in effect
         "new_session", "fetch_artifact",  # writes session metadata / reads disk
         "wait_for_marker",  # polling — open-world
         # v0.3.0 destructive — writes to disk / runs builds
@@ -211,6 +212,7 @@ def default_annotations(tool_name: str) -> dict[str, bool]:
     # filesystem we don't control.
     OPEN_WORLD_PREFIXES = (
         "tap", "swipe", "type_text", "press_key", "take_screenshot",
+        "zoom_screenshot",
         "start_recording", "stop_recording",
         "install_app", "uninstall_app", "launch_app", "stop_app",
         "clear_app_data", "grant_permission",

@@ -28,6 +28,7 @@ Sessions are cached per UDID and reused — WDA session creation costs ~2s.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import os
 import socket
@@ -37,6 +38,7 @@ from typing import Any, Protocol
 
 class WdaFactory(Protocol):
     async def get(self, udid: str) -> Any: ...
+    async def invalidate(self, udid: str) -> None: ...
 
 
 class WdaUnreachable(RuntimeError):
@@ -114,6 +116,23 @@ def _wda_port() -> int:
     return 8100
 
 
+def _snapshot_max_depth() -> int:
+    """WDA's element-snapshot traversal depth for FIND/action commands.
+
+    Default WDA is shallow enough that deep Flutter/Compose trees abort
+    with `call depth exceed N` on `tap`/`tap_text`/`swipe` even though
+    `source` (dump_ui) reads them fine. Raise it at session creation.
+    Override with `MCP_IOS_WDA_SNAPSHOT_DEPTH`.
+    """
+    raw = os.environ.get("MCP_IOS_WDA_SNAPSHOT_DEPTH", "")
+    if raw:
+        try:
+            return max(1, int(raw))
+        except ValueError:
+            pass
+    return 60
+
+
 def _port_open(host: str, port: int, timeout: float = 0.5) -> bool:
     """Best-effort TCP connect probe. Cheap; safe to call before every session."""
     try:
@@ -165,8 +184,30 @@ class CachingWdaFactory:
                 client = await asyncio.to_thread(wda.USBClient, udid)
 
             session = await asyncio.to_thread(client.session)
+            await self._apply_session_settings(session)
             self._clients[udid] = session
             return session
+
+    async def invalidate(self, udid: str) -> None:
+        """Drop the cached session for `udid` so the next `get()` performs a
+        fresh handshake. Called when a session goes stale (device reboot,
+        WDA restart) — the repository invokes this on a recoverable session
+        error and then retries. Safe to call for an unknown udid."""
+        async with self._lock:
+            self._clients.pop(udid, None)
+
+    async def invalidate_all(self) -> None:
+        async with self._lock:
+            self._clients.clear()
+
+    async def _apply_session_settings(self, session: Any) -> None:
+        """Best-effort: raise WDA's snapshot traversal depth so actions on
+        deep Flutter/Compose trees don't abort with `call depth exceed N`.
+        Swallows everything — a settings failure must never block a tap."""
+        with contextlib.suppress(Exception):
+            await asyncio.to_thread(
+                session.appium_settings, {"snapshotMaxDepth": _snapshot_max_depth()}
+            )
 
     async def _classify(self, udid: str) -> bool:
         if self._is_simulator is not None:

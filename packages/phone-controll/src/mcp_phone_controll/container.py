@@ -174,6 +174,7 @@ from .domain.usecases.observation import (
     StopRecording,
     TailLogs,
     TakeScreenshot,
+    ZoomScreenshot,
 )
 from .domain.usecases.ocr import OcrScreenshot
 from .domain.usecases.patch_safe import PatchApplySafe
@@ -580,13 +581,14 @@ def build_runtime(
         press_key=PressKey(ui_repo, state_repo),
         find_element=FindElement(ui_repo, state_repo),
         wait_for_element=WaitForElement(ui_repo, state_repo),
-        dump_ui=DumpUi(ui_repo, state_repo),
+        dump_ui=DumpUi(ui_repo, state_repo, artifacts_repo),
         assert_visible=AssertVisible(ui_repo, state_repo),
         tap_and_verify=TapAndVerify(ui_repo, state_repo),
         assert_no_errors_since=AssertNoErrorsSince(observation_repo, state_repo),
         extract_ui_graph=ExtractUiGraph(ui_repo, state_repo),
         ocr_screenshot=OcrScreenshot(),
         take_screenshot=TakeScreenshot(observation_repo, artifacts_repo, state_repo),
+        zoom_screenshot=ZoomScreenshot(observation_repo, artifacts_repo, state_repo),
         start_recording=StartRecording(observation_repo, artifacts_repo, state_repo),
         stop_recording=StopRecording(observation_repo, artifacts_repo, state_repo),
         read_logs=ReadLogs(observation_repo, state_repo),
