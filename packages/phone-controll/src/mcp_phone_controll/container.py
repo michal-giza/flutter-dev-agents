@@ -212,7 +212,13 @@ from .domain.usecases.ui_automation_pause import (
 )
 from .domain.usecases.ui_graph import ExtractUiGraph
 from .domain.usecases.ui_input import PressKey, Swipe, Tap, TapText, TypeText
-from .domain.usecases.ui_query import AssertVisible, DumpUi, FindElement, WaitForElement
+from .domain.usecases.ui_query import (
+    AssertVisible,
+    DumpUi,
+    FindElement,
+    WaitForElement,
+    WaitUntil,
+)
 from .domain.usecases.ui_verify import AssertNoErrorsSince, TapAndVerify
 from .domain.usecases.virtual_devices import (
     BootSimulator,
@@ -581,9 +587,10 @@ def build_runtime(
         press_key=PressKey(ui_repo, state_repo),
         find_element=FindElement(ui_repo, state_repo),
         wait_for_element=WaitForElement(ui_repo, state_repo),
+        wait_until=WaitUntil(ui_repo, state_repo),
         dump_ui=DumpUi(ui_repo, state_repo, artifacts_repo),
         assert_visible=AssertVisible(ui_repo, state_repo),
-        tap_and_verify=TapAndVerify(ui_repo, state_repo),
+        tap_and_verify=TapAndVerify(ui_repo, state_repo, observation_repo, artifacts_repo),
         assert_no_errors_since=AssertNoErrorsSince(observation_repo, state_repo),
         extract_ui_graph=ExtractUiGraph(ui_repo, state_repo),
         ocr_screenshot=OcrScreenshot(),

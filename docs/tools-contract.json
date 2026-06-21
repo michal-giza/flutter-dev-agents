@@ -691,6 +691,53 @@
       "openWorldHint": true,
       "readOnlyHint": false
     },
+    "description": "Run an ordered list of tool calls server-side in ONE round-trip: collapses a known flow (tap, wait_until, assert_visible, dump_ui) so the model reasons once, not per step. Each step gets the full pipeline (image-cap/trace/truncate). stop_on_error halts at the first failure; capture_on_failure folds a screenshot + logs into the failed step. Returns a per-step trace. Prefer run_test_plan for reusable asserted flows. No nested batch.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "capture_on_failure": {
+          "description": "Attach a screenshot + recent logs to a failed step (default true).",
+          "type": "boolean"
+        },
+        "steps": {
+          "description": "Ordered steps. Each: {tool, args?, label?}.",
+          "items": {
+            "properties": {
+              "args": {
+                "type": "object"
+              },
+              "label": {
+                "type": "string"
+              },
+              "tool": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "tool"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "stop_on_error": {
+          "description": "Stop at the first failing step (default true).",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "steps"
+      ],
+      "type": "object"
+    },
+    "name": "batch"
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
     "description": "Boot an iOS simulator by name (e.g. \"iPhone 15\") or UDID. Returns the booted Device \u2014 use its serial in select_device.",
     "inputSchema": {
       "additionalProperties": false,
@@ -4750,6 +4797,45 @@
       "type": "object"
     },
     "name": "wait_for_marker"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Block server-side until a UI condition holds \u2014 one call instead of an agent poll-loop. gone=false waits for an element to appear; gone=true waits for it to DISAPPEAR (spinner / dialog / loading overlay). Times out into a structured failure. Returns {condition, met, waited_s, element}.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "gone": {
+          "description": "true = wait until ABSENT; false (default) = wait until visible.",
+          "type": "boolean"
+        },
+        "poll_interval_s": {
+          "description": "Poll cadence (default 0.5).",
+          "type": "number"
+        },
+        "resource_id": {
+          "description": "Match by resource-id / a11y id.",
+          "type": "string"
+        },
+        "serial": {
+          "description": "Device serial. Defaults to the selected device.",
+          "type": "string"
+        },
+        "text": {
+          "description": "Match by visible text.",
+          "type": "string"
+        },
+        "timeout_s": {
+          "description": "Max wait (default 10).",
+          "type": "number"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "wait_until"
   },
   {
     "annotations": {

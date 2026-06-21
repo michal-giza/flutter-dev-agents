@@ -15,9 +15,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ..entities import LogEntry, LogLevel, UiElement
+from ..entities import Artifact, ArtifactKind, LogEntry, LogLevel, UiElement
 from ..failures import TestExecutionFailure, UiElementNotFoundFailure
 from ..repositories import (
+    ArtifactRepository,
     ObservationRepository,
     SessionStateRepository,
     UiRepository,
@@ -34,6 +35,9 @@ class TapAndVerifyParams:
     expect_resource_id: str | None = None
     timeout_s: float = 5.0
     exact: bool = False
+    # On verify failure, attach a capped screenshot + recent error logs to
+    # the failure — so diagnosing the miss costs no extra round-trip.
+    capture_on_failure: bool = True
     serial: str | None = None
 
 
@@ -47,10 +51,18 @@ class TapAndVerify(BaseUseCase[TapAndVerifyParams, UiElement]):
     """
 
     def __init__(
-        self, ui: UiRepository, state: SessionStateRepository
+        self,
+        ui: UiRepository,
+        state: SessionStateRepository,
+        observation: ObservationRepository | None = None,
+        artifacts: ArtifactRepository | None = None,
     ) -> None:
         self._ui = ui
         self._state = state
+        # Optional: when both are wired, a verify failure folds in a
+        # screenshot + recent error logs (no separate diagnose call).
+        self._observation = observation
+        self._artifacts = artifacts
 
     async def execute(self, params: TapAndVerifyParams) -> Result[UiElement]:
         if params.expect_text is None and params.expect_resource_id is None:
@@ -82,22 +94,68 @@ class TapAndVerify(BaseUseCase[TapAndVerifyParams, UiElement]):
         )
         if isinstance(wait_res, Err):
             failure = wait_res.failure
+            details: dict = {
+                "tapped": params.text,
+                "expect_text": params.expect_text,
+                "expect_resource_id": params.expect_resource_id,
+                "underlying": failure.message,
+            }
+            next_action = "capture_diagnostics"
+            if params.capture_on_failure:
+                diag = await self._capture(serial_res.value)
+                if diag:
+                    details["diagnostics"] = diag
+                    # Diagnostics are in-hand — point at the fix, not a
+                    # follow-up capture call.
+                    next_action = "inspect_diagnostics"
             return err(
                 UiElementNotFoundFailure(
                     message=(
                         f"tapped {params.text!r} but verification element did "
                         f"not appear within {params.timeout_s}s"
                     ),
-                    next_action="capture_diagnostics",
-                    details={
-                        "tapped": params.text,
-                        "expect_text": params.expect_text,
-                        "expect_resource_id": params.expect_resource_id,
-                        "underlying": failure.message,
-                    },
+                    next_action=next_action,
+                    details=details,
                 )
             )
         return ok(wait_res.value)
+
+    async def _capture(self, serial: str) -> dict | None:
+        """Best-effort screenshot (capped) + recent error logs for a verify
+        failure. Returns None if the observation/artifact repos aren't
+        wired or capture fails — never raises into the action path."""
+        if self._observation is None or self._artifacts is None:
+            return None
+        diag: dict = {}
+        try:
+            path_res = await self._artifacts.allocate_path(
+                "screenshot", ".png", "tap-verify-fail"
+            )
+            if not isinstance(path_res, Err):
+                shot_res = await self._observation.screenshot(serial, path_res.value)
+                if not isinstance(shot_res, Err):
+                    from ...data.image_capping import cap_image_in_place
+
+                    cap_image_in_place(shot_res.value)
+                    await self._artifacts.register(
+                        Artifact(
+                            path=shot_res.value,
+                            kind=ArtifactKind.SCREENSHOT,
+                            label="tap-verify-fail",
+                        )
+                    )
+                    diag["screenshot"] = str(shot_res.value)
+        except Exception:
+            pass
+        try:
+            logs_res = await self._observation.read_logs(
+                serial, since_s=30, min_level=LogLevel.ERROR, max_lines=20
+            )
+            if not isinstance(logs_res, Err) and logs_res.value:
+                diag["recent_errors"] = [e.message[:200] for e in logs_res.value]
+        except Exception:
+            pass
+        return diag or None
 
 
 @dataclass(frozen=True, slots=True)

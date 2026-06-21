@@ -98,6 +98,35 @@ observation that's at most `ttl_ms` stale, never across an action you just
 took. Enable it for navigation work; leave it off when you need
 guaranteed-fresh reads (e.g. waiting on async-loaded content).
 
+## Collapse round-trips (v0.15.0)
+
+Per-step latency is only half the story. The other half is **how many
+times the model has to wake up**: total time ≈ round-trips × (model
+reasoning + tool exec + transport). A 12-step flow is 12 model turns.
+Collapse them:
+
+- **`batch([{tool, args}, …])`** — run a known flow server-side in ONE
+  round-trip. Each step still gets the full pipeline (image-cap / trace /
+  truncate); `stop_on_error` halts at the first failure and returns a
+  per-step trace. The model reasons once, not per step.
+  ```jsonc
+  batch {"steps": [
+    {"tool": "tap", "args": {"resource_id": "btn_signin"}},
+    {"tool": "wait_until", "args": {"text": "Loading", "gone": true}},
+    {"tool": "assert_visible", "args": {"text": "Welcome"}}
+  ]}
+  ```
+  For a *reusable, asserted* flow prefer **`run_test_plan`** (declarative
+  YAML); use `batch` for ad-hoc sequences.
+- **`wait_until(gone=true)`** — block until a spinner/dialog disappears
+  (or `gone=false` until something appears) in one call, instead of a
+  poll-loop where every check is a round-trip.
+- **Diagnostics-on-failure** — when a `batch` step or `tap_and_verify`
+  fails, a capped screenshot + recent error logs are folded into the
+  result, so you don't spend another round-trip capturing them.
+- **`restart_debug_session(full_restart=false)`** — hot reload to iterate
+  code without the rebuild+reinstall round-trip.
+
 ## When you *do* need vision
 
 - Visual regression / golden checks — `compare_screenshot`,

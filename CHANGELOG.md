@@ -5,6 +5,48 @@ All notable changes to `flutter-dev-agents` / `mcp-phone-controll`.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0] — 2026-06-18
+
+**Round-trip reduction.** Testing felt slow because every step was its
+own request → model-reasoning → next-request cycle: total time ≈
+round-trips × per-turn cost. This release collapses many steps into one
+call. Tool count: 145 → 147 (`batch`, `wait_until`).
+
+### Added — `batch` (EXPERT tier)
+
+Run an ordered list of tool calls **server-side in ONE round-trip** —
+the model reasons once for a known flow instead of once per step. Each
+step is dispatched through the full middleware chain (image-cap / trace /
+truncation), so a batched action behaves exactly like a direct one.
+`stop_on_error` (default true) halts at the first failure; returns a
+per-step trace. Nested batch is rejected; capped at 30 steps. For a
+reusable, asserted flow prefer `run_test_plan`; `batch` is for ad-hoc
+sequences. Kept out of BASIC/INTERMEDIATE because composing a `steps[]`
+array is an advanced skill — SLMs are better served by `run_test_plan`.
+
+### Added — diagnostics-on-failure (`batch` + `tap_and_verify`)
+
+When a step fails, fold a **capped screenshot + recent error logs**
+straight into the failure result, so diagnosing a break costs **no extra
+round-trip** (previously the failure just said `next_action:
+capture_diagnostics`, forcing another call). `batch`:
+`capture_on_failure` (default true). `tap_and_verify`: now takes optional
+observation/artifact repos and attaches diagnostics on a verify miss
+(`next_action: inspect_diagnostics`). Both default-on, backward compatible.
+
+### Added — `wait_until`
+
+Block server-side until a UI condition holds — one call instead of an
+agent poll-loop (each poll was a round-trip). `gone=true` waits for an
+element to **disappear** (spinner / dialog / loading overlay — previously
+impossible without polling); `gone=false` waits for it to appear. Times
+out into a structured `TimeoutFailure`.
+
+### Tests
+- `test_batch.py` (+9), `test_wait_until.py` (+5), `test_ui_verify.py`
+  (+2 diagnostics).
+- Full suite: **1142 passed, 6 skipped.** ruff clean. Contract refreshed.
+
 ## [0.14.0] — 2026-06-18
 
 **Action-primitive hardening**, all from real-device field feedback

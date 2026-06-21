@@ -118,7 +118,8 @@ def default_annotations(tool_name: str) -> dict[str, bool]:
         "check_environment", "disk_usage",
         "find_", "is_", "tail_", "grep_", "extract_ui_graph",
         "ocr_screenshot", "compare_screenshot", "detect_markers",
-        "infer_camera_pose", "assert_", "wait_for_", "validate_test_plan",
+        "infer_camera_pose", "assert_", "wait_for_", "wait_until",
+        "validate_test_plan",
         "tool_usage_report", "recall", "narrate",
         "vm_list_isolates", "dart_analyze",
         "flutter_pub_outdated", "list_patrol_tests",
@@ -170,6 +171,9 @@ def default_annotations(tool_name: str) -> dict[str, bool]:
     # Destructive tools — touch device state, install/launch/stop apps,
     # write files in arbitrary places, modify project source.
     DESTRUCTIVE_PREFIXES = (
+        # batch composes other tools — as powerful as its steps, so treat
+        # it as destructive (a host should gate it like a tap).
+        "batch",
         "tap", "swipe", "type_text", "press_key",
         "install_app", "uninstall_app", "launch_app", "stop_app",
         "clear_app_data", "grant_permission",

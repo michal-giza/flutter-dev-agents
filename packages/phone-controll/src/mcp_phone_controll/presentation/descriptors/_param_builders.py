@@ -204,6 +204,7 @@ from ...domain.usecases.ui_query import (
     DumpUiParams,
     FindElementParams,
     WaitForElementParams,
+    WaitUntilParams,
 )
 from ...domain.usecases.ui_verify import (
     AssertNoErrorsSinceParams,
@@ -404,6 +405,17 @@ def _params_wait_for(args: JsonDict) -> WaitForElementParams:
     )
 
 
+def _params_wait_until(args: JsonDict) -> WaitUntilParams:
+    return WaitUntilParams(
+        text=args.get("text"),
+        resource_id=args.get("resource_id"),
+        gone=bool(args.get("gone", False)),
+        timeout_s=float(args.get("timeout_s", 10.0)),
+        poll_interval_s=float(args.get("poll_interval_s", 0.5)),
+        serial=args.get("serial"),
+    )
+
+
 def _params_dump_ui(args: JsonDict) -> DumpUiParams:
     return DumpUiParams(serial=args.get("serial"))
 
@@ -424,6 +436,7 @@ def _params_tap_and_verify(args: JsonDict) -> TapAndVerifyParams:
         expect_resource_id=args.get("expect_resource_id"),
         timeout_s=float(args.get("timeout_s", 5.0)),
         exact=bool(args.get("exact", False)),
+        capture_on_failure=bool(args.get("capture_on_failure", True)),
         serial=args.get("serial"),
     )
 

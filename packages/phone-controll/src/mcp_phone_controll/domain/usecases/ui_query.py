@@ -162,6 +162,95 @@ class DumpUi(BaseUseCase[DumpUiParams, DumpUiResult]):
 
 
 @dataclass(frozen=True, slots=True)
+class WaitUntilParams:
+    text: str | None = None
+    resource_id: str | None = None
+    # gone=False → block until the element is VISIBLE; gone=True → block
+    # until it's ABSENT (the new capability: wait for a spinner / dialog /
+    # overlay to disappear, which previously forced an agent poll-loop).
+    gone: bool = False
+    timeout_s: float = 10.0
+    poll_interval_s: float = 0.5
+    serial: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class WaitUntilResult:
+    condition: str       # "visible" | "gone"
+    met: bool            # always True on Ok (timeout returns Err)
+    waited_s: float
+    element: UiElement | None  # the element, when waiting for visible
+
+
+class WaitUntil(BaseUseCase[WaitUntilParams, WaitUntilResult]):
+    """Block server-side until a UI condition holds — one call instead of
+    an agent poll-loop (each poll was a round-trip). `gone=True` waits for
+    an element to DISAPPEAR (spinner/dialog/overlay); `gone=False` waits
+    for it to appear. Times out into a structured TimeoutFailure."""
+
+    def __init__(self, ui: UiRepository, state: SessionStateRepository) -> None:
+        self._ui = ui
+        self._state = state
+
+    async def execute(self, params: WaitUntilParams) -> Result[WaitUntilResult]:
+        import asyncio
+        import time
+
+        if params.text is None and params.resource_id is None:
+            from ..failures import InvalidArgumentFailure
+
+            return err(
+                InvalidArgumentFailure(
+                    message="wait_until needs `text` or `resource_id`.",
+                    next_action="fix_arguments",
+                )
+            )
+        serial_res = await resolve_serial(params.serial, self._state)
+        if isinstance(serial_res, Err):
+            return serial_res
+        serial = serial_res.value
+        condition = "gone" if params.gone else "visible"
+        poll = max(0.05, params.poll_interval_s)
+        start = time.monotonic()
+        deadline = start + max(0.0, params.timeout_s)
+
+        while True:
+            find_res = await self._ui.find(
+                serial,
+                text=params.text,
+                resource_id=params.resource_id,
+                timeout_s=poll,
+            )
+            if isinstance(find_res, Err):
+                return find_res
+            present = find_res.value is not None
+            waited = round(time.monotonic() - start, 2)
+            if params.gone and not present:
+                return ok(WaitUntilResult("gone", True, waited, None))
+            if not params.gone and present:
+                return ok(WaitUntilResult("visible", True, waited, find_res.value))
+            if time.monotonic() >= deadline:
+                from ..failures import TimeoutFailure
+
+                return err(
+                    TimeoutFailure(
+                        message=(
+                            f"condition '{condition}' not met within "
+                            f"{params.timeout_s}s"
+                        ),
+                        next_action="capture_diagnostics",
+                        details={
+                            "condition": condition,
+                            "text": params.text,
+                            "resource_id": params.resource_id,
+                            "waited_s": waited,
+                        },
+                    )
+                )
+            await asyncio.sleep(poll)
+
+
+@dataclass(frozen=True, slots=True)
 class AssertVisibleParams:
     text: str | None = None
     resource_id: str | None = None

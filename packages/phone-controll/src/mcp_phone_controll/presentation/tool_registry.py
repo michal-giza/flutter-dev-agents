@@ -200,6 +200,7 @@ from ..domain.usecases.ui_query import (
     DumpUi,
     FindElement,
     WaitForElement,
+    WaitUntil,
 )
 from ..domain.usecases.ui_verify import (
     AssertNoErrorsSince,
@@ -372,6 +373,7 @@ from .descriptors._param_builders import (
     _params_wait_for,
     _params_wait_for_ar_session_ready,
     _params_wait_for_marker,
+    _params_wait_until,
     _params_write_vscode_launch_config,
     _params_zoom_screenshot,
 )
@@ -428,6 +430,7 @@ class UseCases:
     press_key: PressKey
     find_element: FindElement
     wait_for_element: WaitForElement
+    wait_until: WaitUntil
     dump_ui: DumpUi
     assert_visible: AssertVisible
     tap_and_verify: TapAndVerify
@@ -574,6 +577,35 @@ def _bind(uc, params_builder):
         return await uc(params_builder(args))
 
     return invoke
+
+
+def _invalid_batch(message: str, example: JsonDict | None) -> JsonDict:
+    details: JsonDict = {}
+    if example is not None:
+        details["corrected_example"] = example
+    return {
+        "ok": False,
+        "error": {
+            "code": "InvalidArgumentFailure",
+            "message": message,
+            "next_action": "fix_arguments",
+            "details": details,
+        },
+    }
+
+
+async def _batch_placeholder(_args: JsonDict) -> Result[Any]:
+    # `batch` is dispatched directly by ToolDispatcher._run_batch; this
+    # invoke is never reached. A descriptor is still registered so `batch`
+    # appears in tools/list with a schema.
+    from ..domain.failures import InvalidArgumentFailure
+    from ..domain.result import err
+
+    return err(
+        InvalidArgumentFailure(
+            message="batch is handled by the dispatcher", next_action="retry_with_backoff"
+        )
+    )
 
 
 def build_registry(uc: UseCases) -> list[ToolDescriptor]:
@@ -812,6 +844,54 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             ),
             build_params=_params_run_test_plan,
             invoke=_bind(uc.run_test_plan, _params_run_test_plan),
+        ),
+        ToolDescriptor(
+            name="batch",
+            description=(
+                "Run an ordered list of tool calls server-side in ONE "
+                "round-trip: collapses a known flow (tap, wait_until, "
+                "assert_visible, dump_ui) so the model reasons once, not "
+                "per step. Each step gets the full pipeline "
+                "(image-cap/trace/truncate). stop_on_error halts at the "
+                "first failure; capture_on_failure folds a screenshot + "
+                "logs into the failed step. Returns a per-step trace. "
+                "Prefer run_test_plan for reusable asserted flows. No "
+                "nested batch."
+            ),
+            # Composes other tools, so it's as powerful as its steps —
+            # mark conservatively for hosts that gate destructive ops.
+            read_only=False,
+            destructive=True,
+            open_world=True,
+            input_schema=_schema(
+                {
+                    "steps": {
+                        "type": "array",
+                        "description": (
+                            "Ordered steps. Each: {tool, args?, label?}."
+                        ),
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "tool": {"type": "string"},
+                                "args": {"type": "object"},
+                                "label": {"type": "string"},
+                            },
+                            "required": ["tool"],
+                        },
+                    },
+                    "stop_on_error": _bool(
+                        "Stop at the first failing step (default true)."
+                    ),
+                    "capture_on_failure": _bool(
+                        "Attach a screenshot + recent logs to a failed step "
+                        "(default true)."
+                    ),
+                },
+                ["steps"],
+            ),
+            build_params=lambda a: a,
+            invoke=_batch_placeholder,
         ),
         ToolDescriptor(
             name="validate_test_plan",
@@ -1102,6 +1182,32 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             ),
             build_params=_params_wait_for,
             invoke=_bind(uc.wait_for_element, _params_wait_for),
+        ),
+        ToolDescriptor(
+            name="wait_until",
+            description=(
+                "Block server-side until a UI condition holds — one call "
+                "instead of an agent poll-loop. gone=false waits for an "
+                "element to appear; gone=true waits for it to DISAPPEAR "
+                "(spinner / dialog / loading overlay). Times out into a "
+                "structured failure. Returns {condition, met, waited_s, "
+                "element}."
+            ),
+            input_schema=_schema(
+                {
+                    "text": _string("Match by visible text."),
+                    "resource_id": _string("Match by resource-id / a11y id."),
+                    "gone": _bool(
+                        "true = wait until ABSENT; false (default) = wait "
+                        "until visible."
+                    ),
+                    "timeout_s": _number("Max wait (default 10)."),
+                    "poll_interval_s": _number("Poll cadence (default 0.5)."),
+                    **serial_prop,
+                }
+            ),
+            build_params=_params_wait_until,
+            invoke=_bind(uc.wait_until, _params_wait_until),
         ),
         ToolDescriptor(
             name="dump_ui",
@@ -3688,6 +3794,14 @@ class ToolDispatcher:
     async def _dispatch_unrecorded(
         self, name: str, args: JsonDict | None
     ) -> JsonDict:
+        # `batch` is special: it composes OTHER tools, so the dispatcher —
+        # which IS the orchestrator — runs it directly rather than a use
+        # case. Each step goes through the full chain via self.dispatch, so
+        # image-capping / tracing / truncation apply per step. Handled
+        # before descriptor lookup; the registered descriptor exists only
+        # for tools/list.
+        if name == "batch":
+            return await self._run_batch(args)
         descriptor = self._by_name.get(name)
         if descriptor is None:
             return {
@@ -3728,6 +3842,118 @@ class ToolDispatcher:
                 error["next_action"] = result.failure.next_action
             return {"ok": False, "error": error}
         return {"ok": True, "data": to_jsonable(result.value)}
+
+    _MAX_BATCH_STEPS = 30
+
+    async def _run_batch(self, args: JsonDict | None) -> JsonDict:
+        """Run an ordered list of tool calls server-side in ONE round-trip.
+
+        The point: a known multi-step flow (tap → wait → assert → dump)
+        costs ONE model turn instead of N. Each step is dispatched through
+        the full middleware chain, so it's traced/capped/truncated exactly
+        as a direct call would be. Stops at the first failing step by
+        default; on failure it can fold a screenshot + recent logs into the
+        result so diagnosing needs no extra round-trip.
+        """
+        args = args or {}
+        steps = args.get("steps")
+        if not isinstance(steps, list) or not steps:
+            return _invalid_batch(
+                "batch requires a non-empty 'steps' array",
+                {"steps": [{"tool": "tap", "args": {"resource_id": "..."}}]},
+            )
+        if len(steps) > self._MAX_BATCH_STEPS:
+            return _invalid_batch(
+                f"batch supports at most {self._MAX_BATCH_STEPS} steps; got {len(steps)}",
+                None,
+            )
+        stop_on_error = bool(args.get("stop_on_error", True))
+        capture_on_failure = bool(args.get("capture_on_failure", True))
+
+        results: list[JsonDict] = []
+        all_ok = True
+        first_failed: int | None = None
+
+        for i, step in enumerate(steps):
+            tool = step.get("tool") if isinstance(step, dict) else None
+            if not tool:
+                entry = {
+                    "step": i, "ok": False,
+                    "error": {
+                        "code": "InvalidArgumentFailure",
+                        "message": "each step needs a 'tool' name",
+                        "next_action": "fix_arguments",
+                    },
+                }
+            elif tool == "batch":
+                entry = {
+                    "step": i, "tool": "batch", "ok": False,
+                    "error": {
+                        "code": "InvalidArgumentFailure",
+                        "message": "nested batch is not allowed",
+                        "next_action": "fix_arguments",
+                    },
+                }
+            else:
+                env = await self.dispatch(tool, step.get("args") or {})
+                entry = {"step": i, "tool": tool, "ok": bool(env.get("ok"))}
+                if step.get("label"):
+                    entry["label"] = step["label"]
+                if env.get("ok"):
+                    entry["data"] = env.get("data")
+                else:
+                    entry["error"] = env.get("error")
+
+            results.append(entry)
+            if not entry["ok"]:
+                all_ok = False
+                if first_failed is None:
+                    first_failed = i
+                if capture_on_failure:
+                    diag = await self._capture_diagnostics()
+                    if diag:
+                        entry["diagnostics"] = diag
+                if stop_on_error:
+                    break
+
+        data: JsonDict = {
+            "steps_total": len(steps),
+            "steps_run": len(results),
+            "all_ok": all_ok,
+            "results": results,
+        }
+        if all_ok:
+            return {"ok": True, "data": data}
+        n_failed = sum(1 for r in results if not r["ok"])
+        msg = (
+            f"batch stopped at step {first_failed}"
+            if stop_on_error
+            else f"{n_failed} step(s) failed"
+        )
+        return {
+            "ok": False,
+            "error": {
+                "code": "BatchStepFailed",
+                "message": msg,
+                "next_action": "inspect_batch_results",
+            },
+            "data": data,
+        }
+
+    async def _capture_diagnostics(self) -> JsonDict | None:
+        """Best-effort screenshot + recent logs for a failed batch step, so
+        the agent diagnoses inline rather than spending another round-trip.
+        Routed through dispatch so the screenshot is image-capped."""
+        diag: JsonDict = {}
+        if self.has("take_screenshot"):
+            shot = await self.dispatch("take_screenshot", {"label": "batch-failure"})
+            if shot.get("ok"):
+                diag["screenshot"] = shot.get("data")
+        if self.has("read_logs"):
+            logs = await self.dispatch("read_logs", {"since_s": 30})
+            if logs.get("ok"):
+                diag["recent_logs"] = logs.get("data")
+        return diag or None
 
     async def _record(
         self, name: str, args: JsonDict | None, envelope: JsonDict

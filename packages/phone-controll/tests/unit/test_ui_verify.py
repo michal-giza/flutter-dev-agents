@@ -52,6 +52,47 @@ async def test_tap_and_verify_fails_when_expected_missing():
 
 
 @pytest.mark.asyncio
+async def test_tap_and_verify_attaches_diagnostics_on_failure(tmp_path):
+    """v0.15.0 #2: with observation+artifacts wired, a verify failure folds
+    in a screenshot + recent errors so diagnosing needs no extra call."""
+    from tests.fakes.fake_repositories import FakeArtifactRepository
+
+    state = FakeSessionStateRepository(serial="EMU01")
+    ui = FakeUiRepository(found=None)
+    artifacts = FakeArtifactRepository(root=tmp_path / "sessions")
+    uc = TapAndVerify(ui, state, FakeObservationRepository(), artifacts)
+    res = await uc.execute(
+        TapAndVerifyParams(text="Sign in", expect_text="Welcome", timeout_s=0.1)
+    )
+    assert isinstance(res, Err)
+    assert res.failure.next_action == "inspect_diagnostics"
+    diag = res.failure.details["diagnostics"]
+    assert "screenshot" in diag
+    assert "recent_errors" in diag
+
+
+@pytest.mark.asyncio
+async def test_tap_and_verify_capture_disabled_keeps_legacy_next_action(tmp_path):
+    from tests.fakes.fake_repositories import FakeArtifactRepository
+
+    state = FakeSessionStateRepository(serial="EMU01")
+    ui = FakeUiRepository(found=None)
+    uc = TapAndVerify(
+        ui, state, FakeObservationRepository(),
+        FakeArtifactRepository(root=tmp_path / "sessions"),
+    )
+    res = await uc.execute(
+        TapAndVerifyParams(
+            text="Sign in", expect_text="Welcome", timeout_s=0.1,
+            capture_on_failure=False,
+        )
+    )
+    assert isinstance(res, Err)
+    assert res.failure.next_action == "capture_diagnostics"
+    assert "diagnostics" not in res.failure.details
+
+
+@pytest.mark.asyncio
 async def test_tap_and_verify_requires_expectation():
     state = FakeSessionStateRepository(serial="EMU01")
     ui = FakeUiRepository(found=None)
