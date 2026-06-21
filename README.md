@@ -2,7 +2,7 @@
 
 **Audit-grade Flutter testing for AI agents — drive real iPhones, Androids & the web, then grade what ships.**
 
-[![tests](https://img.shields.io/badge/tests-1142_passing-A6E22E?style=flat-square)](packages/phone-controll/tests)
+[![tests](https://img.shields.io/badge/tests-1144_passing-A6E22E?style=flat-square)](packages/phone-controll/tests)
 [![license](https://img.shields.io/badge/license-Apache_2.0-F76C28?style=flat-square)](LICENSE)
 [![MCP spec](https://img.shields.io/badge/MCP-2025--06--18-F76C28?style=flat-square)](https://modelcontextprotocol.io)
 [![python](https://img.shields.io/badge/python-3.11+-3B4252?style=flat-square)](pyproject.toml)
@@ -132,7 +132,7 @@ Run `check_environment` from any Claude Code session — it returns a structured
 
 ## Status
 
-- **`packages/phone-controll/` v0.15.0** — **147 tools** live on PyPI, **1142 hermetic unit tests** + real-device tests (gated on `MCP_REAL_DEVICE=1`). Field-tested across real Flutter projects (`docs/v030-field-test.md`); web debug + WDA-simulator + `audit_performance` live-verified on bike_news_room.
+- **`packages/phone-controll/` v0.15.1** — **147 tools** live on PyPI, **1144 hermetic unit tests** + real-device tests (gated on `MCP_REAL_DEVICE=1`). Field-tested across real Flutter projects (`docs/v030-field-test.md`); the v0.13–v0.15 tools (selector-tap, `dump_ui` spill, deep-tree dump, `batch`, diagnostics-on-failure, `wait_until`, `zoom_screenshot`) live-verified on the iPhone 17 Pro simulator.
 - **First-real-device patch release shipped May 2026** — fixed iOS 17+ `--rsd` routing, WDA team_id signing, Polish NBSP `tap_text`, raw-`adb screencap` recovery loop. See [`CHANGELOG.md`](CHANGELOG.md).
 - Multi-window VS Code orchestration + debug sessions + WDA setup + cross-session device locks all in place.
 

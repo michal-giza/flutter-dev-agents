@@ -13,6 +13,7 @@ import pytest
 
 from mcp_phone_controll.data.repositories.wda_ui_repository import (
     WdaUiRepository,
+    _is_absent_error,
     _is_recoverable_session_error,
 )
 from mcp_phone_controll.domain.result import Err, Ok
@@ -163,3 +164,58 @@ def test_exc_name_detection():
         pass
 
     assert _is_recoverable_session_error(WDAInvalidSessionIdError("x"))
+
+
+# --- v0.15.1: stale-element-reference means ABSENT (live-caught on sim) ---
+
+
+class _StaleElement(Exception):
+    """WDA's status-110 error when a previously-located element vanished."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            'stale element reference: The previously found element "Accept '
+            'personalised ads" Button is not present in the current view anymore.'
+        )
+
+
+def test_is_absent_error_classifies_stale_and_not_found():
+    assert _is_absent_error(_StaleElement())
+    assert _is_absent_error(Exception("no matches found for predicate"))
+    assert not _is_absent_error(Exception("invalid session id"))  # that's a session error
+
+
+class _ElemDisappeared:
+    """uiautomator-style element whose .wait() raises a stale-element error,
+    mimicking WDA when the element disappeared between locate and re-check."""
+
+    def wait(self, timeout_s):
+        raise _StaleElement()
+
+
+class _DisappearedSession:
+    def __call__(self, **kwargs):
+        return _ElemDisappeared()
+
+
+class _StableFactory:
+    def __init__(self):
+        self._s = _DisappearedSession()
+
+    async def get(self, udid):
+        return self._s
+
+    async def invalidate(self, udid):
+        # Must NOT be called — a stale ELEMENT is not a dead SESSION.
+        raise AssertionError("stale element wrongly triggered a session refresh")
+
+
+@pytest.mark.asyncio
+async def test_find_treats_stale_element_as_absent():
+    """find() returns ok(None) — not an error — when the element is stale,
+    so wait_until(gone) on a vanished element concludes 'met', and no
+    session re-handshake is triggered."""
+    repo = WdaUiRepository(_StableFactory())
+    res = await repo.find(_S, text="Accept personalised ads")
+    assert isinstance(res, Ok), res
+    assert res.value is None

@@ -49,6 +49,34 @@ def _is_recoverable_session_error(exc: BaseException) -> bool:
     return any(marker in msg for marker in _STALE_SESSION_MARKERS)
 
 
+# An ELEMENT-level "not there" — distinct from a dead SESSION. WDA raises
+# `stale element reference` when an element that was located earlier (e.g.
+# by a prior wait_until-visible) has since disappeared, and
+# `no matches found` for a plain miss. For find(), both mean ABSENT — they
+# must resolve to ok(None), not a hard error. Without this, the common
+# wait_until(visible) → wait_until(gone) pattern on the SAME element blows
+# up on the gone check the instant the element disappears (live-caught on
+# the iPhone 17 sim: the consent screen's button vanished and the gone
+# wait errored instead of reporting met). NB: keep separate from session
+# recovery — a stale ELEMENT must NOT trigger a session re-handshake.
+_ABSENT_EXC_NAMES = frozenset(
+    {"WDAStaleElementReferenceError", "WDAElementNotFoundError"}
+)
+_ABSENT_MARKERS = (
+    "stale element reference",
+    "no matches found",
+    "not present in the current view",
+    "element not found",
+)
+
+
+def _is_absent_error(exc: BaseException) -> bool:
+    if type(exc).__name__ in _ABSENT_EXC_NAMES:
+        return True
+    msg = str(exc).lower()
+    return any(marker in msg for marker in _ABSENT_MARKERS)
+
+
 def _bounds_from_rect(rect: dict | None) -> Bounds:
     if not rect:
         return Bounds(0, 0, 0, 0)
@@ -214,10 +242,19 @@ class WdaUiRepository(UiRepository):
             return err(UiFailure(message="find requires at least one selector"))
 
         def op(s):
-            elem = s(**kwargs)
-            if not elem.wait(timeout_s):
-                return None
-            return _element_from_wda(elem)
+            try:
+                elem = s(**kwargs)
+                if not elem.wait(timeout_s):
+                    return None
+                return _element_from_wda(elem)
+            except Exception as e:
+                # A stale/disappeared element means ABSENT, not failure —
+                # critical for wait_until(gone) after a visible-wait on the
+                # same element. Re-raise anything else (incl. session errors
+                # that _run recovers).
+                if _is_absent_error(e):
+                    return None
+                raise
 
         try:
             element = await self._run(serial, op)

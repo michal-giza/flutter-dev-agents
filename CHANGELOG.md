@@ -5,6 +5,41 @@ All notable changes to `flutter-dev-agents` / `mcp-phone-controll`.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.1] — 2026-06-21
+
+**Live-verification fix** (caught driving bike_news_room / "PlantDex" on
+the iPhone 17 Pro simulator, WDA 13). The v0.13–v0.15 tools verified
+end-to-end on-device — selector-tap, `dump_ui` artifact spill, deep-tree
+dump (`snapshotMaxDepth`), `extract_ui_graph`, `batch`,
+diagnostics-on-failure, `zoom_screenshot`, `estimate_tokens` — with one
+real bug surfaced and fixed.
+
+### Fixed — `wait_until(gone)` / `find` on a vanished WDA element
+
+The common `wait_until(visible)` → `wait_until(gone)` pattern on the
+**same** element failed the `gone` check: once the element disappeared,
+WDA raised `WDAStaleElementReferenceError` (status 110) for the
+previously-located element, and `find()` propagated it as a hard error
+instead of concluding "absent." `WdaUiRepository.find()` now treats a
+stale-element / no-matches error as **ok(None)** — so `wait_until(gone)`,
+`wait_for`, and `find` are robust to the locate-then-disappear pattern.
+Kept distinct from session recovery: a stale *element* must never trigger
+a session re-handshake.
+
+### Notes from the live run
+- `batch` diagnostics-on-failure worked exactly as designed — the failed
+  step auto-folded a screenshot + 28 log lines into the result (zero
+  extra round-trips to diagnose).
+- Minor known gap (not fixed here): `extract_ui_graph` returns
+  `bounds: null` for iOS clickables (the WDA x/y/w/h aren't mapped), so
+  `tap(bounds=…)` from a graph node is Android-only for now — text-tap is
+  the iOS path.
+
+### Tests
+- `test_wda_session_refresh.py` (+2): stale-element → `ok(None)`, and a
+  stale element must not trigger a session refresh.
+- Full suite: **1144 passed, 6 skipped.** ruff clean.
+
 ## [0.15.0] — 2026-06-18
 
 **Round-trip reduction.** Testing felt slow because every step was its
