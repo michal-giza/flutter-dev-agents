@@ -5,6 +5,28 @@ All notable changes to `flutter-dev-agents` / `mcp-phone-controll`.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.2] — 2026-06-21
+
+**Closes the iOS `extract_ui_graph` bounds gap** flagged during the
+v0.15.1 live run.
+
+### Fixed — `extract_ui_graph` now populates bounds on iOS
+
+WDA / XCUITest nodes carry **separate `x` / `y` / `width` / `height`
+integer attributes** (there is no Android-style `bounds="[x1,y1][x2,y2]"`
+attribute), so iOS clickables came back with `bounds: null` — making
+`tap(bounds=…)` from a graph node Android-only. The parser now derives
+`(x1, y1, x2, y2)` from `x/y/width/height` when no `bounds` string is
+present (Android string form still handled first). These are WDA point
+coordinates — the same space `tap`/`swipe` use on iOS — so tapping the
+centre of the returned rect is correct. iOS agents can now get a tappable
+selector from `extract_ui_graph` even for elements with no text/id.
+
+### Tests
+- `test_ui_graph.py` (+1; iOS fixture gains x/y/w/h): asserts iOS bounds
+  map to `(x1,y1,x2,y2)`.
+- Full suite: **1145 passed, 6 skipped.** ruff clean.
+
 ## [0.15.1] — 2026-06-21
 
 **Live-verification fix** (caught driving bike_news_room / "PlantDex" on

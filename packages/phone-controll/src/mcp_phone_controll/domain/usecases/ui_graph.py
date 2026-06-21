@@ -173,7 +173,7 @@ def _parse(xml_text: str, max_nodes: int) -> UiGraphResult:
             or elem.attrib.get("identifier")
             or None
         )
-        bounds = _parse_bounds(elem.attrib.get("bounds"))
+        bounds = _bounds_from_attrib(elem.attrib)
         enabled = elem.attrib.get("enabled", "true").lower() == "true"
         clickable = elem.attrib.get("clickable", "false").lower() == "true"
         if role != "unknown" or text or clickable:
@@ -238,6 +238,36 @@ def _role_for(class_name: str, mapping: list[tuple[str, str]]) -> str:
 
 
 _BOUNDS_RE = re.compile(r"\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]")
+
+
+def _bounds_from_attrib(
+    attrib: dict[str, str],
+) -> tuple[int, int, int, int] | None:
+    """Extract bounds as (x1, y1, x2, y2) from a node's attributes,
+    covering both dump formats:
+
+      - Android (UIAutomator): a single `bounds="[x1,y1][x2,y2]"` string.
+      - iOS (WDA / XCUITest): separate integer `x` / `y` / `width` /
+        `height` attributes — there is NO `bounds` attribute, which is why
+        iOS nodes previously came back with bounds=null (so tap(bounds=…)
+        from a graph node was Android-only). These are in WDA's point
+        space, the same space `tap`/`swipe` use on iOS — so tapping the
+        centre of this rect is correct for WDA.
+    """
+    raw = attrib.get("bounds")
+    if raw:
+        parsed = _parse_bounds(raw)
+        if parsed is not None:
+            return parsed
+    x, y = attrib.get("x"), attrib.get("y")
+    w, h = attrib.get("width"), attrib.get("height")
+    if x is not None and y is not None and w is not None and h is not None:
+        try:
+            xi, yi, wi, hi = int(x), int(y), int(w), int(h)
+        except ValueError:
+            return None
+        return (xi, yi, xi + wi, yi + hi)
+    return None
 
 
 def _parse_bounds(raw: str | None) -> tuple[int, int, int, int] | None:

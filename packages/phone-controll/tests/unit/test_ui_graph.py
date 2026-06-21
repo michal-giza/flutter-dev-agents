@@ -33,12 +33,13 @@ _ANDROID_DUMP = """<?xml version="1.0" encoding="UTF-8"?>
 
 
 _IOS_DUMP = """<?xml version="1.0" encoding="UTF-8"?>
-<XCUIElementTypeApplication>
-  <XCUIElementTypeWindow>
-    <XCUIElementTypeButton label="Continue" enabled="true" />
-    <XCUIElementTypeStaticText label="Welcome back" />
-    <XCUIElementTypeTextField label="Email" />
-    <XCUIElementTypeImage label="logo" />
+<XCUIElementTypeApplication x="0" y="0" width="402" height="874">
+  <XCUIElementTypeWindow x="0" y="0" width="402" height="874">
+    <XCUIElementTypeButton label="Continue" enabled="true"
+      x="16" y="156" width="370" height="48" />
+    <XCUIElementTypeStaticText label="Welcome back" x="16" y="80" width="200" height="30" />
+    <XCUIElementTypeTextField label="Email" x="16" y="320" width="370" height="44" />
+    <XCUIElementTypeImage label="logo" x="160" y="40" width="80" height="80" />
   </XCUIElementTypeWindow>
 </XCUIElementTypeApplication>
 """
@@ -76,6 +77,18 @@ def test_parses_bounds_correctly():
     result = _parse(_ANDROID_DUMP, max_nodes=200)
     btn = next(n for n in result.clickables if n.text == "Sign in")
     assert btn.bounds == (40, 200, 400, 280)
+
+
+def test_parses_ios_bounds_from_xywh():
+    """v0.15.2: WDA/XCUITest nodes carry separate x/y/width/height (no
+    `bounds` attr) — map them to (x1,y1,x2,y2) so tap(bounds=…) from a
+    graph node works on iOS, not just Android."""
+    result = _parse(_IOS_DUMP, max_nodes=200)
+    btn = next(n for n in result.clickables if n.text == "Continue")
+    # x=16,y=156,w=370,h=48 → (16,156,386,204); centre (201,180) for tap.
+    assert btn.bounds == (16, 156, 386, 204)
+    field = next(n for n in result.inputs if n.role == "text_field")
+    assert field.bounds == (16, 320, 386, 364)
 
 
 class _FakeUiRepo:
