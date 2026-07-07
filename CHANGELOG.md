@@ -5,6 +5,53 @@ All notable changes to `flutter-dev-agents` / `mcp-phone-controll`.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.0] — 2026-06-21
+
+**Durable debug sessions** (field-reported "gap #6"): the debug-session
+registry lived only in the MCP process's memory, so restarting the tool
+server orphaned still-alive sessions — the Flutter app + VM Service kept
+running, but `list_debug_sessions` came back empty and there was no way
+to re-attach (`attach_debug_session` was a stub). Fixed.
+
+### Added — the registry survives an MCP restart, with auto-reattach
+
+- **`DebugSessionStore`** persists each session's reconnection metadata
+  (id, device, project, **VM Service ws URI**, mode…) to a small JSON
+  file (`~/.mcp_phone_controll/debug_sessions.json`; override
+  `MCP_DEBUG_SESSIONS_FILE`). Written on start/attach/stop; atomic; never
+  fails a session op if the file is missing/corrupt.
+- **`list_debug_sessions` auto-reattaches.** On the first call after a
+  restart it probes each persisted session's VM Service — reviving the
+  ones still reachable and pruning the dead. Call it first after a
+  restart to recover an orphaned session.
+
+### Fixed — `attach_debug_session` is now implemented
+
+`attach(vm_service_uri, project_path)` was a stub. It now probes the VM
+Service for reachability and registers a **client-less** session that
+serves service extensions / `dump_widget_tree` / `vm_evaluate` over the
+direct VM Service — no `flutter --machine` daemon required. This is the
+same path used for auto-reattach and for attaching to an app started
+outside the MCP.
+
+### The capability boundary (stated plainly)
+
+A re-attached session is **VM-Service-only**: service extensions, widget
+tree, and expression eval work, but **hot reload / restart and daemon
+logs do not** — those need the daemon, whose stdio connection can't
+outlive the process. Those ops return a clean error pointing at
+`start_debug_session` for a fresh daemon-backed session. `stop` on a
+re-attached session just detaches (removes the record); it never kills
+an app it didn't start.
+
+### Tests
+- `test_debug_session_store.py` (+7), `test_debug_session_durable.py`
+  (+7): store round-trip / persistence-across-instances, attach
+  reachable/unreachable, list-reattach + prune-dead, service extensions
+  on a re-attached session, no-hot-reload, stop-detaches.
+- Full suite: **1159 passed, 6 skipped.** ruff clean. Contract refreshed
+  (attach/list descriptions). Tool count unchanged (147).
+
 ## [0.15.2] — 2026-06-21
 
 **Closes the iOS `extract_ui_graph` bounds gap** flagged during the

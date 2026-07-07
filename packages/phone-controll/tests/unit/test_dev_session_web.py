@@ -75,7 +75,7 @@ class _FakeLocks:
         return ok(self._lock)
 
 
-def _repo(locks, created: list):
+def _repo(locks, created: list, store=None):
     def factory(flutter):
         client = _FakeMachineClient(flutter)
         created.append(client)
@@ -86,7 +86,25 @@ def _repo(locks, created: list):
         locks=locks,
         session_id="sess-A",
         client_factory=factory,
+        # Hermetic: never touch the real ~/.mcp_phone_controll registry.
+        store=store or _MemStore(),
     )
+
+
+class _MemStore:
+    """In-memory DebugSessionStore stand-in for hermetic tests."""
+
+    def __init__(self) -> None:
+        self.records: dict[str, dict] = {}
+
+    def load(self):
+        return list(self.records.values())
+
+    def upsert(self, record):
+        self.records[record["id"]] = record
+
+    def remove(self, session_id):
+        self.records.pop(session_id, None)
 
 
 # ---- web targets skip the lock -----------------------------------------

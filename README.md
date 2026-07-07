@@ -2,7 +2,7 @@
 
 **Audit-grade Flutter testing for AI agents — drive real iPhones, Androids & the web, then grade what ships.**
 
-[![tests](https://img.shields.io/badge/tests-1145_passing-A6E22E?style=flat-square)](packages/phone-controll/tests)
+[![tests](https://img.shields.io/badge/tests-1159_passing-A6E22E?style=flat-square)](packages/phone-controll/tests)
 [![license](https://img.shields.io/badge/license-Apache_2.0-F76C28?style=flat-square)](LICENSE)
 [![MCP spec](https://img.shields.io/badge/MCP-2025--06--18-F76C28?style=flat-square)](https://modelcontextprotocol.io)
 [![python](https://img.shields.io/badge/python-3.11+-3B4252?style=flat-square)](pyproject.toml)
@@ -31,6 +31,13 @@ claude mcp add playwright      --scope user -- npx -y @playwright/mcp@latest
 Then call `describe_capabilities` from your agent. Full setup (venv-pinned, device prereqs): **[First 15 minutes](docs/GETTING-STARTED.md)**.
 
 → **[The Stack](docs/the-stack.md)** · **[Navigation latency](docs/agent-navigation-latency.md)** · **[Performance rubric](docs/performance-rubric.md)** · **[SLM / local-model setup](docs/slm-setup.md)** · **[Senior-tester discipline](docs/senior-tester-discipline.md)** · **[Comparison vs other MCPs](docs/flutter-mcp-comparison.md)** · **[Web before/after playbook](docs/web-logged-in-flow.md)** · **[FAQ](docs/FAQ.md)** · **[Configuration](docs/CONFIGURATION.md)** · **[Tools by category](docs/tools-by-category.md)** · **[Architecture](docs/architecture.md)**
+
+## What's new in v0.16.0 (June 2026)
+
+**Durable debug sessions** (from field use). The debug-session registry was in-memory, so restarting the MCP server orphaned still-alive sessions — the app + VM Service kept running but there was no way to reach them.
+
+- 🆕 **Registry survives an MCP restart** (v0.16.0) — session reconnection metadata (crucially the VM Service ws URI) persists to disk; `list_debug_sessions` **auto-reattaches** live sessions and prunes dead ones. Call it first after a restart to recover an orphaned session.
+- 🆕 **`attach_debug_session` implemented** (v0.16.0) — attach to an already-running app by its VM Service URI (no `flutter --machine` daemon). Re-attached sessions are VM-Service-only: service extensions / `dump_widget_tree` / `vm_evaluate` work; hot reload needs a fresh `start_debug_session`.
 
 ## What's new in v0.15.0 (June 2026)
 
@@ -132,7 +139,7 @@ Run `check_environment` from any Claude Code session — it returns a structured
 
 ## Status
 
-- **`packages/phone-controll/` v0.15.2** — **147 tools** live on PyPI, **1145 hermetic unit tests** + real-device tests (gated on `MCP_REAL_DEVICE=1`). Field-tested across real Flutter projects (`docs/v030-field-test.md`); the v0.13–v0.15 tools (selector-tap, `dump_ui` spill, deep-tree dump, `batch`, diagnostics-on-failure, `wait_until`, `zoom_screenshot`) live-verified on the iPhone 17 Pro simulator.
+- **`packages/phone-controll/` v0.16.0** — **147 tools** live on PyPI, **1159 hermetic unit tests** + real-device tests (gated on `MCP_REAL_DEVICE=1`). Field-tested across real Flutter projects (`docs/v030-field-test.md`); the v0.13–v0.15 tools (selector-tap, `dump_ui` spill, deep-tree dump, `batch`, diagnostics-on-failure, `wait_until`, `zoom_screenshot`) live-verified on the iPhone 17 Pro simulator.
 - **First-real-device patch release shipped May 2026** — fixed iOS 17+ `--rsd` routing, WDA team_id signing, Polish NBSP `tap_text`, raw-`adb screencap` recovery loop. See [`CHANGELOG.md`](CHANGELOG.md).
 - Multi-window VS Code orchestration + debug sessions + WDA setup + cross-session device locks all in place.
 

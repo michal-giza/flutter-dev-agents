@@ -30,8 +30,10 @@ from ...domain.failures import (
 )
 from ...domain.repositories import DebugSessionRepository, DeviceLockRepository
 from ...domain.result import Err, Result, err, ok
+from ...infrastructure.debug_session_store import DebugSessionStore
 from ...infrastructure.flutter_cli import FlutterCli
 from ...infrastructure.flutter_machine_client import FlutterMachineClient
+from ...observability import emit
 
 # Flutter "web" device ids (`flutter run -d <id>`). These aren't physical
 # devices we lock — `flutter run -d chrome --machine` launches a browser +
@@ -49,6 +51,7 @@ class FlutterDebugSessionRepository(DebugSessionRepository):
         locks: DeviceLockRepository,
         session_id: str,
         client_factory=None,
+        store: DebugSessionStore | None = None,
     ) -> None:
         self._flutter = flutter
         self._locks = locks
@@ -58,6 +61,14 @@ class FlutterDebugSessionRepository(DebugSessionRepository):
         self._mutex = asyncio.Lock()
         # Injectable for tests; defaults to a real FlutterMachineClient.
         self._client_factory = client_factory or (lambda f: FlutterMachineClient(f))
+        # Durable registry so sessions survive an MCP restart. Records
+        # loaded here are candidates for re-attach — not yet connected; a
+        # `list_sessions()` (or attach) probes each and revives the ones
+        # whose VM Service is still reachable, pruning the dead.
+        self._store = store if store is not None else DebugSessionStore()
+        self._reattach: dict[str, dict] = {
+            rec["id"]: rec for rec in self._store.load()
+        }
 
     # ----- start / stop / restart ------------------------------------
 
@@ -144,17 +155,27 @@ class FlutterDebugSessionRepository(DebugSessionRepository):
         async with self._mutex:
             self._sessions[sid] = active
             self._most_recent = sid
+        self._store.upsert(active.to_record())
         return ok(active.snapshot())
 
     async def stop(self, session_id: str | None = None) -> Result[None]:
         target_id = session_id or self._most_recent
         if target_id is None:
+            # Might still be a persisted-but-not-yet-materialised session.
             return ok(None)
         async with self._mutex:
             active = self._sessions.pop(target_id, None)
+            self._reattach.pop(target_id, None)
             if self._most_recent == target_id:
                 self._most_recent = next(iter(reversed(self._sessions.keys())), None)
+        # Drop it from the durable store either way.
+        self._store.remove(target_id)
         if active is None:
+            return ok(None)
+        # A re-attached session has no daemon client to stop — we only
+        # detach (already removed from the registry). We do NOT kill the
+        # app: it wasn't ours to start, and the whole point is it's alive.
+        if active.client is None:
             return ok(None)
         try:
             await active.client.stop()
@@ -177,6 +198,20 @@ class FlutterDebugSessionRepository(DebugSessionRepository):
                     next_action="start_debug_session",
                 )
             )
+        if active.client is None:
+            return err(
+                HotReloadFailure(
+                    message=(
+                        "this is a re-attached session (VM Service only) — hot "
+                        "reload/restart needs the `flutter --machine` daemon, "
+                        "which didn't survive the MCP restart. Service "
+                        "extensions, widget-tree and vm_evaluate still work. "
+                        "Run start_debug_session for a fresh daemon-backed "
+                        "session that can hot reload."
+                    ),
+                    next_action="start_debug_session",
+                )
+            )
         active.state = DebugSessionState.RELOADING
         try:
             response = await active.client.restart(full_restart=full_restart)
@@ -195,23 +230,135 @@ class FlutterDebugSessionRepository(DebugSessionRepository):
         return ok(active.snapshot())
 
     async def attach(
-        self, vm_service_uri: str, project_path: Path
+        self,
+        vm_service_uri: str,
+        project_path: Path,
+        *,
+        device_serial: str = "attached",
+        session_id: str | None = None,
+        mode: BuildMode = BuildMode.DEBUG,
+        flavor: str | None = None,
+        target: str | None = None,
     ) -> Result[DebugSession]:
-        # Attach is documented as advanced; we don't implement the full flow yet.
-        # Return a clean InvalidArgumentFailure-style error so agents know to skip.
-        return err(
-            DebugSessionFailure(
-                message="attach_debug_session is not yet implemented",
-                details={"vm_service_uri": vm_service_uri},
-                next_action="ask_user",
-            )
+        """Attach to an already-running app by its VM Service ws URI —
+        without a `flutter --machine` daemon. Probes reachability, then
+        registers a client-less session that services VM-Service ops
+        (service extensions / widget-tree / vm_evaluate) via the direct
+        VmServiceClient. This is also the re-attach path after an MCP
+        restart. It CANNOT hot reload (no daemon)."""
+        probe = await self._probe(vm_service_uri)
+        if isinstance(probe, Err):
+            return probe
+
+        sid = session_id or uuid.uuid4().hex[:12]
+        active = _Active(
+            session_id=sid,
+            client=None,
+            project_path=project_path,
+            device_serial=device_serial,
+            mode=mode,
+            flavor=flavor,
+            target=target,
+            started_at=datetime.now(),
+            state=DebugSessionState.RUNNING,
+            vm_service_uri=vm_service_uri,
         )
+        async with self._mutex:
+            self._sessions[sid] = active
+            self._reattach.pop(sid, None)
+            self._most_recent = sid
+        self._store.upsert(active.to_record())
+        emit("debug_session_attached", level="info", session_id=sid, uri=vm_service_uri)
+        return ok(active.snapshot())
+
+    async def _probe(self, uri: str) -> Result[str]:
+        """Return ok(isolate_id) if the VM Service is reachable, else a
+        typed Err. Connect + read one isolate, then close."""
+        from ...infrastructure.vm_service_client import VmServiceClient
+
+        client = VmServiceClient(uri)
+        try:
+            try:
+                await client.connect()
+            except ImportError as e:
+                return err(
+                    DebugSessionFailure(
+                        message=str(e), next_action="install_debug_extras"
+                    )
+                )
+            except Exception as e:
+                return err(
+                    DebugSessionFailure(
+                        message=f"VM Service not reachable at {uri}: {e}",
+                        details={"vm_service_uri": uri},
+                        next_action="check_debug_session",
+                    )
+                )
+            isolate_id = await client.first_isolate_id()
+            if not isolate_id:
+                return err(
+                    DebugSessionFailure(
+                        message=f"VM Service at {uri} has no isolate",
+                        next_action="check_debug_session",
+                    )
+                )
+            return ok(isolate_id)
+        finally:
+            await client.close()
 
     # ----- introspection --------------------------------------------
 
     async def list_sessions(self) -> Result[list[DebugSession]]:
+        # Auto-reattach: revive persisted sessions whose VM Service is
+        # still reachable (survived an MCP restart), prune the dead. This
+        # is what makes list_debug_sessions "just work" after a restart.
+        await self._reconcile_reattach()
         async with self._mutex:
             return ok([active.snapshot() for active in self._sessions.values()])
+
+    async def _reconcile_reattach(self) -> None:
+        async with self._mutex:
+            pending = [
+                rec for sid, rec in self._reattach.items()
+                if sid not in self._sessions
+            ]
+        for rec in pending:
+            sid = rec["id"]
+            uri = rec.get("vm_service_uri")
+            if not uri:
+                async with self._mutex:
+                    self._reattach.pop(sid, None)
+                self._store.remove(sid)
+                continue
+            probe = await self._probe(uri)
+            if isinstance(probe, Err):
+                async with self._mutex:
+                    self._reattach.pop(sid, None)
+                self._store.remove(sid)
+                emit(
+                    "debug_session_reattach_pruned",
+                    level="info", session_id=sid, uri=uri,
+                )
+                continue
+            active = _Active(
+                session_id=sid,
+                client=None,
+                project_path=Path(rec.get("project_path") or "."),
+                device_serial=rec.get("device_serial") or "attached",
+                mode=_mode_from(rec.get("mode")),
+                flavor=rec.get("flavor"),
+                target=rec.get("target"),
+                started_at=_dt_from(rec.get("started_at")),
+                state=DebugSessionState.RUNNING,
+                vm_service_uri=uri,
+                app_id=rec.get("app_id"),
+            )
+            async with self._mutex:
+                self._sessions[sid] = active
+                self._reattach.pop(sid, None)
+                if self._most_recent is None:
+                    self._most_recent = sid
+            emit("debug_session_reattached", level="info", session_id=sid, uri=uri)
 
     async def read_log(
         self,
@@ -228,6 +375,8 @@ class FlutterDebugSessionRepository(DebugSessionRepository):
                     next_action="start_debug_session",
                 )
             )
+        if active.client is None:
+            return err(_reattached_no_daemon("read_debug_log"))
         cutoff = datetime.now().timestamp() - since_s
         filtered = [
             entry
@@ -251,6 +400,8 @@ class FlutterDebugSessionRepository(DebugSessionRepository):
                     next_action="start_debug_session",
                 )
             )
+        if active.client is None:
+            return err(_reattached_no_daemon("tail_debug_log"))
         pattern = re.compile(until_pattern)
         deadline = asyncio.get_event_loop().time() + timeout_s
         last_seen = len(active.client.recent_logs(active.client.BUFFER_CAPACITY))
@@ -277,11 +428,14 @@ class FlutterDebugSessionRepository(DebugSessionRepository):
                     next_action="start_debug_session",
                 )
             )
-        # Web (DWDS): the flutter daemon's app.callServiceExtension proxy
-        # doesn't reach the app's isolate, but the direct VM Service does.
-        # The ext.flutter.* extensions register a few seconds after the web
-        # app loads, so we retry on -32601 (method-not-found) until ready.
-        if active.device_serial in _WEB_DEVICE_IDS:
+        # Route through the DIRECT VM Service when either:
+        #  - web (DWDS): the daemon's app.callServiceExtension proxy doesn't
+        #    reach the app isolate, but the direct VM Service does; or
+        #  - re-attached (client is None): there's no daemon at all, only
+        #    the VM Service ws URI.
+        # ext.flutter.* register a few seconds after the app loads, so the
+        # web path retries on -32601 (method-not-found) until ready.
+        if active.client is None or active.device_serial in _WEB_DEVICE_IDS:
             return await self._call_service_extension_web(active, method, args)
         if not active.client.app_id:
             return err(
@@ -320,7 +474,7 @@ class FlutterDebugSessionRepository(DebugSessionRepository):
         args: dict | None,
         ext_timeout_s: float = 20.0,
     ) -> Result[ServiceExtensionResult]:
-        uri = active.client.vm_service_uri
+        uri = active.vm_uri
         if not uri:
             return err(
                 ServiceExtensionFailure(
@@ -409,22 +563,64 @@ class FlutterDebugSessionRepository(DebugSessionRepository):
             return self._sessions.get(target_id)
 
     async def stop_all(self) -> None:
-        """For atexit cleanup."""
+        """For atexit cleanup. Only daemon-backed sessions have a client to
+        stop; re-attached sessions (client is None) are just dropped — we
+        never kill an app we didn't start. Their record stays in the store
+        so a future MCP start can re-attach."""
         async with self._mutex:
             sessions = list(self._sessions.values())
             self._sessions.clear()
             self._most_recent = None
         for active in sessions:
+            if active.client is None:
+                continue
             try:
                 await active.client.stop()
             except Exception:
                 continue
 
 
+def _reattached_no_daemon(op: str) -> DebugSessionFailure:
+    return DebugSessionFailure(
+        message=(
+            f"{op} needs the flutter --machine daemon, which didn't survive "
+            "the MCP restart — this is a re-attached (VM-Service-only) "
+            "session. Service extensions / dump_widget_tree / vm_evaluate "
+            "still work. Run start_debug_session for a fresh daemon-backed "
+            "session."
+        ),
+        next_action="start_debug_session",
+    )
+
+
+def _mode_from(value: str | None) -> BuildMode:
+    try:
+        return BuildMode(value) if value else BuildMode.DEBUG
+    except ValueError:
+        return BuildMode.DEBUG
+
+
+def _dt_from(value: str | None) -> datetime:
+    try:
+        return datetime.fromisoformat(value) if value else datetime.now()
+    except (ValueError, TypeError):
+        return datetime.now()
+
+
 class _Active:
-    """Internal record bundling DebugSession entity with its live client."""
+    """Internal record bundling a DebugSession with its live daemon client.
+
+    `client` is None for a **re-attached** session — one revived from the
+    durable store (or `attach()`) after the daemon connection was lost.
+    Such a session talks only to the VM Service (via its uri); it can run
+    service extensions but not hot reload. The vm_uri/app_id/pid come from
+    the client when present, else from the stored values.
+    """
 
     __slots__ = (
+        "_app_id",
+        "_pid",
+        "_vm_service_uri",
         "client",
         "device_serial",
         "flavor",
@@ -439,7 +635,7 @@ class _Active:
     def __init__(
         self,
         session_id: str,
-        client: FlutterMachineClient,
+        client: FlutterMachineClient | None,
         project_path: Path,
         device_serial: str,
         mode: BuildMode,
@@ -447,6 +643,9 @@ class _Active:
         target: str | None,
         started_at: datetime,
         state: DebugSessionState,
+        vm_service_uri: str | None = None,
+        app_id: str | None = None,
+        pid: int | None = None,
     ) -> None:
         self.session_id = session_id
         self.client = client
@@ -457,6 +656,21 @@ class _Active:
         self.target = target
         self.started_at = started_at
         self.state = state
+        self._vm_service_uri = vm_service_uri
+        self._app_id = app_id
+        self._pid = pid
+
+    @property
+    def vm_uri(self) -> str | None:
+        return self.client.vm_service_uri if self.client is not None else self._vm_service_uri
+
+    @property
+    def app_id(self) -> str | None:
+        return self.client.app_id if self.client is not None else self._app_id
+
+    @property
+    def pid(self) -> int | None:
+        return self.client.pid if self.client is not None else self._pid
 
     def snapshot(self) -> DebugSession:
         return DebugSession(
@@ -466,9 +680,23 @@ class _Active:
             mode=self.mode,
             started_at=self.started_at,
             state=self.state,
-            app_id=self.client.app_id,
-            vm_service_uri=self.client.vm_service_uri,
+            app_id=self.app_id,
+            vm_service_uri=self.vm_uri,
             flavor=self.flavor,
             target=self.target,
-            pid=self.client.pid,
+            pid=self.pid,
         )
+
+    def to_record(self) -> dict:
+        """Durable metadata for the store — everything needed to re-attach."""
+        return {
+            "id": self.session_id,
+            "device_serial": self.device_serial,
+            "project_path": str(self.project_path),
+            "vm_service_uri": self.vm_uri,
+            "app_id": self.app_id,
+            "mode": self.mode.value,
+            "flavor": self.flavor,
+            "target": self.target,
+            "started_at": self.started_at.isoformat(),
+        }

@@ -198,16 +198,16 @@
       "openWorldHint": true,
       "readOnlyHint": false
     },
-    "description": "Attach to a `flutter run` started outside this MCP via its VM service URI. Advanced; not implemented in v1.",
+    "description": "Attach to an already-running app by its VM Service ws URI (from a debug session, `flutter run`, or your own probe) \u2014 no `flutter --machine` daemon needed. Probes reachability, then serves service extensions / dump_widget_tree / vm_evaluate over the direct VM Service. This is also the manual re-attach path after an MCP restart. Cannot hot reload (no daemon) \u2014 use start_debug_session for that.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
         "project_path": {
-          "description": "",
+          "description": "The Flutter project root.",
           "type": "string"
         },
         "vm_service_uri": {
-          "description": "",
+          "description": "The VM Service WebSocket URI, e.g. ws://127.0.0.1:PORT/<token>=/ws",
           "type": "string"
         }
       },
@@ -2250,7 +2250,7 @@
       "idempotentHint": true,
       "readOnlyHint": true
     },
-    "description": "List all debug sessions owned by this MCP process.",
+    "description": "List debug sessions. Also AUTO-RE-ATTACHES: sessions persist across an MCP-server restart, so this revives any whose VM Service is still reachable (and prunes the dead) \u2014 call it first after a restart to recover an orphaned session. Re-attached sessions are VM-Service-only (service extensions / dump_widget_tree / vm_evaluate work; hot reload does not).",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {},

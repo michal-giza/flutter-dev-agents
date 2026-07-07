@@ -1717,7 +1717,15 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
         ),
         ToolDescriptor(
             name="list_debug_sessions",
-            description="List all debug sessions owned by this MCP process.",
+            description=(
+                "List debug sessions. Also AUTO-RE-ATTACHES: sessions "
+                "persist across an MCP-server restart, so this revives any "
+                "whose VM Service is still reachable (and prunes the dead) "
+                "— call it first after a restart to recover an orphaned "
+                "session. Re-attached sessions are VM-Service-only (service "
+                "extensions / dump_widget_tree / vm_evaluate work; hot "
+                "reload does not)."
+            ),
             input_schema=_schema({}),
             build_params=_params_no,
             invoke=_bind(uc.list_debug_sessions, _params_no),
@@ -1725,13 +1733,21 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
         ToolDescriptor(
             name="attach_debug_session",
             description=(
-                "Attach to a `flutter run` started outside this MCP via its VM "
-                "service URI. Advanced; not implemented in v1."
+                "Attach to an already-running app by its VM Service ws URI "
+                "(from a debug session, `flutter run`, or your own probe) — "
+                "no `flutter --machine` daemon needed. Probes reachability, "
+                "then serves service extensions / dump_widget_tree / "
+                "vm_evaluate over the direct VM Service. This is also the "
+                "manual re-attach path after an MCP restart. Cannot hot "
+                "reload (no daemon) — use start_debug_session for that."
             ),
             input_schema=_schema(
                 {
-                    "vm_service_uri": _string(""),
-                    "project_path": _string(""),
+                    "vm_service_uri": _string(
+                        "The VM Service WebSocket URI, e.g. "
+                        "ws://127.0.0.1:PORT/<token>=/ws"
+                    ),
+                    "project_path": _string("The Flutter project root."),
                 },
                 ["vm_service_uri", "project_path"],
             ),
