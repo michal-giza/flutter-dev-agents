@@ -91,6 +91,43 @@ async def test_get_device_unknown_returns_not_found():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("serial", ["chrome", "web-server"])
+async def test_ui_ops_on_web_target_return_actionable_boundary(serial):
+    """v0.16.1: tap/find/dump_ui on a Flutter web target don't reach a
+    mobile UI backend — they return an actionable 'use a browser MCP'
+    boundary instead of a confusing device-not-found."""
+    android = FakeUiRepository(name="android")
+    ios = FakeUiRepository(name="ios")
+    repo = CompositeUiRepository(android, ios, CachingPlatformResolver())
+
+    for res in (
+        await repo.tap(serial, 10, 20),
+        await repo.find(serial, text="x"),
+        await repo.dump_ui(serial),
+        await repo.swipe(serial, 0, 0, 1, 1),
+    ):
+        assert isinstance(res, Err)
+        assert res.failure.next_action == "use_browser_mcp_for_web"
+        assert "canvas" in res.failure.message.lower()
+    # Never reached the mobile backends.
+    assert android.taps == [] and ios.taps == []
+
+
+@pytest.mark.asyncio
+async def test_ui_ops_still_route_real_serials():
+    """The web guard must not disturb normal Android/iOS routing."""
+    android = FakeUiRepository(name="android")
+    ios = FakeUiRepository(name="ios")
+    resolver = CachingPlatformResolver()
+    await resolver.remember("EMU01", Platform.ANDROID)
+    repo = CompositeUiRepository(android, ios, resolver)
+
+    res = await repo.tap("EMU01", 5, 6)
+    assert isinstance(res, Ok)
+    assert android.taps and android.taps[0][:3] == ("android", "tap", "EMU01")
+
+
+@pytest.mark.asyncio
 async def test_lifecycle_routes_to_android_for_android_serial():
     a_lifecycle = FakeLifecycleRepository(name="android")
     i_lifecycle = FakeLifecycleRepository(name="ios")

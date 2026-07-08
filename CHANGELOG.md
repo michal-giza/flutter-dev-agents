@@ -5,6 +5,40 @@ All notable changes to `flutter-dev-agents` / `mcp-phone-controll`.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.1] — 2026-07-07
+
+**Web boundary guardrail** — encode "phone-controll doesn't click Flutter
+web" so agents don't waste turns discovering it.
+
+### Fixed — actionable error for mobile UI ops on a web target
+
+Flutter web renders to a **canvas**, so the mobile UI layer (adb
+uiautomator2 / iOS WebDriverAgent) has no widget hit-targets — `tap` /
+`find_element` / `dump_ui` / `swipe` don't apply. Calling them on a web
+serial (`chrome` / `web-server`) used to fail with a confusing "device
+chrome not found". `CompositeUiRepository` now returns a structured
+`UiFailure(next_action="use_browser_mcp_for_web")` explaining the
+boundary and pointing to the fix: **drive web UI with a browser MCP
+(Chrome DevTools MCP / Playwright MCP); verify with phone-controll's web
+debug session** (`dump_widget_tree` / `read_debug_log` / `vm_evaluate`).
+One guard at the single routing chokepoint covers every UI op; lifecycle
+and observation are untouched.
+
+### Docs — the interactive-web division of labor
+
+`docs/web-logged-in-flow.md` gains a crisp "you drive, phone-controll
+verifies" section: the browser MCP clicks the canvas; phone-controll
+confirms the fresh build came up and verifies each step over the VM
+Service (widget tree, logs, `vm_evaluate` on app + backend state — e.g. a
+worker task's `transferProgress`, an undo/reverse, a Firestore
+write-through).
+
+### Tests
+- `test_composite_routing.py` (+3): web serials → `use_browser_mcp_for_web`
+  boundary across tap/find/dump_ui/swipe; real serials still route
+  normally.
+- Full suite: **1162 passed, 6 skipped.** ruff clean.
+
 ## [0.16.0] — 2026-06-21
 
 **Durable debug sessions** (field-reported "gap #6"): the debug-session

@@ -21,6 +21,30 @@
 phone-controll grades; the browser MCP drives and observes. Neither
 reimplements the other.
 
+## The one boundary (so nobody wastes time)
+
+**phone-controll does not click Flutter web.** `tap` / `find_element` /
+`dump_ui` / `swipe` are the *mobile* UI layer (adb uiautomator2 / iOS
+WebDriverAgent). Flutter web renders to a **canvas**, so there are no
+widget hit-targets for that layer to reach — calling them on a web
+target (`serial="chrome"` / `"web-server"`) returns a structured
+`next_action: use_browser_mcp_for_web` telling you to switch. Don't
+burn turns on it.
+
+So the interactive-web division of labor is **"you drive, phone-controll
+verifies"**:
+
+| You / a browser MCP do | phone-controll does (on the web debug session) |
+|---|---|
+| click / type / scroll / import (canvas) | confirm the **new code built + came up** (`start_debug_session(serial="chrome")`) |
+| navigate + log in | read the **widget tree** via the VM probe — `dump_widget_tree` / `dump_render_tree` / `toggle_inspector` |
+| — | read **logs** (`read_debug_log` / `tail_debug_log`) |
+| — | live-verify **app + backend state** with `vm_evaluate` (e.g. a worker task's `transferProgress`, an undo/reverse, Firestore write-through) |
+
+Net: **you click, phone-controll verifies each step pass/fail** — and
+confirms the fresh build is running — all over the direct VM Service. No
+widget-tapping required on our side.
+
 ## Prerequisite — connect a browser MCP (model-agnostic)
 
 Pick the browser-driving MCP that fits your model and add it **alongside**

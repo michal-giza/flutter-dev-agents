@@ -20,7 +20,11 @@ from ....domain.entities import (
     TestRun,
     UiElement,
 )
-from ....domain.failures import DeviceNotFoundFailure, InvalidArgumentFailure
+from ....domain.failures import (
+    DeviceNotFoundFailure,
+    InvalidArgumentFailure,
+    UiFailure,
+)
 from ....domain.repositories import (
     BuildRepository,
     DeviceRepository,
@@ -168,7 +172,40 @@ class CompositeBuildRepository(BuildRepository):
         return err(InvalidArgumentFailure(message=f"unsupported platform: {platform}"))
 
 
+# Flutter "web" device ids. Web renders to a canvas, so the mobile UI
+# layer (adb uiautomator2 / iOS WebDriverAgent) has no widget hit-targets
+# to tap or query — tap/find_element/dump_ui simply don't apply. Driving
+# web UI is a browser MCP's job; phone-controll VERIFIES via the web
+# debug session's VM Service (dump_widget_tree, logs, vm_evaluate).
+_WEB_DEVICE_IDS = frozenset({"chrome", "web-server"})
+
+
 class CompositeUiRepository(_PlatformRouted, UiRepository):
+    async def _route(self, serial: str):
+        # Turn the confusing "device chrome not found" into an actionable
+        # boundary message — so an agent doesn't burn turns trying to tap a
+        # canvas. Only the UI repo guards this; lifecycle/observation don't.
+        if serial in _WEB_DEVICE_IDS:
+            return err(
+                UiFailure(
+                    message=(
+                        "Flutter web renders to a canvas — tap / find_element "
+                        "/ swipe / dump_ui don't reach widgets on a web "
+                        f"target ({serial!r}). Drive the web UI with a browser "
+                        "MCP (Chrome DevTools MCP or Playwright MCP); VERIFY "
+                        "with phone-controll on the web debug session: "
+                        "dump_widget_tree / dump_render_tree (VM Service), "
+                        "read_debug_log, and vm_evaluate."
+                    ),
+                    next_action="use_browser_mcp_for_web",
+                    details={
+                        "serial": serial,
+                        "playbook": "docs/web-logged-in-flow.md",
+                    },
+                )
+            )
+        return await super()._route(serial)
+
     async def tap(self, serial: str, x: int, y: int) -> Result[None]:
         impl_res = await self._route(serial)
         if isinstance(impl_res, Err):
