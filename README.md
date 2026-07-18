@@ -2,7 +2,7 @@
 
 **Audit-grade Flutter testing for AI agents — drive real iPhones, Androids & the web, then grade what ships.**
 
-[![tests](https://img.shields.io/badge/tests-1162_passing-A6E22E?style=flat-square)](packages/phone-controll/tests)
+[![tests](https://img.shields.io/badge/tests-1171_passing-A6E22E?style=flat-square)](packages/phone-controll/tests)
 [![license](https://img.shields.io/badge/license-Apache_2.0-F76C28?style=flat-square)](LICENSE)
 [![MCP spec](https://img.shields.io/badge/MCP-2025--06--18-F76C28?style=flat-square)](https://modelcontextprotocol.io)
 [![python](https://img.shields.io/badge/python-3.11+-3B4252?style=flat-square)](pyproject.toml)
@@ -31,6 +31,14 @@ claude mcp add playwright      --scope user -- npx -y @playwright/mcp@latest
 Then call `describe_capabilities` from your agent. Full setup (venv-pinned, device prereqs): **[First 15 minutes](docs/GETTING-STARTED.md)**.
 
 → **[The Stack](docs/the-stack.md)** · **[Navigation latency](docs/agent-navigation-latency.md)** · **[Performance rubric](docs/performance-rubric.md)** · **[SLM / local-model setup](docs/slm-setup.md)** · **[Senior-tester discipline](docs/senior-tester-discipline.md)** · **[Comparison vs other MCPs](docs/flutter-mcp-comparison.md)** · **[Web before/after playbook](docs/web-logged-in-flow.md)** · **[FAQ](docs/FAQ.md)** · **[Configuration](docs/CONFIGURATION.md)** · **[Tools by category](docs/tools-by-category.md)** · **[Architecture](docs/architecture.md)**
+
+## What's new in v0.17.0 (July 2026)
+
+**Patrol web e2e — plus a P0 the investigation uncovered.**
+
+- 🐛 **Every Patrol run was failing** (v0.17.0) — the runner hard-coded `--reporter=json`, a flag `patrol test` has never had (`Could not find an option named "--reporter"`, exit 1). Fixed, with a patrol-native result parser (the old one used the `flutter test` NDJSON grammar) and failures that quote the real CLI error instead of blaming your toolchain.
+- 🆕 **`platform="web"` on `run_patrol_test` / `run_patrol_suite`** (v0.17.0) — Patrol 4 drives Flutter web in Chromium via **Playwright**, so this is real e2e web *clicking*, which `tap`/`find_element` can't do on a canvas. Emits `--device chrome --web-headless true`, suppresses `--flavor` (rejected on web), and skips device selection.
+- 🆕 **Patrol CLI version preflight** (v0.17.0) — web fails closed below patrol_cli 4.0.0 with an actionable upgrade path (parsed anchored on `patrol_cli v…`, since `patrol --version` prints a banner containing both installed and latest).
 
 ## What's new in v0.16.0 (June 2026)
 
@@ -139,7 +147,7 @@ Run `check_environment` from any Claude Code session — it returns a structured
 
 ## Status
 
-- **`packages/phone-controll/` v0.16.1** — **147 tools** live on PyPI, **1162 hermetic unit tests** + real-device tests (gated on `MCP_REAL_DEVICE=1`). Field-tested across real Flutter projects (`docs/v030-field-test.md`); the v0.13–v0.15 tools (selector-tap, `dump_ui` spill, deep-tree dump, `batch`, diagnostics-on-failure, `wait_until`, `zoom_screenshot`) live-verified on the iPhone 17 Pro simulator.
+- **`packages/phone-controll/` v0.17.0** — **147 tools** live on PyPI, **1171 hermetic unit tests** + real-device tests (gated on `MCP_REAL_DEVICE=1`). Field-tested across real Flutter projects (`docs/v030-field-test.md`); the v0.13–v0.15 tools (selector-tap, `dump_ui` spill, deep-tree dump, `batch`, diagnostics-on-failure, `wait_until`, `zoom_screenshot`) live-verified on the iPhone 17 Pro simulator.
 - **First-real-device patch release shipped May 2026** — fixed iOS 17+ `--rsd` routing, WDA team_id signing, Polish NBSP `tap_text`, raw-`adb screencap` recovery loop. See [`CHANGELOG.md`](CHANGELOG.md).
 - Multi-window VS Code orchestration + debug sessions + WDA setup + cross-session device locks all in place.
 

@@ -25,6 +25,13 @@ class ListPatrolTests(BaseUseCase[ListPatrolTestsParams, list[PatrolTestFile]]):
         return await self._patrol.list_tests(params.project_path)
 
 
+# `platform="web"` runs the suite against Flutter web (Patrol >= 4.0.0,
+# Playwright/Chromium). There is no device to select in that mode, so we
+# skip serial resolution entirely — otherwise every web run would die on
+# NoDeviceSelectedFailure.
+_WEB = "web"
+
+
 @dataclass(frozen=True, slots=True)
 class RunPatrolTestParams:
     project_path: Path
@@ -32,6 +39,7 @@ class RunPatrolTestParams:
     serial: str | None = None
     flavor: str | None = None
     build_mode: BuildMode = BuildMode.DEBUG
+    platform: str = "mobile"   # "mobile" | "web"
 
 
 class RunPatrolTest(BaseUseCase[RunPatrolTestParams, TestRun]):
@@ -40,15 +48,20 @@ class RunPatrolTest(BaseUseCase[RunPatrolTestParams, TestRun]):
         self._state = state
 
     async def execute(self, params: RunPatrolTestParams) -> Result[TestRun]:
-        serial_res = await resolve_serial(params.serial, self._state)
-        if isinstance(serial_res, Err):
-            return serial_res
+        web = params.platform == _WEB
+        serial = ""
+        if not web:
+            serial_res = await resolve_serial(params.serial, self._state)
+            if isinstance(serial_res, Err):
+                return serial_res
+            serial = serial_res.value
         return await self._patrol.run_test(
             project_path=params.project_path,
             test_path=params.test_path,
-            device_serial=serial_res.value,
+            device_serial=serial,
             flavor=params.flavor,
             build_mode=params.build_mode,
+            web=web,
         )
 
 
@@ -59,6 +72,7 @@ class RunPatrolSuiteParams:
     serial: str | None = None
     flavor: str | None = None
     build_mode: BuildMode = BuildMode.DEBUG
+    platform: str = "mobile"   # "mobile" | "web"
 
 
 class RunPatrolSuite(BaseUseCase[RunPatrolSuiteParams, TestRun]):
@@ -67,13 +81,18 @@ class RunPatrolSuite(BaseUseCase[RunPatrolSuiteParams, TestRun]):
         self._state = state
 
     async def execute(self, params: RunPatrolSuiteParams) -> Result[TestRun]:
-        serial_res = await resolve_serial(params.serial, self._state)
-        if isinstance(serial_res, Err):
-            return serial_res
+        web = params.platform == _WEB
+        serial = ""
+        if not web:
+            serial_res = await resolve_serial(params.serial, self._state)
+            if isinstance(serial_res, Err):
+                return serial_res
+            serial = serial_res.value
         return await self._patrol.run_suite(
             project_path=params.project_path,
             test_dir=params.test_dir,
-            device_serial=serial_res.value,
+            device_serial=serial,
             flavor=params.flavor,
             build_mode=params.build_mode,
+            web=web,
         )

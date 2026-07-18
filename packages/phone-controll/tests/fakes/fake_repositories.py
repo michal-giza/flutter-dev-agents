@@ -243,12 +243,22 @@ class FakePatrolRepository:
         self.calls.append(("list_tests", str(project_path)))
         return ok(self.files)
 
-    async def run_test(self, project_path, test_path, device_serial, flavor=None, build_mode=None):
-        self.calls.append(("run_test", str(project_path), str(test_path), device_serial))
+    async def run_test(
+        self, project_path, test_path, device_serial, flavor=None, build_mode=None,
+        web=False,
+    ):
+        self.calls.append(
+            ("run_test", str(project_path), str(test_path), device_serial, web)
+        )
         return ok(self.run)
 
-    async def run_suite(self, project_path, test_dir, device_serial, flavor=None, build_mode=None):
-        self.calls.append(("run_suite", str(project_path), str(test_dir), device_serial))
+    async def run_suite(
+        self, project_path, test_dir, device_serial, flavor=None, build_mode=None,
+        web=False,
+    ):
+        self.calls.append(
+            ("run_suite", str(project_path), str(test_dir), device_serial, web)
+        )
         return ok(self.run)
 
     # Also acts as a TestRepository for composite routing tests.

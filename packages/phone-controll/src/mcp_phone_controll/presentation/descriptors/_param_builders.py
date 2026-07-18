@@ -705,20 +705,22 @@ def _params_list_patrol(args: JsonDict) -> ListPatrolTestsParams:
 def _params_run_patrol_test(args: JsonDict) -> RunPatrolTestParams:
     return RunPatrolTestParams(
         project_path=Path(args["project_path"]).expanduser(),
-        test_path=Path(args["test_path"]),
+        test_path=Path(args["test_path"]).expanduser(),
         serial=args.get("serial"),
         flavor=args.get("flavor"),
         build_mode=BuildMode(args.get("build_mode", "debug")),
+        platform=args.get("platform", "mobile"),
     )
 
 
 def _params_run_patrol_suite(args: JsonDict) -> RunPatrolSuiteParams:
     return RunPatrolSuiteParams(
         project_path=Path(args["project_path"]).expanduser(),
-        test_dir=Path(args.get("test_dir", "integration_test")),
+        test_dir=Path(args.get("test_dir", "integration_test")).expanduser(),
         serial=args.get("serial"),
         flavor=args.get("flavor"),
         build_mode=BuildMode(args.get("build_mode", "debug")),
+        platform=args.get("platform", "mobile"),
     )
 
 

@@ -1491,16 +1491,22 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
         ToolDescriptor(
             name="run_patrol_test",
             description=(
-                "PREFERRED for Flutter. Run a single Patrol test file on the selected "
-                "device. Locale-independent (drives by widget Keys), works for AR / "
-                "Vision / native plugin code paths via patrol_finders + native automator."
+                "PREFERRED for Flutter. Run a single Patrol test file. "
+                "Locale-independent (drives by widget Keys); covers AR / "
+                "Vision / native plugins via patrol_finders. "
+                "platform='mobile' (default) uses the selected device; "
+                "platform='web' drives Flutter WEB in Chromium via "
+                "Playwright — real e2e web clicking, which tap/find_element "
+                "cannot do on a canvas. Web needs patrol_cli >= 4.0.0 plus "
+                "Node.js, ignores flavor/serial, and runs headless."
             ),
             input_schema=_schema(
                 {
                     "project_path": _string("Flutter project root."),
                     "test_path": _string("Path to a *_test.dart file."),
-                    "flavor": _string(""),
+                    "flavor": _string("Ignored when platform=web."),
                     "build_mode": _enum(["debug", "profile", "release"]),
+                    "platform": _enum(["mobile", "web"]),
                     **serial_prop,
                 },
                 ["project_path", "test_path"],
@@ -1517,9 +1523,13 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             input_schema=_schema(
                 {
                     "project_path": _string("Flutter project root."),
-                    "test_dir": _string("Defaults to integration_test/"),
-                    "flavor": _string(""),
+                    "test_dir": _string(
+                        "Defaults to integration_test/ (Patrol 4 projects "
+                        "often use patrol_test/)."
+                    ),
+                    "flavor": _string("Ignored when platform=web."),
                     "build_mode": _enum(["debug", "profile", "release"]),
+                    "platform": _enum(["mobile", "web"]),
                     **serial_prop,
                 },
                 ["project_path"],

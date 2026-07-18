@@ -5,6 +5,82 @@ All notable changes to `flutter-dev-agents` / `mcp-phone-controll`.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.0] — 2026-07-18
+
+**Patrol web e2e — and a P0 the investigation uncovered.** Went looking
+for Flutter-web driving via Patrol 4; found first that the Patrol runner
+had been broken the whole time.
+
+### Fixed (P0) — every Patrol run was failing
+
+`PatrolTestRepository` hard-coded `extra_flags=["--reporter=json"]`, but
+`patrol test` has **never** had a `--reporter` flag. Verified against the
+real CLI:
+
+```
+$ patrol test --reporter=json
+Could not find an option named "--reporter".      # exit 1
+```
+
+So `run_patrol_test` / `run_patrol_suite` / Patrol-routed
+`run_integration_tests` failed **100% of the time**, surfaced as
+"patrol test produced no results" with a misleading *"run patrol
+doctor"* hint that blamed the user's toolchain for our bad argv.
+
+- The flag is gone, with a regression test asserting it is never emitted.
+- Results now parse with a **patrol-native** parser
+  (`parse_patrol_output`) instead of the `flutter test --reporter=json`
+  NDJSON grammar, which never matched Patrol's human-readable output
+  (counts would have been 0 even without the flag). Counts are
+  best-effort; **the exit code is authoritative** — we never report
+  "0 tests" as a pass.
+- Failures now quote the real CLI error, name the failing tests, and
+  return `next_action: inspect_test_output`. An unknown-option error is
+  explicitly reported as *our* bug, not the project's.
+
+### Added — `platform="web"` on `run_patrol_test` / `run_patrol_suite`
+
+Patrol 4 runs Flutter web in Chromium via **Playwright** (verified: the
+CLI literally spawns `npx playwright test`; zero chromedriver/WebDriver
+involvement). This is genuine e2e **web clicking** — the thing
+`tap`/`find_element` cannot do on a canvas.
+
+- Emits the documented argv: `patrol test --target <t> --device chrome
+  --web-headless true`.
+- Web-specific rules enforced: `--flavor` is **suppressed** (patrol_cli
+  rejects it for web), build mode forced to debug, headless by default
+  (MCP runs are unattended), and device resolution **skipped** (no device
+  to select — otherwise every web run died on NoDeviceSelected).
+- `--web-reporter` is deliberately **not** emitted yet: its accepted
+  encoding through subprocess argv is unverified upstream.
+
+### Added — Patrol CLI version preflight
+
+`PatrolCli.version()` parses the installed version anchored on
+`patrol_cli v<x.y.z>` — necessary because `patrol --version` prints an
+update banner containing *both* the installed and latest versions, so a
+naive parse reads the wrong one. Web **fails closed** below patrol_cli
+4.0.0 (or on an unparsable version) with an actionable error:
+`next_action: upgrade_patrol_cli`, naming the found version, the binary
+path, the lockstep patrol/patrol_cli constraint, Flutter >= 3.32.0, and
+the Node.js requirement.
+
+### Fixed — `list_patrol_tests` missed Patrol 4 projects
+
+Discovery hard-coded `integration_test/`; Patrol 4 moved the default to
+`patrol_test/`, so it silently returned `[]`. Now scans both.
+
+### Verification status
+The P0 fix, argv construction, version gate and discovery are unit-tested,
+and the gate was **live-verified against the real 3.11.0 CLI** on this
+machine (correctly read 3.11.0, not the banner's 4.5.1). An actual
+green web run is **not** claimed: it needs patrol_cli >= 4.0.0 installed
+and the app on patrol >= 4.0.0 (the reference project pins ^3.20.0).
+
+### Tests
+- `test_patrol_runner_fix.py` (+9), fake repo + description updates.
+- Full suite: **1171 passed, 6 skipped.** ruff clean. Contract refreshed.
+
 ## [0.16.1] — 2026-07-07
 
 **Web boundary guardrail** — encode "phone-controll doesn't click Flutter

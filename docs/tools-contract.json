@@ -3350,7 +3350,15 @@
           "type": "string"
         },
         "flavor": {
+          "description": "Ignored when platform=web.",
+          "type": "string"
+        },
+        "platform": {
           "description": "",
+          "enum": [
+            "mobile",
+            "web"
+          ],
           "type": "string"
         },
         "project_path": {
@@ -3362,7 +3370,7 @@
           "type": "string"
         },
         "test_dir": {
-          "description": "Defaults to integration_test/",
+          "description": "Defaults to integration_test/ (Patrol 4 projects often use patrol_test/).",
           "type": "string"
         }
       },
@@ -3379,7 +3387,7 @@
       "openWorldHint": true,
       "readOnlyHint": false
     },
-    "description": "PREFERRED for Flutter. Run a single Patrol test file on the selected device. Locale-independent (drives by widget Keys), works for AR / Vision / native plugin code paths via patrol_finders + native automator.",
+    "description": "PREFERRED for Flutter. Run a single Patrol test file. Locale-independent (drives by widget Keys); covers AR / Vision / native plugins via patrol_finders. platform='mobile' (default) uses the selected device; platform='web' drives Flutter WEB in Chromium via Playwright \u2014 real e2e web clicking, which tap/find_element cannot do on a canvas. Web needs patrol_cli >= 4.0.0 plus Node.js, ignores flavor/serial, and runs headless.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -3393,7 +3401,15 @@
           "type": "string"
         },
         "flavor": {
+          "description": "Ignored when platform=web.",
+          "type": "string"
+        },
+        "platform": {
           "description": "",
+          "enum": [
+            "mobile",
+            "web"
+          ],
           "type": "string"
         },
         "project_path": {
