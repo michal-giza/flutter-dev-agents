@@ -5,6 +5,59 @@ All notable changes to `flutter-dev-agents` / `mcp-phone-controll`.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.0] — 2026-07-18
+
+**Patrol 4, professionally** — mobile *and* web, CI-ready. Built against
+the real patrol_cli **4.5.1** (upgraded locally from 3.11.0), with every
+flag validated by executing it, not by reading docs.
+
+### Added — exact web results (Playwright JSON report)
+
+v0.17.0 deferred `--web-reporter` because its encoding was unverified.
+The 4.5.1 `--help` confirms it takes a **JSON array string**
+(`--web-reporter=<'["html", "json", "list"]'>`), so we now emit
+`--web-reporter '["json"]' --web-results-dir <dir>` and parse the
+resulting **Playwright JSON report** — web runs get *exact* counts and
+per-test names instead of scraped output. Handles nested suites, retries
+(the last result wins — a flaky-then-passing spec counts as passed), and
+falls back to the report's `stats` block, then to output scraping, then
+to the exit code. The report path is surfaced on failure.
+
+### Added — headless-CI mode (`ci: true`)
+
+One flag flips a coherent unattended profile:
+- **web**: `--web-headless true`, `--web-retries 2`,
+  `--web-global-timeout` (30 min ceiling so a hung run can't wedge a
+  job), `--web-video retain-on-failure`, and
+  `--web-browser-args '["--no-sandbox","--disable-gpu","--disable-dev-shm-usage"]'`
+  — required in most containers (root, no user namespaces).
+- **native**: Patrol 4's hermeticity knobs — `--full-isolation`
+  (uninstall between tests) + `--clear-permissions` (reset
+  XCUIProtectedResource grants). Web-only flags never leak onto the
+  native path, and vice versa.
+
+### Added — Patrol 4 mobile knobs
+
+`tags` / `exclude_tags` (`--tags '(smoke || auth) && !slow'`) for
+filtering and CI sharding, on both platforms.
+
+### Verification
+Both argv sets were **executed against the live 4.5.1 CLI**: every flag
+parsed (the run reached the project-level pubspec check at
+`test.dart:104`, well past argument parsing — a bad flag fails earlier
+with `Could not find an option named …`, exactly as `--reporter` did).
+
+⚠️ **Upgrading patrol_cli to 4.x is a breaking change for apps still on
+patrol 3.x** — the two are lockstep version-checked. A project pinning
+`patrol: ^3.20.0` must bump to `^4.7.0` (and migrate `$.native.*` call
+sites to `$.platform.action.maybe(web:, ios:, android:)`). Roll back with
+`dart pub global activate patrol_cli 3.11.0` if needed.
+
+### Tests
+- `test_patrol_web_ci.py` (+9): reporter encoding, CI web/native profiles,
+  flag isolation, tags, Playwright report parsing (nested/retry/stats).
+- Full suite: **1180 passed, 6 skipped.** ruff clean. Contract refreshed.
+
 ## [0.17.0] — 2026-07-18
 
 **Patrol web e2e — and a P0 the investigation uncovered.** Went looking

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import tempfile
 from pathlib import Path
 
 from ...domain.entities import BuildMode, PatrolTestFile, TestRun, TestStatus
@@ -10,6 +11,15 @@ from ...domain.repositories import PatrolRepository, TestRepository
 from ...domain.result import Result, err, ok
 from ...infrastructure.patrol_cli import MIN_WEB_CLI_VERSION, PatrolCli
 from ..parsers.patrol_output_parser import parse_patrol_output
+from ..parsers.playwright_report_parser import find_report, parse_playwright_report
+
+# Headless-CI defaults. Unattended runs need retries (headless browsers
+# flake more), a hard ceiling so a hung run can't wedge the job, and
+# --no-sandbox because most CI containers run as root without user
+# namespaces.
+_CI_WEB_RETRIES = 2
+_CI_GLOBAL_TIMEOUT_MS = 30 * 60 * 1000   # 30 min for the whole run
+_CI_BROWSER_ARGS = ("--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage")
 
 # Patrol CLI errors worth quoting verbatim instead of guessing. An
 # unknown-option error means WE built bad argv — never blame the user's
@@ -88,6 +98,9 @@ class PatrolTestRepository(PatrolRepository, TestRepository):
         flavor: str | None = None,
         build_mode: BuildMode = BuildMode.DEBUG,
         web: bool = False,
+        ci: bool = False,
+        tags: str | None = None,
+        exclude_tags: str | None = None,
     ) -> Result[TestRun]:
         return await self._run(
             project_path,
@@ -96,6 +109,9 @@ class PatrolTestRepository(PatrolRepository, TestRepository):
             flavor=flavor,
             build_mode=build_mode,
             web=web,
+            ci=ci,
+            tags=tags,
+            exclude_tags=exclude_tags,
         )
 
     async def run_suite(
@@ -106,6 +122,9 @@ class PatrolTestRepository(PatrolRepository, TestRepository):
         flavor: str | None = None,
         build_mode: BuildMode = BuildMode.DEBUG,
         web: bool = False,
+        ci: bool = False,
+        tags: str | None = None,
+        exclude_tags: str | None = None,
     ) -> Result[TestRun]:
         return await self._run(
             project_path,
@@ -114,6 +133,9 @@ class PatrolTestRepository(PatrolRepository, TestRepository):
             flavor=flavor,
             build_mode=build_mode,
             web=web,
+            ci=ci,
+            tags=tags,
+            exclude_tags=exclude_tags,
         )
 
     # ----- TestRepository surface (drop-in replacement for FlutterTestRepository) ----
@@ -188,11 +210,21 @@ class PatrolTestRepository(PatrolRepository, TestRepository):
         flavor: str | None,
         build_mode: BuildMode,
         web: bool = False,
+        ci: bool = False,
+        tags: str | None = None,
+        exclude_tags: str | None = None,
     ) -> Result[TestRun]:
         if web:
             gate = await self._web_gate()
             if gate is not None:
                 return gate
+        # Web: ask Patrol for a machine-readable Playwright JSON report so
+        # counts are EXACT rather than scraped from human output. Written to
+        # a temp dir we don't delete — the report is useful evidence and the
+        # OS reaps /tmp.
+        results_dir: Path | None = None
+        if web:
+            results_dir = Path(tempfile.mkdtemp(prefix="patrol-web-results-"))
         result = await self._cli.test(
             project_path=project_path,
             target=target,
@@ -200,6 +232,20 @@ class PatrolTestRepository(PatrolRepository, TestRepository):
             flavor=flavor,
             build_mode=build_mode.value,
             web=web,
+            web_results_dir=results_dir,
+            # CI mode: unattended + deterministic. Retries absorb the flake
+            # a headless browser adds; --no-sandbox is required in most
+            # containers; a global timeout stops a hung run wedging the job.
+            web_retries=_CI_WEB_RETRIES if (ci and web) else None,
+            web_global_timeout_ms=_CI_GLOBAL_TIMEOUT_MS if (ci and web) else None,
+            web_browser_args=list(_CI_BROWSER_ARGS) if (ci and web) else None,
+            web_video="retain-on-failure" if (ci and web) else None,
+            # Native-only hermeticity (Patrol 4). In CI we want each test to
+            # start from a clean install and clean permission grants.
+            clear_permissions=ci and not web,
+            full_isolation=ci and not web,
+            tags=tags,
+            exclude_tags=exclude_tags,
             # NOTE: do NOT pass `--reporter=json` here. `patrol test` has
             # never had a --reporter flag — passing one exits 1 with
             # `Could not find an option named "--reporter"`, which made
@@ -207,7 +253,15 @@ class PatrolTestRepository(PatrolRepository, TestRepository):
             # hint). Patrol's output is human-readable; we parse it
             # best-effort and treat the exit code as authoritative.
         )
-        run = parse_patrol_output(result.stdout, result.stderr)
+        # Prefer the exact Playwright report; fall back to scraping.
+        run: TestRun | None = None
+        report_path: Path | None = None
+        if results_dir is not None:
+            report_path = find_report(results_dir)
+            if report_path is not None:
+                run = parse_playwright_report(report_path)
+        if run is None:
+            run = parse_patrol_output(result.stdout, result.stderr)
         if not result.ok:
             return err(
                 TestExecutionFailure(
@@ -224,6 +278,11 @@ class PatrolTestRepository(PatrolRepository, TestRepository):
                         "failed_tests": [
                             c.name for c in run.cases if c.status is TestStatus.FAILED
                         ],
+                        **(
+                            {"playwright_report": str(report_path)}
+                            if report_path is not None
+                            else {}
+                        ),
                     },
                     next_action="inspect_test_output",
                 )

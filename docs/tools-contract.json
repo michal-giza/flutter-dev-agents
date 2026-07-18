@@ -3349,6 +3349,14 @@
           ],
           "type": "string"
         },
+        "ci": {
+          "description": "Headless-CI mode: unattended + deterministic (retries, global timeout, --no-sandbox browser args, video on failure; hermetic native runs via --full-isolation + --clear-permissions).",
+          "type": "boolean"
+        },
+        "exclude_tags": {
+          "description": "Patrol --exclude-tags filter.",
+          "type": "string"
+        },
         "flavor": {
           "description": "Ignored when platform=web.",
           "type": "string"
@@ -3367,6 +3375,10 @@
         },
         "serial": {
           "description": "Device serial. Defaults to the selected device.",
+          "type": "string"
+        },
+        "tags": {
+          "description": "Patrol --tags filter, e.g. '(smoke || auth) && !slow'.",
           "type": "string"
         },
         "test_dir": {
@@ -3400,6 +3412,14 @@
           ],
           "type": "string"
         },
+        "ci": {
+          "description": "Headless-CI mode: unattended + deterministic (retries, global timeout, --no-sandbox browser args, video on failure; hermetic native runs via --full-isolation + --clear-permissions).",
+          "type": "boolean"
+        },
+        "exclude_tags": {
+          "description": "Patrol --exclude-tags filter.",
+          "type": "string"
+        },
         "flavor": {
           "description": "Ignored when platform=web.",
           "type": "string"
@@ -3418,6 +3438,10 @@
         },
         "serial": {
           "description": "Device serial. Defaults to the selected device.",
+          "type": "string"
+        },
+        "tags": {
+          "description": "Patrol --tags filter, e.g. '(smoke || auth) && !slow'.",
           "type": "string"
         },
         "test_path": {

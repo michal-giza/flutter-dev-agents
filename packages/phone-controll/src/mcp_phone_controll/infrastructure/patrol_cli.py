@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import shutil
 from pathlib import Path
@@ -92,6 +93,20 @@ class PatrolCli:
         web: bool = False,
         web_headless: bool = True,
         web_port: int | None = None,
+        # Machine-readable web results (Playwright JSON report).
+        web_results_dir: Path | None = None,
+        web_retries: int | None = None,
+        web_global_timeout_ms: int | None = None,
+        web_browser_args: list[str] | None = None,
+        web_video: str | None = None,
+        # Patrol 4 native-only hermeticity knobs.
+        clear_permissions: bool = False,
+        full_isolation: bool = False,
+        # Shared filtering / config.
+        tags: str | None = None,
+        exclude_tags: str | None = None,
+        dart_defines: list[str] | None = None,
+        dart_define_from_file: Path | None = None,
     ) -> ProcessResult:
         """Run `patrol test`.
 
@@ -114,6 +129,21 @@ class PatrolCli:
             argv += ["--web-headless", "true" if web_headless else "false"]
             if web_port is not None:
                 argv += ["--web-port", str(web_port)]
+            # Machine-readable results. `--web-reporter` takes a JSON ARRAY
+            # STRING (verified in patrol_cli 4.5.1 --help:
+            #   --web-reporter=<'["html", "json", "list"]'>), so we json.dumps
+            # it rather than passing a bare word.
+            if web_results_dir is not None:
+                argv += ["--web-reporter", json.dumps(["json"])]
+                argv += ["--web-results-dir", str(web_results_dir)]
+            if web_retries is not None:
+                argv += ["--web-retries", str(web_retries)]
+            if web_global_timeout_ms is not None:
+                argv += ["--web-global-timeout", str(web_global_timeout_ms)]
+            if web_browser_args:
+                argv += ["--web-browser-args", json.dumps(list(web_browser_args))]
+            if web_video:
+                argv += ["--web-video", web_video]
         else:
             if device_serial:
                 argv += ["--device", device_serial]
@@ -121,6 +151,20 @@ class PatrolCli:
                 argv += ["--flavor", flavor]
             if build_mode in ("release", "profile"):
                 argv += [f"--{build_mode}"]
+            # Patrol 4 hermeticity knobs — they only exist on the native path.
+            if clear_permissions:
+                argv += ["--clear-permissions"]
+            if full_isolation:
+                argv += ["--full-isolation"]
+        # Shared across platforms.
+        if tags:
+            argv += ["--tags", tags]
+        if exclude_tags:
+            argv += ["--exclude-tags", exclude_tags]
+        for define in dart_defines or []:
+            argv += ["--dart-define", define]
+        if dart_define_from_file is not None:
+            argv += ["--dart-define-from-file", str(dart_define_from_file)]
         if extra_flags:
             argv += list(extra_flags)
         return await self._runner.run(argv, cwd=project_path, timeout_s=timeout_s)

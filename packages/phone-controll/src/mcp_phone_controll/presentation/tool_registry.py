@@ -1507,6 +1507,14 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
                     "flavor": _string("Ignored when platform=web."),
                     "build_mode": _enum(["debug", "profile", "release"]),
                     "platform": _enum(["mobile", "web"]),
+                    "ci": _bool(
+                        "Headless-CI mode: unattended + deterministic "
+                        "(retries, global timeout, --no-sandbox browser args, "
+                        "video on failure; hermetic native runs via "
+                        "--full-isolation + --clear-permissions)."
+                    ),
+                    "tags": _string("Patrol --tags filter, e.g. '(smoke || auth) && !slow'."),
+                    "exclude_tags": _string("Patrol --exclude-tags filter."),
                     **serial_prop,
                 },
                 ["project_path", "test_path"],
@@ -1530,6 +1538,14 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
                     "flavor": _string("Ignored when platform=web."),
                     "build_mode": _enum(["debug", "profile", "release"]),
                     "platform": _enum(["mobile", "web"]),
+                    "ci": _bool(
+                        "Headless-CI mode: unattended + deterministic "
+                        "(retries, global timeout, --no-sandbox browser args, "
+                        "video on failure; hermetic native runs via "
+                        "--full-isolation + --clear-permissions)."
+                    ),
+                    "tags": _string("Patrol --tags filter, e.g. '(smoke || auth) && !slow'."),
+                    "exclude_tags": _string("Patrol --exclude-tags filter."),
                     **serial_prop,
                 },
                 ["project_path"],

@@ -40,6 +40,9 @@ class RunPatrolTestParams:
     flavor: str | None = None
     build_mode: BuildMode = BuildMode.DEBUG
     platform: str = "mobile"   # "mobile" | "web"
+    ci: bool = False           # headless-CI mode: unattended + deterministic
+    tags: str | None = None
+    exclude_tags: str | None = None
 
 
 class RunPatrolTest(BaseUseCase[RunPatrolTestParams, TestRun]):
@@ -62,6 +65,9 @@ class RunPatrolTest(BaseUseCase[RunPatrolTestParams, TestRun]):
             flavor=params.flavor,
             build_mode=params.build_mode,
             web=web,
+            ci=params.ci,
+            tags=params.tags,
+            exclude_tags=params.exclude_tags,
         )
 
 
@@ -73,6 +79,9 @@ class RunPatrolSuiteParams:
     flavor: str | None = None
     build_mode: BuildMode = BuildMode.DEBUG
     platform: str = "mobile"   # "mobile" | "web"
+    ci: bool = False           # headless-CI mode: unattended + deterministic
+    tags: str | None = None
+    exclude_tags: str | None = None
 
 
 class RunPatrolSuite(BaseUseCase[RunPatrolSuiteParams, TestRun]):
@@ -95,4 +104,7 @@ class RunPatrolSuite(BaseUseCase[RunPatrolSuiteParams, TestRun]):
             flavor=params.flavor,
             build_mode=params.build_mode,
             web=web,
+            ci=params.ci,
+            tags=params.tags,
+            exclude_tags=params.exclude_tags,
         )

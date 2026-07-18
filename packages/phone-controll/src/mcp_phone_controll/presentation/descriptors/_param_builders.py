@@ -710,6 +710,9 @@ def _params_run_patrol_test(args: JsonDict) -> RunPatrolTestParams:
         flavor=args.get("flavor"),
         build_mode=BuildMode(args.get("build_mode", "debug")),
         platform=args.get("platform", "mobile"),
+        ci=bool(args.get("ci", False)),
+        tags=args.get("tags"),
+        exclude_tags=args.get("exclude_tags"),
     )
 
 
@@ -721,6 +724,9 @@ def _params_run_patrol_suite(args: JsonDict) -> RunPatrolSuiteParams:
         flavor=args.get("flavor"),
         build_mode=BuildMode(args.get("build_mode", "debug")),
         platform=args.get("platform", "mobile"),
+        ci=bool(args.get("ci", False)),
+        tags=args.get("tags"),
+        exclude_tags=args.get("exclude_tags"),
     )
 
 
