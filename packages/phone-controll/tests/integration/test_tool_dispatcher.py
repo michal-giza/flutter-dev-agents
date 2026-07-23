@@ -164,6 +164,7 @@ from mcp_phone_controll.domain.usecases.productivity import (
     ListMissingWidgetKeys,
     RunQuickCheck,
     ScaffoldFeature,
+    ScaffoldPatrolTest,
     SummarizeSession,
 )
 from mcp_phone_controll.domain.usecases.projects import InspectProject
@@ -414,6 +415,7 @@ def _build_fake_dispatcher(tmp_path: Path) -> ToolDispatcher:
         patch_apply_safe=PatchApplySafe(),
         narrate=Narrate(),
         scaffold_feature=ScaffoldFeature(),
+        scaffold_patrol_test=ScaffoldPatrolTest(),
         run_quick_check=RunQuickCheck(FakeCodeQualityRepository()),
         grep_logs=GrepLogs(),
         summarize_session=SummarizeSession(trace),
@@ -683,6 +685,7 @@ async def test_registry_covers_all_use_case_fields(tmp_path: Path):
         "patch_apply_safe",
         "narrate",
         "scaffold_feature",
+        "scaffold_patrol_test",
         "run_quick_check",
         "grep_logs",
         "summarize_session",

@@ -153,6 +153,7 @@ from ..domain.usecases.productivity import (
     ListMissingWidgetKeys,
     RunQuickCheck,
     ScaffoldFeature,
+    ScaffoldPatrolTest,
     SummarizeSession,
 )
 from ..domain.usecases.projects import InspectProject
@@ -338,6 +339,7 @@ from .descriptors._param_builders import (
     _params_run_widget_test,
     _params_save_golden_image,
     _params_scaffold_feature,
+    _params_scaffold_patrol_test,
     _params_screenshot,
     _params_select_device,
     _params_session_summary,
@@ -492,6 +494,7 @@ class UseCases:
     patch_apply_safe: PatchApplySafe
     narrate: Narrate
     scaffold_feature: ScaffoldFeature
+    scaffold_patrol_test: ScaffoldPatrolTest
     run_quick_check: RunQuickCheck
     grep_logs: GrepLogs
     summarize_session: SummarizeSession
@@ -2199,6 +2202,32 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             ),
             build_params=_params_scaffold_feature,
             invoke=_bind(uc.scaffold_feature, _params_scaffold_feature),
+        ),
+        ToolDescriptor(
+            name="scaffold_patrol_test",
+            description=(
+                "Emit a Patrol-4 web+mobile e2e SMOKE test into patrol_test/ "
+                "(compile-verified against patrol 4.7.x). Widget-Key based so "
+                "it's locale-independent; the same file runs on device and "
+                "Chromium. Returns the run commands + wiring steps. Idempotent "
+                "unless overwrite=true."
+            ),
+            input_schema=_schema(
+                {
+                    "project_path": _string("Flutter project root."),
+                    "test_name": _string(
+                        "snake_case test id; file is <test_name>_test.dart. "
+                        "Default app_smoke."
+                    ),
+                    "root_widget": _string(
+                        "The app's root widget class in main.dart. Default MyApp."
+                    ),
+                    "overwrite": _bool(""),
+                },
+                ["project_path"],
+            ),
+            build_params=_params_scaffold_patrol_test,
+            invoke=_bind(uc.scaffold_patrol_test, _params_scaffold_patrol_test),
         ),
         ToolDescriptor(
             name="run_quick_check",

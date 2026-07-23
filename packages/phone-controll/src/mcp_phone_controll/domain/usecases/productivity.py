@@ -170,6 +170,222 @@ class ScaffoldFeature(BaseUseCase[ScaffoldFeatureParams, ScaffoldedFiles]):
         )
 
 
+# ---------------- F1b: scaffold_patrol_test ------------------------------
+#
+# Emits a Patrol-4 web+mobile e2e SMOKE test. The Dart below is
+# compile-verified against a real `flutter analyze` on patrol 4.7.1 (the
+# package that pairs with patrol_cli 4.5.x) — NOT copied from docs. The
+# verified surface: patrolTest(desc, ($) async {...}, tags: 'smoke'),
+# $.pumpWidgetAndSettle(const Root()), the widget-Key finder layer
+# ($(#key) / $(const Key('x')) / $('text'), .tap(), .waitUntilVisible(),
+# findsOneWidget/findsNothing), and the modern $.platform automator
+# ($.platform.tap(Selector(text: ...))) — $.native is deprecated in 4.x.
+#
+# The smoke flow deliberately drives the FLUTTER WIDGET layer (patrol
+# finders), which behaves identically on mobile and web — the same file
+# runs on a device and in Chromium. OS-level hooks ($.platform) are shown
+# commented so the emitted file analyzes clean in any app.
+
+_PATROL_SMOKE_TEMPLATE = """\
+import 'package:flutter_test/flutter_test.dart';
+import 'package:patrol/patrol.dart';
+import 'package:__PKG__/main.dart';
+// Add `import 'package:flutter/material.dart';` when you reference widgets
+// directly (e.g. `find.byType(...)` or `Key('...')`).
+
+// Patrol 4 web + mobile e2e smoke test. The SAME file runs on both:
+//   mobile:  run_patrol_test test_path=patrol_test/__SNAKE___test.dart
+//                            platform=mobile serial=<udid>
+//   web:     run_patrol_test test_path=patrol_test/__SNAKE___test.dart
+//                            platform=web ci=true
+//
+// Assertions key on widget `Key`s — locale-independent, so a Polish (or
+// any) locale can't break them (never assert on visible text). Add
+// `key: Key('...')` to the widgets you assert on, then swap the
+// placeholder keys below for your screen's real ones.
+void main() {
+  patrolTest(
+    '__SNAKE__: app boots and the primary flow works',
+    ($) async {
+      await $.pumpWidgetAndSettle(const __ROOT__());
+
+      // TODO: replace these placeholder keys + flow with your screen's.
+      await $(#__SNAKE___primary_action).tap();
+      await $(#__SNAKE___result).waitUntilVisible();
+      expect($(#__SNAKE___result), findsOneWidget);
+
+      // OS-level interactions (permission dialogs, web DOM) use the
+      // modern platform automator (compile-verified on patrol 4.7.x):
+      //   await $.platform.tap(Selector(text: 'Allow'));
+    },
+    tags: 'smoke',
+  );
+}
+"""
+
+# The pubspec `patrol:` block + dev-dep line to add if missing. Returned as
+# guidance — we never mutate the app's pubspec/build files.
+_PATROL_PUBSPEC_HINT = (
+    "dev_dependencies:\n"
+    "  patrol: ^4.7.0\n"
+    "  integration_test:\n"
+    "    sdk: flutter\n"
+    "\n"
+    "# top-level (NOT under flutter:)\n"
+    "patrol:\n"
+    "  app_name: <Your App>\n"
+    "  android:\n"
+    "    package_name: <applicationId>\n"
+    "  ios:\n"
+    "    bundle_id: <PRODUCT_BUNDLE_IDENTIFIER>\n"
+)
+
+_PUBSPEC_NAME_RE = re.compile(r"^name:\s*([A-Za-z_][A-Za-z0-9_]*)", re.MULTILINE)
+
+
+@dataclass(frozen=True, slots=True)
+class ScaffoldPatrolTestParams:
+    project_path: Path
+    test_name: str = "app_smoke"   # snake_case; file is <test_name>_test.dart
+    root_widget: str = "MyApp"     # the app's root widget class (in main.dart)
+    overwrite: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class ScaffoldedPatrolTest:
+    test_file: Path
+    created: tuple[str, ...]
+    skipped: tuple[str, ...]
+    package_name: str
+    patrol_in_pubspec: bool
+    run_mobile: str
+    run_web: str
+    next_steps: tuple[str, ...]
+
+
+class ScaffoldPatrolTest(BaseUseCase[ScaffoldPatrolTestParams, ScaffoldedPatrolTest]):
+    """Emit a compile-verified Patrol-4 web+mobile e2e smoke test into a
+    project's `patrol_test/` dir (the Patrol-4 default), keyed on widget
+    Keys so it's locale-independent. Does not mutate pubspec/build files —
+    surfaces the wiring steps as guidance instead."""
+
+    async def execute(
+        self, params: ScaffoldPatrolTestParams
+    ) -> Result[ScaffoldedPatrolTest]:
+        project = Path(params.project_path).expanduser()
+        pubspec = project / "pubspec.yaml"
+        if not pubspec.exists():
+            return err(
+                FilesystemFailure(
+                    message="not a Flutter project (no pubspec.yaml)",
+                    next_action="check_path",
+                )
+            )
+
+        snake = params.test_name.strip()
+        if not re.fullmatch(r"[a-z][a-z0-9_]*", snake):
+            return err(
+                InvalidArgumentFailure(
+                    message="test_name must be snake_case",
+                    next_action="fix_arguments",
+                    details={
+                        "corrected_example": {
+                            "project_path": str(project),
+                            "test_name": "app_smoke",
+                        }
+                    },
+                )
+            )
+        # A Dart class identifier (UpperCamelCase-ish, but accept what the
+        # app actually uses — validate it's a legal identifier).
+        root = params.root_widget.strip()
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", root):
+            return err(
+                InvalidArgumentFailure(
+                    message="root_widget must be a valid Dart class name",
+                    next_action="fix_arguments",
+                    details={"corrected_example": {"root_widget": "MyApp"}},
+                )
+            )
+
+        text = pubspec.read_text(encoding="utf-8", errors="replace")
+        name_m = _PUBSPEC_NAME_RE.search(text)
+        if name_m is None:
+            return err(
+                FilesystemFailure(
+                    message="couldn't read `name:` from pubspec.yaml",
+                    next_action="check_path",
+                )
+            )
+        package_name = name_m.group(1)
+        patrol_present = re.search(r"^\s*patrol:\s", text, re.MULTILINE) is not None
+
+        body = (
+            _PATROL_SMOKE_TEMPLATE.replace("__PKG__", package_name)
+            .replace("__ROOT__", root)
+            .replace("__SNAKE__", snake)
+        )
+
+        target = project / "patrol_test" / f"{snake}_test.dart"
+        created: list[str] = []
+        skipped: list[str] = []
+        if target.exists() and not params.overwrite:
+            skipped.append(str(target.relative_to(project)))
+        else:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(body, encoding="utf-8")
+            created.append(str(target.relative_to(project)))
+
+        rel = target.relative_to(project)
+        run_mobile = (
+            f"run_patrol_test project_path={project} test_path={rel} "
+            "platform=mobile serial=<udid>"
+        )
+        run_web = (
+            f"run_patrol_test project_path={project} test_path={rel} "
+            "platform=web ci=true "
+            f"junit_path={project / 'build' / 'patrol-web.xml'}"
+        )
+
+        next_steps: list[str] = []
+        if not patrol_present:
+            next_steps.append(
+                "Add Patrol to pubspec.yaml (patrol + patrol_cli are "
+                "lockstep — patrol ^4.7.0 pairs with patrol_cli 4.5.x):\n"
+                + _PATROL_PUBSPEC_HINT
+            )
+        next_steps.append(
+            "Wire the native harnesses once: Android PatrolJUnitRunner "
+            "(app/build.gradle + MainActivityTest), iOS RunnerUITests "
+            "target. Full steps: docs/patrol4-factory-enablement.md."
+        )
+        next_steps.append(
+            "Add real widget `Key`s to the screen under test and replace "
+            f"the #{snake}_* placeholders. Never assert on localized text."
+        )
+        next_steps.append(
+            "git-ignore the regenerated bundle: "
+            "integration_test/test_bundle.dart"
+        )
+        next_steps.append(
+            "Verify it compiles before running: "
+            f"`flutter analyze {rel}`."
+        )
+
+        return ok(
+            ScaffoldedPatrolTest(
+                test_file=target,
+                created=tuple(created),
+                skipped=tuple(skipped),
+                package_name=package_name,
+                patrol_in_pubspec=patrol_present,
+                run_mobile=run_mobile,
+                run_web=run_web,
+                next_steps=tuple(next_steps),
+            )
+        )
+
+
 # ---------------- F2: run_quick_check ------------------------------------
 
 

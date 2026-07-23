@@ -3660,6 +3660,39 @@
   {
     "annotations": {
       "destructiveHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Emit a Patrol-4 web+mobile e2e SMOKE test into patrol_test/ (compile-verified against patrol 4.7.x). Widget-Key based so it's locale-independent; the same file runs on device and Chromium. Returns the run commands + wiring steps. Idempotent unless overwrite=true.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "overwrite": {
+          "description": "",
+          "type": "boolean"
+        },
+        "project_path": {
+          "description": "Flutter project root.",
+          "type": "string"
+        },
+        "root_widget": {
+          "description": "The app's root widget class in main.dart. Default MyApp.",
+          "type": "string"
+        },
+        "test_name": {
+          "description": "snake_case test id; file is <test_name>_test.dart. Default app_smoke.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_path"
+      ],
+      "type": "object"
+    },
+    "name": "scaffold_patrol_test"
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
       "openWorldHint": true,
       "readOnlyHint": false
     },

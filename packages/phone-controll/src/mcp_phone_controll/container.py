@@ -191,6 +191,7 @@ from .domain.usecases.productivity import (
     ListMissingWidgetKeys,
     RunQuickCheck,
     ScaffoldFeature,
+    ScaffoldPatrolTest,
     SummarizeSession,
 )
 from .domain.usecases.projects import InspectProject
@@ -655,6 +656,7 @@ def build_runtime(
         ),
         narrate=Narrate(),
         scaffold_feature=ScaffoldFeature(),
+        scaffold_patrol_test=ScaffoldPatrolTest(),
         run_quick_check=RunQuickCheck(quality_repo),
         grep_logs=GrepLogs(),
         summarize_session=SummarizeSession(trace_repo),

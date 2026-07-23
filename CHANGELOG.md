@@ -5,6 +5,37 @@ All notable changes to `flutter-dev-agents` / `mcp-phone-controll`.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.0] — 2026-07-23
+
+### Added — `scaffold_patrol_test` (day-1 e2e for every factory app)
+
+The run+grade engine (v0.17–0.19) was idle until each app hand-authored
+its first Patrol test. This tool emits a **Patrol-4 web+mobile e2e smoke
+test** into `patrol_test/<name>_test.dart` — widget-`Key` based (so a
+Polish, or any, locale can't break it), tagged `smoke`, and the **same
+file runs on a device and in Chromium**.
+
+The catch with generating framework code is emitting an API that doesn't
+compile. So the template is **compile-verified, not doc-derived**: it was
+validated with a real `flutter analyze` against **patrol 4.7.1** (the
+package that pairs with patrol_cli 4.5.x) in a throwaway project, and the
+tool's *actual output* analyzes **clean** (zero issues). Verified surface:
+`patrolTest(desc, ($) async {…}, tags: 'smoke')`,
+`$.pumpWidgetAndSettle(const Root())`, the widget finder layer (`$(#key)`,
+`.tap()`, `.waitUntilVisible()`, `findsOneWidget`), and the **modern
+`$.platform` automator** — `$.native` is deprecated in 4.x, and the
+scaffold never emits it.
+
+It does **not** mutate pubspec/gradle/Podfile — it returns the wiring
+steps, the pubspec block to add (with a patrol-in-pubspec check), and the
+exact `run_patrol_test` commands for mobile and web (the web one wired to
+`junit_path` for CI). Idempotent unless `overwrite=true`. **149 tools.**
+
+### Tests
+- `test_scaffold_patrol_test.py` (+8): target path, package-name
+  substitution, patrol-presence detection, run commands, idempotency,
+  validation. **1213 passed, 6 skipped.** ruff clean. Contract refreshed.
+
 ## [0.19.0] — 2026-07-23
 
 Two field-reported gaps, closed — and the factory's Patrol-4 playbook.

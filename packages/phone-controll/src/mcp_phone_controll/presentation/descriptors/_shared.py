@@ -181,7 +181,7 @@ def default_annotations(tool_name: str) -> dict[str, bool]:
         "start_recording", "stop_recording",
         "force_release_lock", "release_device", "select_device",
         "set_agent_profile", "prune_originals", "compress_png",
-        "patch_apply_safe", "scaffold_feature", "dart_fix",
+        "patch_apply_safe", "scaffold_feature", "scaffold_patrol_test", "dart_fix",
         "dart_format", "flutter_pub_get", "save_golden_image",
         "notify_webhook", "prepare_for_test",
         "start_debug_session", "stop_debug_session",

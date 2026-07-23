@@ -166,6 +166,7 @@ from ...domain.usecases.productivity import (
     ListMissingWidgetKeysParams,
     RunQuickCheckParams,
     ScaffoldFeatureParams,
+    ScaffoldPatrolTestParams,
     SummarizeSessionParams,
 )
 from ...domain.usecases.projects import InspectProjectParams
@@ -551,6 +552,15 @@ def _params_scaffold_feature(args: JsonDict) -> ScaffoldFeatureParams:
     return ScaffoldFeatureParams(
         project_path=Path(args["project_path"]).expanduser(),
         feature_name=args["feature_name"],
+        overwrite=bool(args.get("overwrite", False)),
+    )
+
+
+def _params_scaffold_patrol_test(args: JsonDict) -> ScaffoldPatrolTestParams:
+    return ScaffoldPatrolTestParams(
+        project_path=Path(args["project_path"]).expanduser(),
+        test_name=args.get("test_name", "app_smoke"),
+        root_widget=args.get("root_widget", "MyApp"),
         overwrite=bool(args.get("overwrite", False)),
     )
 

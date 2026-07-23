@@ -66,6 +66,14 @@ both, but new apps should use `patrol_test/`. Key assertions on **widget
 toolchain was built around (a Polish-locale phone breaks text matchers).
 `list_missing_widget_keys` flags gaps.
 
+**Generate the first test with `scaffold_patrol_test`** — emits a
+`patrol_test/<name>_test.dart` smoke test that's **compile-verified against
+patrol 4.7.x** (`flutter analyze`-clean out of the box), widget-Key based,
+tagged `smoke`, and runs unchanged on **mobile and web**. It doesn't touch
+your pubspec/build files — it returns the wiring steps + the exact
+`run_patrol_test` commands. Then swap the placeholder keys for your
+screen's real ones.
+
 **Android native harness**
 
 - `android/app/build.gradle(.kts)` → `defaultConfig`:
