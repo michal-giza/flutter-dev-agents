@@ -187,7 +187,7 @@ def default_annotations(tool_name: str) -> dict[str, bool]:
         "start_debug_session", "stop_debug_session",
         "restart_debug_session", "attach_debug_session",
         "call_service_extension", "toggle_inspector", "vm_evaluate",
-        "start_wda_on_simulator", "setup_webdriveragent",
+        "start_wda_on_simulator", "start_wda_on_device", "setup_webdriveragent",
         "open_project_in_ide", "close_ide_window", "focus_ide_window",
         "write_vscode_launch_config",
         # v0.3.0 phase 8.5 — `pm disable-user` / `pm enable` mutates device state
@@ -228,7 +228,7 @@ def default_annotations(tool_name: str) -> dict[str, bool]:
         "call_service_extension", "toggle_inspector", "vm_evaluate",
         "vm_list_isolates", "read_debug_log", "tail_debug_log",
         "dump_widget_tree", "dump_render_tree",
-        "start_wda_on_simulator", "setup_webdriveragent",
+        "start_wda_on_simulator", "start_wda_on_device", "setup_webdriveragent",
         "open_project_in_ide", "close_ide_window", "focus_ide_window",
         "is_ide_available",
         "run_test_plan", "run_patrol_test", "run_patrol_suite",

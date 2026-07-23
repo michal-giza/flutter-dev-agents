@@ -2,14 +2,14 @@
 
 **Audit-grade Flutter testing for AI agents — drive real iPhones, Androids & the web, then grade what ships.**
 
-[![tests](https://img.shields.io/badge/tests-1180_passing-A6E22E?style=flat-square)](packages/phone-controll/tests)
+[![tests](https://img.shields.io/badge/tests-1205_passing-A6E22E?style=flat-square)](packages/phone-controll/tests)
 [![license](https://img.shields.io/badge/license-Apache_2.0-F76C28?style=flat-square)](LICENSE)
 [![MCP spec](https://img.shields.io/badge/MCP-2025--06--18-F76C28?style=flat-square)](https://modelcontextprotocol.io)
 [![python](https://img.shields.io/badge/python-3.11+-3B4252?style=flat-square)](pyproject.toml)
 [![PyPI](https://img.shields.io/pypi/v/mcp-phone-controll?style=flat-square&color=3B4252)](https://pypi.org/project/mcp-phone-controll/)
 [![CI](https://img.shields.io/github/actions/workflow/status/michal-giza/flutter-dev-agents/ci.yml?branch=main&style=flat-square)](https://github.com/michal-giza/flutter-dev-agents/actions)
 
-`mcp-phone-controll` is an MCP server that gives agents safe, structured access to **real Android + iOS devices and Flutter web** — and, uniquely, an **opinionated audit suite** that *grades* the code, tests, and runtime an agent produces. **147 tools.** Works with Claude Desktop / Code, Cursor, or any MCP host — **including local/SLM models** via the OpenAI-compat HTTP adapter.
+`mcp-phone-controll` is an MCP server that gives agents safe, structured access to **real Android + iOS devices and Flutter web** — and, uniquely, an **opinionated audit suite** that *grades* the code, tests, and runtime an agent produces. **148 tools.** Works with Claude Desktop / Code, Cursor, or any MCP host — **including local/SLM models** via the OpenAI-compat HTTP adapter.
 
 ### What makes it different
 
@@ -85,7 +85,7 @@ The **navigation-latency** arc. For device agents, the slow default is *screensh
 Mobile QA still loses 30–50% of its engineering hours to flaky selector maintenance ([Drizz industry survey, 2026](https://drizz.dev)). Agents can close that loop — but until now there was no production-grade MCP that gave them safe, structured access to real phones. This is that MCP:
 
 - **Cross-session device locking** so 4 concurrent Claude windows don't collide on the same Galaxy S25.
-- **Tiered tool surface** (BASIC / INTERMEDIATE / EXPERT, **147 tools** total) so 4B-class local LLMs aren't overwhelmed and Claude Desktop's tool-count ceiling doesn't drop your server.
+- **Tiered tool surface** (BASIC / INTERMEDIATE / EXPERT, **148 tools** total) so 4B-class local LLMs aren't overwhelmed and Claude Desktop's tool-count ceiling doesn't drop your server.
 - **Defense-in-depth image cap** that survived three production "2000 px API limit" incidents — including the case where an overnight bot bypassed `take_screenshot` and used raw `adb screencap`.
 - **Patrol-first Flutter integration** with `system=true` for OS dialogs, `tap_and_verify` for the verify-after-action discipline, and YAML test plans the agent can author and re-run.
 - **Production-ready out of the gate**: CycloneDX SBOM, pip-audit gating, structured JSON logs, Prometheus `/metrics`, k8s `/health` + `/ready`, Docker image, GitHub Action wrapper, 7 ADRs documenting load-bearing decisions.
@@ -94,7 +94,7 @@ Mobile QA still loses 30–50% of its engineering hours to flaky selector mainte
 
 | Path | What |
 |---|---|
-| [`packages/phone-controll/`](packages/phone-controll/) | The flagship MCP. **147 tools** spanning device control, build/install/launch, Patrol-driven Flutter UI tests, **Flutter web** (web debug sessions + `run_lighthouse` + `audit_web_app`), AR/Vision, declarative YAML test plans, cross-session device locking, the **audit suite** (seniority/security/**performance**/i18n/dependencies/a11y/test-quality/web + 9-domain composite), the **senior-tester loop** (`design_test_plan` + `audit_test_quality`), and **runtime graders** (`ingest_frame_timeline` / `ingest_har` / `ingest_maestro_report`). |
+| [`packages/phone-controll/`](packages/phone-controll/) | The flagship MCP. **148 tools** spanning device control, build/install/launch, Patrol-driven Flutter UI tests, **Flutter web** (web debug sessions + `run_lighthouse` + `audit_web_app`), AR/Vision, declarative YAML test plans, cross-session device locking, the **audit suite** (seniority/security/**performance**/i18n/dependencies/a11y/test-quality/web + 9-domain composite), the **senior-tester loop** (`design_test_plan` + `audit_test_quality`), and **runtime graders** (`ingest_frame_timeline` / `ingest_har` / `ingest_maestro_report`). |
 | `packages/<future>/` | Future MCPs slot in here using the same shape (see [`docs/adding_an_mcp.md`](docs/adding_an_mcp.md)). |
 | [`examples/templates/`](examples/templates/) | Shared YAML test-plan templates (smoke, ump-decline, ar-anchor, flutter-test-smoke). |
 | [`examples/agent_loop.py`](examples/agent_loop.py) | Reference autonomous Plan→Build→Test→Verify loop using any OpenAI-compat local LLM. |
@@ -147,7 +147,7 @@ Run `check_environment` from any Claude Code session — it returns a structured
 
 ## Status
 
-- **`packages/phone-controll/` v0.18.0** — **147 tools** live on PyPI, **1180 hermetic unit tests** + real-device tests (gated on `MCP_REAL_DEVICE=1`). Field-tested across real Flutter projects (`docs/v030-field-test.md`); the v0.13–v0.15 tools (selector-tap, `dump_ui` spill, deep-tree dump, `batch`, diagnostics-on-failure, `wait_until`, `zoom_screenshot`) live-verified on the iPhone 17 Pro simulator.
+- **`packages/phone-controll/` v0.19.0** — **148 tools** live on PyPI, **1205 hermetic unit tests** + real-device tests (gated on `MCP_REAL_DEVICE=1`). Field-tested across real Flutter projects (`docs/v030-field-test.md`); the v0.13–v0.15 tools (selector-tap, `dump_ui` spill, deep-tree dump, `batch`, diagnostics-on-failure, `wait_until`, `zoom_screenshot`) live-verified on the iPhone 17 Pro simulator.
 - **First-real-device patch release shipped May 2026** — fixed iOS 17+ `--rsd` routing, WDA team_id signing, Polish NBSP `tap_text`, raw-`adb screencap` recovery loop. See [`CHANGELOG.md`](CHANGELOG.md).
 - Multi-window VS Code orchestration + debug sessions + WDA setup + cross-session device locks all in place.
 

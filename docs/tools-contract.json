@@ -3361,6 +3361,10 @@
           "description": "Ignored when platform=web.",
           "type": "string"
         },
+        "junit_path": {
+          "description": "Write a JUnit XML report here (web + mobile) for CI/PR status. One <testcase> per test; a failing run always emits red XML even when per-test output can't be parsed.",
+          "type": "string"
+        },
         "platform": {
           "description": "",
           "enum": [
@@ -3422,6 +3426,10 @@
         },
         "flavor": {
           "description": "Ignored when platform=web.",
+          "type": "string"
+        },
+        "junit_path": {
+          "description": "Write a JUnit XML report here (web + mobile) for CI/PR status. One <testcase> per test; a failing run always emits red XML even when per-test output can't be parsed.",
           "type": "string"
         },
         "platform": {
@@ -3978,6 +3986,48 @@
       "type": "object"
     },
     "name": "start_recording"
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Launch WebDriverAgent on a PHYSICAL iPhone (detached) and wait until it answers over usbmux. Call when tap/swipe returned next_action='start_wda_on_device'. Requires setup_webdriveragent to have built+signed it once. Fixes physical-iOS input, which only works once WDA runs on-device.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "port": {
+          "description": "WDA on-device HTTP port. Default 8100.",
+          "type": "integer"
+        },
+        "ready_timeout_s": {
+          "description": "How long to wait for WDA. Default 90 (device + CoreDevice tunnel bring-up is slower than a sim).",
+          "type": "number"
+        },
+        "scheme": {
+          "description": "Default WebDriverAgentRunner.",
+          "type": "string"
+        },
+        "team_id": {
+          "description": "Apple Developer Team ID for the signed launch. Falls back to the MCP_WDA_TEAM_ID env var.",
+          "type": "string"
+        },
+        "udid": {
+          "description": "Physical device UDID (from list_devices / `pymobiledevice3 usbmux list`).",
+          "type": "string"
+        },
+        "wda_dir": {
+          "description": "WebDriverAgent checkout dir. Defaults to ~/.mcp_phone_controll/WebDriverAgent.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "udid"
+      ],
+      "type": "object"
+    },
+    "name": "start_wda_on_device"
   },
   {
     "annotations": {

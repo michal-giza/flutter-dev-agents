@@ -245,7 +245,7 @@ class FakePatrolRepository:
 
     async def run_test(
         self, project_path, test_path, device_serial, flavor=None, build_mode=None,
-        web=False, ci=False, tags=None, exclude_tags=None,
+        web=False, ci=False, tags=None, exclude_tags=None, junit_path=None,
     ):
         self.calls.append(
             ("run_test", str(project_path), str(test_path), device_serial, web, ci)
@@ -254,7 +254,7 @@ class FakePatrolRepository:
 
     async def run_suite(
         self, project_path, test_dir, device_serial, flavor=None, build_mode=None,
-        web=False, ci=False, tags=None, exclude_tags=None,
+        web=False, ci=False, tags=None, exclude_tags=None, junit_path=None,
     ):
         self.calls.append(
             ("run_suite", str(project_path), str(test_dir), device_serial, web, ci)

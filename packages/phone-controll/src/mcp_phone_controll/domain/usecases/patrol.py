@@ -43,6 +43,7 @@ class RunPatrolTestParams:
     ci: bool = False           # headless-CI mode: unattended + deterministic
     tags: str | None = None
     exclude_tags: str | None = None
+    junit_path: Path | None = None  # write a JUnit XML report here (CI/PR)
 
 
 class RunPatrolTest(BaseUseCase[RunPatrolTestParams, TestRun]):
@@ -68,6 +69,7 @@ class RunPatrolTest(BaseUseCase[RunPatrolTestParams, TestRun]):
             ci=params.ci,
             tags=params.tags,
             exclude_tags=params.exclude_tags,
+            junit_path=params.junit_path,
         )
 
 
@@ -82,6 +84,7 @@ class RunPatrolSuiteParams:
     ci: bool = False           # headless-CI mode: unattended + deterministic
     tags: str | None = None
     exclude_tags: str | None = None
+    junit_path: Path | None = None  # write a JUnit XML report here (CI/PR)
 
 
 class RunPatrolSuite(BaseUseCase[RunPatrolSuiteParams, TestRun]):
@@ -107,4 +110,5 @@ class RunPatrolSuite(BaseUseCase[RunPatrolSuiteParams, TestRun]):
             ci=params.ci,
             tags=params.tags,
             exclude_tags=params.exclude_tags,
+            junit_path=params.junit_path,
         )

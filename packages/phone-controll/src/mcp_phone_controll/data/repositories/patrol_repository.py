@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import tempfile
 from pathlib import Path
 
@@ -9,6 +10,7 @@ from ...domain.entities import BuildMode, PatrolTestFile, TestRun, TestStatus
 from ...domain.failures import InvalidArgumentFailure, TestExecutionFailure
 from ...domain.repositories import PatrolRepository, TestRepository
 from ...domain.result import Result, err, ok
+from ...infrastructure.junit_writer import write_junit_testrun
 from ...infrastructure.patrol_cli import MIN_WEB_CLI_VERSION, PatrolCli
 from ..parsers.patrol_output_parser import parse_patrol_output
 from ..parsers.playwright_report_parser import find_report, parse_playwright_report
@@ -101,6 +103,7 @@ class PatrolTestRepository(PatrolRepository, TestRepository):
         ci: bool = False,
         tags: str | None = None,
         exclude_tags: str | None = None,
+        junit_path: Path | None = None,
     ) -> Result[TestRun]:
         return await self._run(
             project_path,
@@ -112,6 +115,7 @@ class PatrolTestRepository(PatrolRepository, TestRepository):
             ci=ci,
             tags=tags,
             exclude_tags=exclude_tags,
+            junit_path=junit_path,
         )
 
     async def run_suite(
@@ -125,6 +129,7 @@ class PatrolTestRepository(PatrolRepository, TestRepository):
         ci: bool = False,
         tags: str | None = None,
         exclude_tags: str | None = None,
+        junit_path: Path | None = None,
     ) -> Result[TestRun]:
         return await self._run(
             project_path,
@@ -136,6 +141,7 @@ class PatrolTestRepository(PatrolRepository, TestRepository):
             ci=ci,
             tags=tags,
             exclude_tags=exclude_tags,
+            junit_path=junit_path,
         )
 
     # ----- TestRepository surface (drop-in replacement for FlutterTestRepository) ----
@@ -213,6 +219,7 @@ class PatrolTestRepository(PatrolRepository, TestRepository):
         ci: bool = False,
         tags: str | None = None,
         exclude_tags: str | None = None,
+        junit_path: Path | None = None,
     ) -> Result[TestRun]:
         if web:
             gate = await self._web_gate()
@@ -262,6 +269,23 @@ class PatrolTestRepository(PatrolRepository, TestRepository):
                 run = parse_playwright_report(report_path)
         if run is None:
             run = parse_patrol_output(result.stdout, result.stderr)
+
+        # JUnit for CI/PR status (opt-in). Write in BOTH the pass and fail
+        # branches — a failing run needs its RED JUnit surfaced on the PR.
+        # `result.ok` (the process exit code) is authoritative and drives
+        # the empty-parse synthetic case, so an unparsed mobile failure is
+        # never emitted as a green (empty) suite. Best-effort: a JUnit write
+        # failure must never change the run's verdict.
+        junit_written: Path | None = None
+        if junit_path is not None:
+            with contextlib.suppress(Exception):
+                junit_written = write_junit_testrun(
+                    run,
+                    junit_path,
+                    suite_name=target.name if target is not None else project_path.name,
+                    overall_ok=result.ok,
+                )
+
         if not result.ok:
             return err(
                 TestExecutionFailure(
@@ -281,6 +305,11 @@ class PatrolTestRepository(PatrolRepository, TestRepository):
                         **(
                             {"playwright_report": str(report_path)}
                             if report_path is not None
+                            else {}
+                        ),
+                        **(
+                            {"junit_report": str(junit_written)}
+                            if junit_written is not None
                             else {}
                         ),
                     },

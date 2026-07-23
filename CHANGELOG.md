@@ -5,6 +5,73 @@ All notable changes to `flutter-dev-agents` / `mcp-phone-controll`.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.0] — 2026-07-23
+
+Two field-reported gaps, closed — and the factory's Patrol-4 playbook.
+
+### Added — `start_wda_on_device` (physical-iOS input, finally)
+
+The field hit a wall on an iOS **26.5** iPhone: every `tap`/`swipe`/
+`press_key` failed. Diagnosis: `setup_webdriveragent` *builds* WDA for a
+device and `start_wda_on_simulator` *runs* it — but only for simulators.
+**Nothing launched the runner on a real device,** so iOS input (which
+routes through WebDriverAgent over usbmux) had no server to reach and died.
+
+`start_wda_on_device` is the missing launcher: it spawns `xcodebuild
+test-without-building` against the device destination (`platform=iOS,id=…`,
+signed via `team_id` / `MCP_WDA_TEAM_ID` + `-allowProvisioningUpdates`),
+detached, and polls WDA `/status` **over usbmux** — not a localhost port,
+because a device's WDA isn't on host localhost (the one real difference
+from the simulator tool). Once it answers, `tap`/`swipe`/`press_key` route
+through WDA automatically. Structured `next_action`s on failure:
+`provide_team_id` (signing, xcodebuild exit 65), `setup_webdriveragent`
+(runner not built), `check_xcode_signing` (device locked / Dev Mode off /
+DDI mismatch), `start_wda_on_simulator` (wrong-tool guard for a sim udid).
+
+Paired factory fix: the WDA factory's **physical branch now probes
+`/status` first**, so a `tap` issued before the runner is up returns
+`next_action="start_wda_on_device"` instead of a raw usbmux error — the
+physical analogue of the simulator's port guard.
+
+> Note for the record: there is **no** pymobiledevice3-HID input path in
+> this codebase (grep-confirmed). The field report's "HID `Number:3`"
+> failure was the symptom of WDA simply not running, not a code path we
+> call — and launching the runner is the whole fix.
+
+### Added — JUnit for CI/PR status on Patrol runs (`junit_path`)
+
+`run_patrol_test` / `run_patrol_suite` gained a `junit_path` that writes
+**JUnit XML** (one `<testcase>` per test) for **web and mobile** — the
+standards slice of the CI story, consumable by GitHub Actions / GitLab /
+Bitbucket Pipelines / Jenkins with **no vendor client**. Previously JUnit
+was emitted only by the YAML plan executor (`PlanRun`), never for a Patrol
+`TestRun`.
+
+Load-bearing safety net: a Patrol **mobile** run is scraped best-effort, so
+a real failure can surface as **zero** parsed cases *or* as **only the
+passing** cases (the failing test's marker missed). Either way an empty or
+all-green `<testsuite>` would read as a **pass** in CI — the opposite of the
+truth. So whenever the run failed (non-zero exit) but no emitted case
+carries a failing status, we append a synthetic failing testcase driven by
+the **authoritative process exit code**, and JUnit is written in **both**
+the pass and fail branches. A failing run always emits red XML.
+
+### Added — `docs/patrol4-factory-enablement.md`
+
+The per-app playbook for making any factory app Patrol-4-drivable on
+mobile + web (pubspec/SDK floors, `patrol_test/` layout, Android
+`PatrolJUnitRunner` + iOS `RunnerUITests` harnesses, CI/JUnit, and the
+physical-iPhone runbook incl. the iOS-26-device vs iOS-17-DDI trap). It
+flags the Dart selector API as *verify-against-your-resolved-patrol* and
+**corrects** the earlier v0.18.0 note: the 3.x→4.x migration target is
+`$.platform` + `MobileSelector`/`WebSelector`, **not** a
+`$.platform.action.maybe(...)` combinator (which doesn't exist).
+
+### Tests
+- `test_start_wda_on_device.py`, `test_junit_testrun.py`,
+  `test_patrol_junit.py`, + factory guard test. **1205 passed, 6 skipped.**
+  ruff clean. Contract refreshed. **148 tools.**
+
 ## [0.18.0] — 2026-07-18
 
 **Patrol 4, professionally** — mobile *and* web, CI-ready. Built against

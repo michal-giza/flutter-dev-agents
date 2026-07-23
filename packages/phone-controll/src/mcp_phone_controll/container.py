@@ -239,7 +239,11 @@ from .domain.usecases.vision_advanced import (
     SaveGoldenImage,
     WaitForArSessionReady,
 )
-from .domain.usecases.wda_setup import SetupWebDriverAgent, StartWdaOnSimulator
+from .domain.usecases.wda_setup import (
+    SetupWebDriverAgent,
+    StartWdaOnDevice,
+    StartWdaOnSimulator,
+)
 from .domain.usecases.widget_testing import (
     ListWidgetTests,
     RunWidgetTest,
@@ -638,6 +642,7 @@ def build_runtime(
         # WDA setup
         setup_webdriveragent=SetupWebDriverAgent(wda_setup_cli),
         start_wda_on_simulator=StartWdaOnSimulator(wda_setup_cli),
+        start_wda_on_device=StartWdaOnDevice(wda_setup_cli),
         # Code quality
         dart_analyze=DartAnalyze(quality_repo),
         dart_format=DartFormat(quality_repo),

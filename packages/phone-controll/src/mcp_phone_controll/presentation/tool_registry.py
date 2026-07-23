@@ -227,6 +227,7 @@ from ..domain.usecases.vision_advanced import (
 )
 from ..domain.usecases.wda_setup import (
     SetupWebDriverAgent,
+    StartWdaOnDevice,
     StartWdaOnSimulator,
 )
 from ..domain.usecases.widget_testing import (
@@ -346,6 +347,7 @@ from .descriptors._param_builders import (
     _params_start_emulator,
     _params_start_frame_profile,
     _params_start_recording,
+    _params_start_wda_on_device,
     _params_start_wda_on_simulator,
     _params_stop,
     _params_stop_debug_session,
@@ -479,6 +481,7 @@ class UseCases:
     # WDA setup
     setup_webdriveragent: SetupWebDriverAgent
     start_wda_on_simulator: StartWdaOnSimulator
+    start_wda_on_device: StartWdaOnDevice
     # Code quality
     dart_analyze: DartAnalyze
     dart_format: DartFormat
@@ -1515,6 +1518,11 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
                     ),
                     "tags": _string("Patrol --tags filter, e.g. '(smoke || auth) && !slow'."),
                     "exclude_tags": _string("Patrol --exclude-tags filter."),
+                    "junit_path": _string(
+                        "Write a JUnit XML report here (web + mobile) for CI/PR "
+                        "status. One <testcase> per test; a failing run always "
+                        "emits red XML even when per-test output can't be parsed."
+                    ),
                     **serial_prop,
                 },
                 ["project_path", "test_path"],
@@ -1546,6 +1554,11 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
                     ),
                     "tags": _string("Patrol --tags filter, e.g. '(smoke || auth) && !slow'."),
                     "exclude_tags": _string("Patrol --exclude-tags filter."),
+                    "junit_path": _string(
+                        "Write a JUnit XML report here (web + mobile) for CI/PR "
+                        "status. One <testcase> per test; a failing run always "
+                        "emits red XML even when per-test output can't be parsed."
+                    ),
                     **serial_prop,
                 },
                 ["project_path"],
@@ -1997,6 +2010,41 @@ def build_registry(uc: UseCases) -> list[ToolDescriptor]:
             ),
             build_params=_params_start_wda_on_simulator,
             invoke=_bind(uc.start_wda_on_simulator, _params_start_wda_on_simulator),
+        ),
+        ToolDescriptor(
+            name="start_wda_on_device",
+            description=(
+                "Launch WebDriverAgent on a PHYSICAL iPhone (detached) and "
+                "wait until it answers over usbmux. Call when tap/swipe "
+                "returned next_action='start_wda_on_device'. Requires "
+                "setup_webdriveragent to have built+signed it once. Fixes "
+                "physical-iOS input, which only works once WDA runs on-device."
+            ),
+            input_schema=_schema(
+                {
+                    "udid": _string(
+                        "Physical device UDID (from list_devices / "
+                        "`pymobiledevice3 usbmux list`)."
+                    ),
+                    "port": _int("WDA on-device HTTP port. Default 8100."),
+                    "wda_dir": _string(
+                        "WebDriverAgent checkout dir. "
+                        "Defaults to ~/.mcp_phone_controll/WebDriverAgent."
+                    ),
+                    "scheme": _string("Default WebDriverAgentRunner."),
+                    "team_id": _string(
+                        "Apple Developer Team ID for the signed launch. "
+                        "Falls back to the MCP_WDA_TEAM_ID env var."
+                    ),
+                    "ready_timeout_s": _number(
+                        "How long to wait for WDA. Default 90 (device + "
+                        "CoreDevice tunnel bring-up is slower than a sim)."
+                    ),
+                },
+                ["udid"],
+            ),
+            build_params=_params_start_wda_on_device,
+            invoke=_bind(uc.start_wda_on_device, _params_start_wda_on_device),
         ),
         # ---- code quality ---------------------------------------------
         ToolDescriptor(

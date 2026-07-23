@@ -41,18 +41,29 @@ class _FakeSession:
 class _FakeClient:
     """Records the kind of client constructed + any positional arg."""
 
-    def __init__(self, kind: str, arg) -> None:
+    def __init__(self, kind: str, arg, status_raises: bool = False) -> None:
         self.kind = kind
         self.arg = arg
+        self._status_raises = status_raises
+
+    def status(self):
+        # The physical (USBClient) branch probes /status before session()
+        # so a device with no running WDA runner fails fast with
+        # next_action=start_wda_on_device. Raise to simulate that.
+        if self._status_raises:
+            raise ConnectionError("usbmux: connection refused")
+        return {"ready": True}
 
     def session(self) -> _FakeSession:
         return _FakeSession()
 
 
-def _fake_wda_module(record: list[tuple[str, object]]):
+def _fake_wda_module(
+    record: list[tuple[str, object]], usb_status_raises: bool = False
+):
     def usb_client(udid):
         record.append(("USBClient", udid))
-        return _FakeClient("USBClient", udid)
+        return _FakeClient("USBClient", udid, status_raises=usb_status_raises)
 
     def tcp_client(url):
         record.append(("Client", url))
@@ -87,6 +98,30 @@ async def test_physical_device_uses_usbclient():
     session = await factory.get("PHY-IPHONE-15-UDID")
     assert isinstance(session, _FakeSession)
     assert record == [("USBClient", "PHY-IPHONE-15-UDID")]
+
+
+@pytest.mark.asyncio
+async def test_physical_device_unreachable_routes_to_start_wda_on_device():
+    """A physical device whose WDA runner isn't running must raise
+    WdaUnreachable(next_action='start_wda_on_device') — the physical
+    analogue of the simulator's port-probe guard. Without this, a tap
+    before the runner is up dies with a raw usbmux error and the agent
+    has no recovery path. This closes the iOS-26.5 field-report loop."""
+    record: list[tuple[str, object]] = []
+
+    async def is_sim(_udid):
+        return False
+
+    factory = CachingWdaFactory(
+        is_simulator=is_sim,
+        wda_module=_fake_wda_module(record, usb_status_raises=True),
+    )
+    with pytest.raises(WdaUnreachable) as ei:
+        await factory.get("PHY-IPHONE-UDID")
+    assert ei.value.next_action == "start_wda_on_device"
+    assert "start_wda_on_device" in ei.value.fix_command
+    # It still constructed the USBClient (right transport) before probing.
+    assert record == [("USBClient", "PHY-IPHONE-UDID")]
 
 
 @pytest.mark.asyncio

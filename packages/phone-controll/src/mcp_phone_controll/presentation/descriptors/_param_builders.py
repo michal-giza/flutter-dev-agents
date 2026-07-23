@@ -230,6 +230,7 @@ from ...domain.usecases.vision_advanced import (
 )
 from ...domain.usecases.wda_setup import (
     SetupWebDriverAgentParams,
+    StartWdaOnDeviceParams,
     StartWdaOnSimulatorParams,
 )
 from ...domain.usecases.widget_testing import (
@@ -713,6 +714,9 @@ def _params_run_patrol_test(args: JsonDict) -> RunPatrolTestParams:
         ci=bool(args.get("ci", False)),
         tags=args.get("tags"),
         exclude_tags=args.get("exclude_tags"),
+        junit_path=(
+            Path(args["junit_path"]).expanduser() if args.get("junit_path") else None
+        ),
     )
 
 
@@ -727,6 +731,9 @@ def _params_run_patrol_suite(args: JsonDict) -> RunPatrolSuiteParams:
         ci=bool(args.get("ci", False)),
         tags=args.get("tags"),
         exclude_tags=args.get("exclude_tags"),
+        junit_path=(
+            Path(args["junit_path"]).expanduser() if args.get("junit_path") else None
+        ),
     )
 
 
@@ -1519,4 +1526,18 @@ def _params_start_wda_on_simulator(
         wda_dir=Path(args["wda_dir"]).expanduser() if args.get("wda_dir") else None,
         scheme=args.get("scheme", "WebDriverAgentRunner"),
         ready_timeout_s=float(args.get("ready_timeout_s", 60.0)),
+    )
+
+
+def _params_start_wda_on_device(
+    args: JsonDict,
+) -> StartWdaOnDeviceParams:
+    team_id = args.get("team_id")
+    return StartWdaOnDeviceParams(
+        udid=args["udid"],
+        port=int(args.get("port", 8100)),
+        wda_dir=Path(args["wda_dir"]).expanduser() if args.get("wda_dir") else None,
+        scheme=args.get("scheme", "WebDriverAgentRunner"),
+        team_id=str(team_id).strip() if team_id else None,
+        ready_timeout_s=float(args.get("ready_timeout_s", 90.0)),
     )

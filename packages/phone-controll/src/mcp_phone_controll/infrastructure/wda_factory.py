@@ -181,7 +181,7 @@ class CachingWdaFactory:
             if is_sim:
                 client = await self._connect_simulator(wda, udid)
             else:
-                client = await asyncio.to_thread(wda.USBClient, udid)
+                client = await self._connect_device(wda, udid)
 
             session = await asyncio.to_thread(client.session)
             await self._apply_session_settings(session)
@@ -243,3 +243,36 @@ class CachingWdaFactory:
         # TCP-based client. facebook-wda's `Client(url)` is the right
         # constructor for sims; `USBClient` is usbmux-only.
         return await asyncio.to_thread(wda.Client, f"http://127.0.0.1:{port}")
+
+    async def _connect_device(self, wda, udid: str) -> Any:
+        """Physical device: usbmux transport via facebook-wda's USBClient.
+
+        Probe `/status` FIRST so a device whose WDA runner isn't running
+        fails NOW with `next_action="start_wda_on_device"` — the physical
+        analogue of the simulator's port probe — instead of later with a
+        raw usbmux/connection error deep inside `session()`. This is what
+        closes the loop for the iOS-26.5 field report: a tap issued before
+        the runner is up now routes the agent to the launcher tool.
+        """
+        client = await asyncio.to_thread(wda.USBClient, udid)
+        try:
+            await asyncio.to_thread(client.status)
+        except Exception as e:
+            raise WdaUnreachable(
+                message=(
+                    f"WebDriverAgent isn't answering on device {udid} over "
+                    "usbmux — the WDA runner isn't running on the device. "
+                    "Launch it (see fix_command), then retry."
+                ),
+                next_action="start_wda_on_device",
+                fix_command=(
+                    "# one-time build+sign (if not done yet):\n"
+                    f"#   setup_webdriveragent udid={udid} team_id=<APPLE_TEAM_ID>\n"
+                    "# then launch the runner on the device:\n"
+                    f"start_wda_on_device udid={udid}\n"
+                    "# keep the device UNLOCKED with Developer Mode ON; do NOT "
+                    "run `pymobiledevice3 remote tunneld` concurrently (it "
+                    "fights Xcode's CoreDevice tunnel during launch)."
+                ),
+            ) from e
+        return client
