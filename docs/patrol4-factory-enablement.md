@@ -1,31 +1,40 @@
 # Patrol 4 factory enablement — what each app needs
 
 How to make any Flutter app in the factory end-to-end testable with the
-**newest Patrol** (patrol 4.7.x ↔ patrol_cli 4.5.x), on **mobile and web**,
-and drivable by phone-controll. Plus the one-time **physical iPhone**
+**newest Patrol** (patrol **4.8.0** / patrol_cli **4.6.1**), on **mobile and
+web**, and drivable by phone-controll. Plus the one-time **physical iPhone**
 runbook for iOS UI driving.
 
 > **Confidence note.** The pubspec, native-harness, CLI, CI, and device
 > sections below are verified against the toolchain on this machine
-> (patrol_cli **4.5.1**, Xcode **26.6**) — every generated CLI flag was
-> executed, not guessed. The **Dart native-automation API** section
-> (selectors) is derived from Patrol's docs, not a compile check on your
-> app — treat it as "verify against the `patrol` version your pubspec
-> actually resolves" and confirm with one throwaway test before templating
-> it across the factory. See *What changed 3.x → 4.x*.
+> (patrol_cli **4.6.1**, patrol **4.8.0**, Xcode **26.6**) — every generated
+> CLI flag was executed, not guessed. The Patrol **Dart API** used by
+> `scaffold_patrol_test` is compile-verified with a real `flutter analyze`
+> against a resolved patrol 4.7.1+; if you hand-write beyond that surface,
+> confirm with one throwaway test before templating it across the factory.
 
 ---
 
-## 0. The lockstep rule (read this first)
+## 0. Version compatibility (read this first)
 
-`patrol` and `patrol_cli` are **version-locked** — each `patrol` release
-names the exact `patrol_cli` it needs, and the CLI refuses a mismatch.
+Compatibility is a **floor, not a strict pairing** — an earlier version of
+this doc overstated it as lockstep, which is wrong and has been corrected.
 
-- Installed CLI here: **patrol_cli 4.5.1** → pairs with **patrol 4.7.x**.
-- Upgrading the global CLI to 4.x is a **breaking change for any app still
-  on patrol 3.x.** Bump the app and migrate its native-automation calls in
-  the same PR (below), or that app's Patrol runs fail the version gate.
+- **Any patrol_cli ≥ 4.5.0 works with any patrol ≥ 4.7.0.** A CLI-only bump
+  is legal; you do not have to move both in lockstep.
+- **patrol ≥ 4.8.0** is what unlocks the newer `--web-*` options — the
+  runner-side wiring landed in 4.8.0, so the CLI flag alone isn't enough.
+- Installed here: **patrol_cli 4.6.1**, newest patrol **4.8.0**.
+- Moving to the 4.x line **is** a breaking change for an app still on
+  patrol 3.x. Bump the app and migrate its native-automation calls in the
+  same PR, or that app's Patrol runs fail the version gate.
 - Roll back if an app can't migrate yet: `dart pub global activate patrol_cli 3.11.0`.
+
+**`--web-headless` changed shape in patrol_cli 4.6.0** — from a value option
+(`--web-headless=<true|false>`) to a negatable boolean (`--[no-]web-headless`).
+The value form still parses on 4.6.x but warns and is slated for removal.
+phone-controll emits whichever form your **installed** CLI accepts, so both
+4.5.x and 4.6.x users are safe; you don't need to do anything.
 
 phone-controll's web path **fails closed** below patrol_cli 4.0.0 with
 `next_action="upgrade_patrol_cli"` — it won't emit web flags an old CLI
@@ -43,7 +52,7 @@ environment:
   flutter: ">=3.32.0"        # and Flutter >= 3.32
 
 dev_dependencies:
-  patrol: ^4.7.0             # matches patrol_cli 4.5.x
+  patrol: ^4.7.0             # floor; caret resolves to 4.8.0 on a fresh pub get
   integration_test:
     sdk: flutter
   flutter_test:

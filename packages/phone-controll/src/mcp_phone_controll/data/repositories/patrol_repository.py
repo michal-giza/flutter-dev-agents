@@ -191,13 +191,16 @@ class PatrolTestRepository(PatrolRepository, TestRepository):
                 message=(
                     f"Patrol web tests require patrol_cli >= {want}; found "
                     f"{found} at {self._cli.binary}. Run "
-                    "`dart pub global activate patrol_cli` to upgrade, and bump "
-                    "`patrol` in the app's pubspec.yaml (patrol and patrol_cli "
-                    "are lockstep version-checked — e.g. patrol_cli 4.5.x "
-                    "requires patrol 4.7.0). Web also needs Flutter >= 3.32.0 "
-                    "and Node.js installed; Patrol installs Playwright itself "
-                    "on first run. Note: patrol_cli 4.0 moved the default test "
-                    "directory from integration_test/ to patrol_test/."
+                    "`dart pub global activate patrol_cli` to upgrade, and make "
+                    "sure the app's pubspec.yaml has `patrol` >= 4.7.0. "
+                    "Compatibility is a FLOOR, not a strict pairing: any "
+                    "patrol_cli >= 4.5.0 works with any patrol >= 4.7.0 — but "
+                    "patrol >= 4.8.0 is needed to consume the newer --web-* "
+                    "options, since the runner-side wiring landed in 4.8.0. "
+                    "Web also needs Flutter >= 3.32.0 and Node.js installed; "
+                    "Patrol installs Playwright itself on first run. Note: "
+                    "patrol_cli 4.0 moved the default test directory from "
+                    "integration_test/ to patrol_test/."
                 ),
                 details={
                     "found_version": found,

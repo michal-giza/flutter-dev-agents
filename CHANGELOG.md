@@ -5,6 +5,78 @@ All notable changes to `flutter-dev-agents` / `mcp-phone-controll`.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.21.0] — 2026-08-04
+
+Toolchain currency + supply-chain security. Two live bugs found by
+upgrading, both of which only bite someone *else* — a new installer, or a
+user on a newer CLI.
+
+### Fixed — P0: a fresh `pip install` produced a server that couldn't boot
+
+`mcp>=1.2.0` was **unbounded**, and the SDK shipped **2.0.0**, which removes
+the low-level decorator API (`@server.list_tools()` / `@server.call_tool()`)
+that `presentation/mcp_server.py` is built on, replacing it with constructor
+callbacks. Verified against a clean install of `mcp==2.0.0`: `Server`
+exposes neither attribute, so the server `AttributeError`s at boot. Our own
+CI never saw it — the venv had 1.x held by the lockfile. Now capped
+`mcp>=1.29,<2.0.0`, with `test_dependency_contract.py` guarding both the cap
+and the installed SDK's API shape so it can't regress. (Migrating to the 2.x
+callback API is deliberately deferred: it's a rewrite, not an upgrade.)
+
+### Fixed — `--web-headless` deprecation on patrol_cli 4.6.x
+
+patrol_cli **4.6.0** changed `--web-headless` from a value option
+(`--web-headless=<true|false>`) to a negatable boolean
+(`--[no-]web-headless`). Observed live on 4.6.1:
+`[WARN] Passing a value to --web-headless is deprecated.` We now emit
+whichever form the **installed** CLI accepts, gated on the cached version
+parser — flipping unconditionally would have broken everyone still on
+4.5.x. Re-validated by executing both the web and native argv against the
+real 4.6.1: every flag parsed, and the deprecation warning is gone.
+
+### Fixed — we were teaching agents a rule that is no longer true
+
+Two agent-facing error strings (and the factory doc) asserted that `patrol`
+and `patrol_cli` are **lockstep** version-checked. They aren't: compatibility
+is a **floor** — any patrol_cli ≥ 4.5.0 works with any patrol ≥ 4.7.0, and
+patrol ≥ 4.8.0 is what unlocks the newer `--web-*` options. A wrong rule in
+an agent-facing string propagates into whatever the agent does next, so this
+is a correctness fix, not a docs nit.
+
+### Security — every known advisory in the dependency tree cleared
+
+`pip-audit` went from **18 vulnerabilities across 6 packages** to
+**"No known vulnerabilities found"**. Floors raised with the reason recorded
+inline: `pillow>=12.3.0` (8 advisories, several heap OOB writes reachable
+from image data — and we push screenshots through PIL), `mcp>=1.29`
+(unverified principal on HTTP session requests, cross-client task
+read/cancel, no WS Host/Origin validation), `starlette>=1.3.1` and
+`python-multipart>=0.0.31` (now declared explicitly in the `http` extra —
+both arrive transitively and neither `mcp` nor `fastapi` bounds them
+safely), `pytest>=9.0.3`. The stale `uv.lock` (last resolved 16 June) was
+regenerated, clearing all **31 open Dependabot alerts** (18 high) —
+pillow 13, pyjwt 5, python-multipart 4, starlette 4, mcp 3, cryptography 1,
+pydantic-settings 1.
+
+### Changed — capability upgrades that came free
+- `uiautomator2>=3.7.0` — adds the opt-in `root_in_active` flag to
+  `dump_hierarchy()` (active window only, not the whole multi-window tree):
+  a direct size/latency win for `dump_ui` + `extract_ui_graph`. 3.5.1 also
+  strips BOM/LRM/RLM invisibles, which our NFC text matcher relies on.
+- `anyio>=4.14.2` — fixes four subprocess bugs that hit us directly (we
+  shell out to adb/xcrun/flutter/patrol constantly): `Process.wait()`
+  hanging on an inherited stdout, `aclose()` deadlocking on a full pipe,
+  `to_process.run_sync()` deadlocking on stderr overflow, CapacityLimiter
+  over-granting.
+- Local CLI **patrol_cli 4.5.1 → 4.6.1**; newest patrol is **4.8.0**.
+  `scaffold_patrol_test`'s emitted Dart was re-verified with a real
+  `flutter analyze` against a resolved **patrol 4.8.0** — still zero issues,
+  so the compile-verified promise holds across the bump.
+
+### Tests
+- `test_patrol_headless_gate.py` (+7), `test_dependency_contract.py` (+6).
+  **1226 passed, 6 skipped.** ruff clean. pip-audit clean.
+
 ## [0.20.0] — 2026-07-23
 
 ### Added — `scaffold_patrol_test` (day-1 e2e for every factory app)

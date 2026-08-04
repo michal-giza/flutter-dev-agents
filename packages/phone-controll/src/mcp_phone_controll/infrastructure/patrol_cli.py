@@ -20,6 +20,18 @@ _VERSION_RE = re.compile(r"patrol_cli\s+v(\d+)\.(\d+)\.(\d+)")
 # 4.0.0, released together 2025-12-08) and is driven by Playwright.
 MIN_WEB_CLI_VERSION = (4, 0, 0)
 
+# patrol_cli 4.6.0 changed `--web-headless` from a VALUE option
+# (`--web-headless=<true|false>`) to a negatable BOOLEAN flag
+# (`--[no-]web-headless`). The value form still parses on 4.6.x but the CLI
+# now warns:
+#   [WARN] Passing a value to --web-headless is deprecated.
+#          Use --web-headless or --no-web-headless instead.
+# (observed live against patrol_cli 4.6.1), and it is slated for removal.
+# We emit whichever form the INSTALLED CLI wants — flipping unconditionally
+# would break everyone still on 4.5.x, which is the version our own
+# scaffolder guidance has been steering people toward.
+HEADLESS_FLAG_MIN_VERSION = (4, 6, 0)
+
 # The `-d` value Patrol documents for web. Chromium only — the docs list
 # no Firefox/WebKit target and there is no documented flag to pick one.
 WEB_DEVICE = "chrome"
@@ -81,6 +93,21 @@ class PatrolCli:
         self._version_cache = parsed
         return parsed
 
+    async def _headless_argv(self, headless: bool) -> list[str]:
+        """The `--web-headless` form the INSTALLED patrol_cli accepts.
+
+        >= 4.6.0 → the negatable boolean flag (`--web-headless` /
+        `--no-web-headless`); below that → the legacy value form
+        (`--web-headless true|false`). An UNPARSABLE version falls back to
+        the legacy form: it still parses on 4.6.x (with a deprecation
+        warning) whereas the bare flag is a hard parse error on 4.5.x, so
+        the legacy form is the safe default when we can't tell.
+        """
+        version = await self.version()
+        if version is not None and version >= HEADLESS_FLAG_MIN_VERSION:
+            return ["--web-headless" if headless else "--no-web-headless"]
+        return ["--web-headless", "true" if headless else "false"]
+
     async def test(
         self,
         project_path: Path,
@@ -116,17 +143,16 @@ class PatrolCli:
           - `--flavor` is SUPPRESSED — patrol_cli rejects it for web;
           - build mode is forced to debug (release/profile on the web path
             are unverified upstream, so we don't emit them);
-          - `--web-headless` takes a literal `true`/`false`, not a bare flag,
-            and we default to headless because MCP runs are unattended.
-        We intentionally do NOT emit `--web-reporter` yet: its accepted
-        encoding (a JSON array) through subprocess argv is unverified.
+          - `--web-headless` changed shape in patrol_cli 4.6.0 (see
+            `_headless_argv`), so we emit whichever form the INSTALLED CLI
+            wants; we default to headless because MCP runs are unattended.
         """
         argv: list[str] = [self._bin, "test"]
         if target is not None:
             argv += ["--target", str(target)]
         if web:
             argv += ["--device", WEB_DEVICE]
-            argv += ["--web-headless", "true" if web_headless else "false"]
+            argv += await self._headless_argv(web_headless)
             if web_port is not None:
                 argv += ["--web-port", str(web_port)]
             # Machine-readable results. `--web-reporter` takes a JSON ARRAY

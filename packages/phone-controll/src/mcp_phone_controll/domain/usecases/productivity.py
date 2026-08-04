@@ -350,8 +350,10 @@ class ScaffoldPatrolTest(BaseUseCase[ScaffoldPatrolTestParams, ScaffoldedPatrolT
         next_steps: list[str] = []
         if not patrol_present:
             next_steps.append(
-                "Add Patrol to pubspec.yaml (patrol + patrol_cli are "
-                "lockstep — patrol ^4.7.0 pairs with patrol_cli 4.5.x):\n"
+                "Add Patrol to pubspec.yaml (compatibility is a FLOOR, not a "
+                "strict pairing: patrol_cli >= 4.5.0 works with any patrol "
+                ">= 4.7.0; patrol >= 4.8.0 unlocks the newer --web-* "
+                "options):\n"
                 + _PATROL_PUBSPEC_HINT
             )
         next_steps.append(
