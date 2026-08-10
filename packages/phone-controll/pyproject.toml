@@ -49,7 +49,7 @@ dependencies = [
     # PYSEC-2026-3483 (WebSocket transport lacked Host/Origin validation →
     # DNS rebinding; fixed 1.28.1). The old >=1.2.0 floor also admitted
     # versions with DNS-rebinding protection off by default (<1.23.0).
-    "mcp>=1.29,<2.0.0",
+    "mcp>=1.29,<3.0.0",
     # 3.7.0 adds the opt-in `root_in_active` flag to dump_hierarchy(), which
     # returns only the ACTIVE window's root instead of the whole multi-window
     # tree — a direct size/latency win for dump_ui + extract_ui_graph. 3.5.1
